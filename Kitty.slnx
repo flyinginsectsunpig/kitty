@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/aspire/">
+    <Project Path="aspire/Kitty.AppHost/Kitty.AppHost.csproj" />
+    <Project Path="aspire/Kitty.ServiceDefaults/Kitty.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/services/" />
+  <Folder Name="/services/ledger/" />
+  <Folder Name="/services/ledger/src/">
+    <Project Path="services/ledger/src/Kitty.Ledger/Kitty.Ledger.csproj" />
+  </Folder>
+  <Folder Name="/services/ledger/tests/">
+    <Project Path="services/ledger/tests/Kitty.Ledger.IntegrationTests/Kitty.Ledger.IntegrationTests.csproj" />
+    <Project Path="services/ledger/tests/Kitty.Ledger.UnitTests/Kitty.Ledger.UnitTests.csproj" />
+  </Folder>
+</Solution>

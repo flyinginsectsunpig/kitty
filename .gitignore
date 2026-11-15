@@ -1,0 +1,15 @@
+bin/
+obj/
+node_modules/
+.next/
+coverage/
+TestResults/
+*.user
+.vs/
+.idea/
+.env
+*.env.local
+.env.local
+.superpowers/
+*.tsbuildinfo
+dist/

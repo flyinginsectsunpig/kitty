@@ -1,0 +1,15 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.5">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>kitty-apphost-6f1c2b7e</UserSecretsId>
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <PackageReference Include="Aspire.Hosting.Keycloak" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\services\ledger\src\Kitty.Ledger\Kitty.Ledger.csproj" />
+  </ItemGroup>
+</Project>

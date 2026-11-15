@@ -1,0 +1,21 @@
+{
+  "name": "@kitty/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "generate": "openapi-typescript ../../services/ledger/openapi/ledger.json -o src/schema.d.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.17.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3",
+    "vitest": "5.1.0",
+    "@types/node": "26.6.6"
+  }
+}

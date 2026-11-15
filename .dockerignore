@@ -1,0 +1,15 @@
+**/bin
+**/obj
+**/node_modules
+**/.next
+**/TestResults
+.git
+.github
+.superpowers
+.vs
+.idea
+**/*.env
+**/.env*
+!apps/web/.env.example
+docs
+deploy

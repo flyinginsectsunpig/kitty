@@ -1,0 +1,1454 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Kitty.Ledger | v1",
+    "version": "1.0.0"
+  },
+  "servers": null,
+  "paths": {
+    "/me": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "operationId": "GetMe",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Me"
+        ],
+        "operationId": "UpdateMe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups": {
+      "post": {
+        "tags": [
+          "Groups"
+        ],
+        "operationId": "CreateGroup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Groups"
+        ],
+        "operationId": "ListGroups",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GroupSummaryDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}": {
+      "get": {
+        "tags": [
+          "Groups"
+        ],
+        "operationId": "GetGroup",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Groups"
+        ],
+        "operationId": "UpdateGroup",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/members": {
+      "post": {
+        "tags": [
+          "Members"
+        ],
+        "operationId": "AddPlaceholderMember",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMemberDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/members/{memberId}": {
+      "patch": {
+        "tags": [
+          "Members"
+        ],
+        "operationId": "UpdateMember",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemberDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/balances": {
+      "get": {
+        "tags": [
+          "Balances"
+        ],
+        "operationId": "GetBalances",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalancesDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/activity": {
+      "get": {
+        "tags": [
+          "Activity"
+        ],
+        "operationId": "ListActivity",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/invites": {
+      "post": {
+        "tags": [
+          "Invites"
+        ],
+        "operationId": "CreateInvite",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInviteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/expenses": {
+      "post": {
+        "tags": [
+          "Expenses"
+        ],
+        "operationId": "CreateExpense",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseWriteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Expenses"
+        ],
+        "operationId": "ListExpenses",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePageDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/expenses/{expenseId}": {
+      "get": {
+        "tags": [
+          "Expenses"
+        ],
+        "operationId": "GetExpense",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "expenseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Expenses"
+        ],
+        "operationId": "UpdateExpense",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "expenseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseWriteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Expenses"
+        ],
+        "operationId": "DeleteExpense",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "expenseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/settlements": {
+      "post": {
+        "tags": [
+          "Settlements"
+        ],
+        "operationId": "CreateSettlement",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettlementWriteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/settlements/{settlementId}": {
+      "delete": {
+        "tags": [
+          "Settlements"
+        ],
+        "operationId": "DeleteSettlement",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "settlementId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/invites/{token}": {
+      "get": {
+        "tags": [
+          "Invites"
+        ],
+        "operationId": "PreviewInvite",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitePreviewDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invites/{token}/accept": {
+      "post": {
+        "tags": [
+          "Invites"
+        ],
+        "operationId": "AcceptInvite",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActivityDto": {
+        "required": [
+          "id",
+          "at",
+          "actorDisplayName",
+          "entityType",
+          "entityId",
+          "action",
+          "before",
+          "after"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorDisplayName": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string"
+          },
+          "before": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            ]
+          },
+          "after": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            ]
+          }
+        }
+      },
+      "AddMemberDto": {
+        "required": [
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          }
+        }
+      },
+      "BalancesDto": {
+        "required": [
+          "currencies"
+        ],
+        "type": "object",
+        "properties": {
+          "currencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurrencyBalanceDto"
+            }
+          }
+        }
+      },
+      "CreateGroupDto": {
+        "required": [
+          "id",
+          "name",
+          "baseCurrency"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "baseCurrency": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateInviteDto": {
+        "required": [
+          "memberId"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "CurrencyBalanceDto": {
+        "required": [
+          "currency",
+          "members",
+          "transfers"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberNetDto"
+            }
+          },
+          "transfers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferDto"
+            }
+          }
+        }
+      },
+      "ExpenseDto": {
+        "required": [
+          "id",
+          "description",
+          "category",
+          "currency",
+          "amountMinor",
+          "occurredOn",
+          "payers",
+          "split",
+          "shares",
+          "version",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "payers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayerDto"
+            }
+          },
+          "split": {
+            "$ref": "#/components/schemas/SplitDto"
+          },
+          "shares": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShareDto"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpensePageDto": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDto"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ExpenseWriteDto": {
+        "required": [
+          "id",
+          "description",
+          "category",
+          "currency",
+          "amountMinor",
+          "occurredOn",
+          "payers",
+          "split",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "payers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayerDto"
+            }
+          },
+          "split": {
+            "$ref": "#/components/schemas/SplitDto"
+          },
+          "version": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "GroupDto": {
+        "required": [
+          "id",
+          "name",
+          "baseCurrency",
+          "members"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "baseCurrency": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberDto"
+            }
+          }
+        }
+      },
+      "GroupSummaryDto": {
+        "required": [
+          "id",
+          "name",
+          "baseCurrency",
+          "memberCount",
+          "myNet"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "baseCurrency": {
+            "type": "string"
+          },
+          "memberCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "myNet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NetDto"
+            }
+          }
+        }
+      },
+      "InviteDto": {
+        "required": [
+          "token",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InvitePreviewDto": {
+        "required": [
+          "groupName",
+          "placeholderName",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "groupName": {
+            "type": "string"
+          },
+          "placeholderName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "JsonElement": {},
+      "MeDto": {
+        "required": [
+          "id",
+          "displayName",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "MemberDto": {
+        "required": [
+          "id",
+          "displayName",
+          "userId",
+          "isPlaceholder",
+          "paymentDetails"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "isPlaceholder": {
+            "type": "boolean"
+          },
+          "paymentDetails": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "MemberNetDto": {
+        "required": [
+          "memberId",
+          "netMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "netMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NetDto": {
+        "required": [
+          "currency",
+          "netMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "netMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ParticipantDto": {
+        "required": [
+          "memberId",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "value": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "PayerDto": {
+        "required": [
+          "memberId",
+          "amountMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SettlementDto": {
+        "required": [
+          "id",
+          "fromMemberId",
+          "toMemberId",
+          "currency",
+          "amountMinor",
+          "createdBy",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fromMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SettlementWriteDto": {
+        "required": [
+          "id",
+          "fromMemberId",
+          "toMemberId",
+          "currency",
+          "amountMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fromMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ShareDto": {
+        "required": [
+          "memberId",
+          "amountMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SplitDto": {
+        "required": [
+          "method",
+          "participants"
+        ],
+        "type": "object",
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/SplitMethod"
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParticipantDto"
+            }
+          }
+        }
+      },
+      "SplitMethod": {
+        "enum": [
+          "equal",
+          "exact",
+          "percent",
+          "shares"
+        ]
+      },
+      "TransferDto": {
+        "required": [
+          "fromMemberId",
+          "toMemberId",
+          "amountMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "fromMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "UpdateGroupDto": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateMeDto": {
+        "required": [
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateMemberDto": {
+        "required": [
+          "displayName",
+          "paymentDetails"
+        ],
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "paymentDetails": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Me"
+    },
+    {
+      "name": "Groups"
+    },
+    {
+      "name": "Members"
+    },
+    {
+      "name": "Balances"
+    },
+    {
+      "name": "Activity"
+    },
+    {
+      "name": "Invites"
+    },
+    {
+      "name": "Expenses"
+    },
+    {
+      "name": "Settlements"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "kitty",
+  "private": true,
+  "packageManager": "pnpm@12.16.1",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  }
+}

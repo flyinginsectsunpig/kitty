@@ -1,0 +1,34 @@
+{$KITTY_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Keycloak: allowlist only what browsers need for the kitty realm. The admin console/API and the
+	# master realm stay private (SSH tunnel to 127.0.0.1:8180). Matching uses Caddy's cleaned path, and
+	# any ';' (servlet path parameters such as "..;") is refused, because Keycloak may resolve those
+	# differently from Caddy.
+	@keycloakPublic {
+		path /auth/realms/kitty /auth/realms/kitty/* /auth/resources/*
+		not path_regexp [;]
+	}
+	handle @keycloakPublic {
+		reverse_proxy keycloak:8080
+	}
+	handle /auth* {
+		respond 404
+	}
+
+	# Public ledger API (used by the mobile app from phase 2): /api/health → ledger /health.
+	handle_path /api/* {
+		reverse_proxy ledger:8080
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}
