@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Testcontainers.PostgreSql;
 
@@ -31,6 +32,8 @@ public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLif
                 // Validate against the test key instead of fetching Keycloak's metadata.
                 o.Configuration = new OpenIdConnectConfiguration { Issuer = TestTokens.Issuer };
                 o.Configuration.SigningKeys.Add(TestTokens.SigningKey);
+                // Without this the handler keeps trying (and timing out) to fetch the fake issuer's metadata.
+                o.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(o.Configuration);
                 o.TokenValidationParameters.ValidIssuer = TestTokens.Issuer;
                 o.TokenValidationParameters.IssuerSigningKey = TestTokens.SigningKey;
             }));
