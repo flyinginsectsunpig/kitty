@@ -1,6 +1,8 @@
 using Kitty.Ledger.Data;
 using Kitty.Ledger.Features.Me;
 using Kitty.Ledger.Infrastructure.Auth;
+using Kitty.Ledger.Infrastructure.Idempotency;
+using Kitty.Ledger.Infrastructure.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +15,8 @@ builder.Services.AddDbContext<LedgerDbContext>((sp, options) =>
     options.UseNpgsql(sp.GetRequiredService<IConfiguration>().GetConnectionString("ledger")
         ?? throw new InvalidOperationException("Connection string 'ledger' is not configured.")));
 builder.Services.AddLedgerAuth(builder.Configuration, builder.Environment);
+builder.Services.AddWriteRateLimiting(builder.Configuration);
+builder.Services.AddHostedService<IdempotencyCleanup>();
 
 var app = builder.Build();
 
@@ -26,6 +30,8 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
+app.UseMiddleware<IdempotencyMiddleware>();
 
 app.MapDefaultEndpoints();
 app.MapMe();
