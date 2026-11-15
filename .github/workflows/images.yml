@@ -9,7 +9,14 @@ permissions:
   packages: write
 
 jobs:
+  ledger-tests:
+    uses: ./.github/workflows/ledger.yml
+  web-tests:
+    uses: ./.github/workflows/web.yml
+
   build:
+    # Only images whose tests passed are published (the runbook deploys :latest).
+    needs: [ledger-tests, web-tests]
     runs-on: ubuntu-latest
     strategy:
       matrix:

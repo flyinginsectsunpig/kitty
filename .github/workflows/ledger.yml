@@ -1,6 +1,7 @@
 name: ledger
 
 on:
+  workflow_call: # images.yml runs these before publishing
   push:
     branches: [main]
     paths: ["services/ledger/**", "aspire/**", "contracts/**", "Directory.*.props", "global.json", ".github/workflows/ledger.yml"]
