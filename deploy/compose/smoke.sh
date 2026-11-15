@@ -20,6 +20,10 @@ check "web home page" 200 "$(status "$BASE/")"
 check "ledger health" 200 "$(status "$BASE/api/health")"
 check "ledger rejects anonymous calls" 401 "$(status "$BASE/api/me")"
 check "keycloak admin is not public" 404 "$(status "$BASE/auth/admin/")"
+check "keycloak master realm is not public" 404 "$(status "$BASE/auth/realms/master/account")"
+check "path-parameter bypass is blocked" 404 "$(status "$BASE/auth/realms/kitty/..;/master/account")"
+check "encoded traversal is blocked" 404 "$(status "$BASE/auth/realms/kitty/%2e%2e/master/account")"
+check "kitty sign-in page loads" 200 "$(status "$BASE/auth/realms/kitty/account")"
 
 issuer="$("${CURL[@]}" "$BASE/auth/realms/kitty/.well-known/openid-configuration" \
   | sed -n 's/.*"issuer":"\([^"]*\)".*/\1/p')"
