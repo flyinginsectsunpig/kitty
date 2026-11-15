@@ -10,7 +10,9 @@ export function safeNext(next: string | undefined, fallback = "/groups"): string
   try {
     const url = new URL(next, BASE);
     if (url.origin !== BASE) return fallback;
-    return url.pathname + url.search + url.hash;
+    // Normalization can produce "//host" from "/.//host"; re-check what we would actually redirect to.
+    const out = url.pathname + url.search + url.hash;
+    return out.startsWith("/") && !out.startsWith("//") && !out.startsWith("/\\") ? out : fallback;
   } catch {
     return fallback;
   }

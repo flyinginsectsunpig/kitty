@@ -13,6 +13,8 @@ describe("safeNext", () => {
     "/\t/evil.example",
     "/\n/evil.example",
     "/\\/evil.example",
+    "/.//evil.example",
+    "/..//evil.example",
   ])(
     "rejects off-site target %s",
     (next) => expect(safeNext(next)).toBe("/groups"),
