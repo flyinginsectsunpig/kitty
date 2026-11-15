@@ -34,6 +34,20 @@ public class InviteTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Creating_an_invite_is_audited_without_the_token()
+    {
+        var owner = factory.NewUser("Owner");
+        var g = await owner.CreateGroupAsync();
+        var invite = await owner.CreateInviteAsync(g.Id);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Kitty.Ledger.Data.LedgerDbContext>();
+        var entry = Assert.Single(db.AuditEntries.Where(a => a.GroupId == g.Id && a.EntityType == "invite").ToList());
+        Assert.Equal("created", entry.Action);
+        Assert.DoesNotContain(invite.Token, entry.After ?? "");
+    }
+
+    [Fact]
     public async Task Open_invite_adds_a_new_member()
     {
         var owner = factory.NewUser("Owner");

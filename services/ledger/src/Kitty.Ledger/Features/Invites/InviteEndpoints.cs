@@ -32,8 +32,10 @@ public static class InviteEndpoints
         invites.MapPost("/accept", AcceptAsync).WithName("AcceptInvite").Produces<GroupDto>();
     }
 
+    public const string EntityType = "invite";
+
     private static async Task<IResult> CreateAsync(Guid groupId, CreateInviteDto body, HttpContext http, LedgerDbContext db,
-        TimeProvider clock, CancellationToken ct)
+        AuditWriter audit, TimeProvider clock, CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
         if (body.MemberId is { } memberId)
@@ -53,6 +55,9 @@ public static class InviteEndpoints
             ExpiresAt = clock.GetUtcNow() + Lifetime,
         };
         db.Invites.Add(invite);
+        // Who issued access to the group matters; the token itself is a secret and is never logged.
+        audit.Record(caller.User.Id, groupId, EntityType, invite.Id, AuditActions.Created, null,
+            new { invite.MemberId, invite.ExpiresAt });
         await db.SaveChangesAsync(ct);
         return Results.Created($"/invites/{invite.Token}", new InviteDto(invite.Token, invite.ExpiresAt));
     }
