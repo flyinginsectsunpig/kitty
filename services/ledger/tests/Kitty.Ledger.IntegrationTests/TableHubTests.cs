@@ -78,6 +78,48 @@ public class TableHubTests(LedgerApiFactory factory)
         Assert.Equal(s.Id, (await NextAsync(events)).SessionId);
     }
 
+    public sealed record ListenTokenDto(string Token, DateTimeOffset ExpiresAt);
+
+    [Fact]
+    public async Task Listen_token_lets_a_browser_follow_one_session()
+    {
+        var (host, g, s, _, burger) = await TableAsync();
+        var listen = (await host.GetFromJsonAsync<ListenTokenDto>($"/groups/{g.Id}/table-sessions/{s.Id}/listen-token",
+            ApiClientExtensions.Json, Ct))!;
+        var (connection, events) = await ConnectAsync("listen_token=" + Uri.EscapeDataString(listen.Token));
+        await using var _ = connection;
+        await connection.InvokeAsync("JoinSession", s.Id, Ct);
+
+        (await host.ClaimAsync(g.Id, s.Id, burger)).EnsureSuccessStatusCode();
+        Assert.Equal(s.Id, (await NextAsync(events)).SessionId);
+    }
+
+    [Fact]
+    public async Task Guest_gets_a_listen_token_for_their_session_only()
+    {
+        var (_, _, s, _, _) = await TableAsync();
+        var (_, _, other, _, _) = await TableAsync();
+        var join = await (await factory.CreateClient().PostAsJsonAsync($"/table-sessions/{s.Id}/join", new { displayName = "Zoe" }, Ct))
+            .ReadAsync<GuestJoinDto>();
+        var guest = factory.CreateClient();
+        guest.DefaultRequestHeaders.Authorization = new("Guest", join.GuestToken);
+        var listen = (await guest.GetFromJsonAsync<ListenTokenDto>($"/guest/table-sessions/{s.Id}/listen-token", ApiClientExtensions.Json, Ct))!;
+
+        var (connection, _) = await ConnectAsync("listen_token=" + Uri.EscapeDataString(listen.Token));
+        await using var _ = connection;
+        await connection.InvokeAsync("JoinSession", s.Id, Ct);
+        await Assert.ThrowsAsync<HubException>(() => connection.InvokeAsync("JoinSession", other.Id, Ct));
+    }
+
+    [Fact]
+    public async Task Forged_listen_token_cannot_join()
+    {
+        var (_, _, s, _, _) = await TableAsync();
+        var (connection, _) = await ConnectAsync("listen_token=" + Uri.EscapeDataString(s.Id.ToString()));
+        await using var _ = connection;
+        await Assert.ThrowsAsync<HubException>(() => connection.InvokeAsync("JoinSession", s.Id, Ct));
+    }
+
     [Fact]
     public async Task Stranger_cannot_join_session_group()
     {

@@ -18,7 +18,7 @@ public static class GuestEndpoints
 {
     public const int MaxGuestsPerSession = 30;
 
-    public static void MapGuestTable(this IEndpointRouteBuilder app)
+    public static RouteGroupBuilder MapGuestTable(this IEndpointRouteBuilder app)
     {
         app.MapPost("/table-sessions/{sessionId:guid}/join", JoinAsync)
             .AllowAnonymous().RequireRateLimiting(WriteRateLimiting.GuestJoinPolicy)
@@ -31,6 +31,7 @@ public static class GuestEndpoints
             ClaimAsync(sessionId, itemId, true, http, svc, ct)).WithName("ClaimTableItemAsGuest");
         guest.MapDelete("/items/{itemId:guid}/claim", (Guid sessionId, Guid itemId, HttpContext http, TableSessionService svc, CancellationToken ct) =>
             ClaimAsync(sessionId, itemId, false, http, svc, ct)).WithName("UnclaimTableItemAsGuest");
+        return guest;
     }
 
     private static async Task<IResult> JoinAsync(Guid sessionId, JoinTableDto body, LedgerDbContext db, TableSessionService svc,

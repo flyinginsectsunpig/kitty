@@ -11,7 +11,7 @@ public sealed record SessionChanged(Guid SessionId, int Version);
 /// a member of the session's group (bearer token), or that session's guest (guest_token). Events carry only
 /// the session id and version; clients re-fetch through REST, so authorization lives in one place.
 /// </summary>
-public sealed class TableHub(LedgerDbContext db, TimeProvider clock) : Hub
+public sealed class TableHub(LedgerDbContext db, TimeProvider clock, ListenTokens listenTokens) : Hub
 {
     public const string Path = "/hubs/table";
     public const string GuestTokenQuery = "guest_token";
@@ -21,12 +21,13 @@ public sealed class TableHub(LedgerDbContext db, TimeProvider clock) : Hub
     public async Task JoinSession(Guid sessionId)
     {
         var ct = Context.ConnectionAborted;
+        var query = Context.GetHttpContext()?.Request.Query;
         var sub = Context.User?.FindFirst("sub")?.Value;
-        var allowed = sub is not null
+        var allowed = listenTokens.Allows(query?[ListenTokens.Query].ToString(), sessionId) || (sub is not null
             ? await db.ReceiptSessions.AnyAsync(s => s.Id == sessionId && db.Members.Any(m => m.GroupId == s.GroupId
                   && db.Users.Any(u => u.Id == m.UserId && u.KeycloakSub == sub)), ct)
-            : await GuestTokens.ResolveAsync(db, Context.GetHttpContext()?.Request.Query[GuestTokenQuery].ToString(), sessionId,
-                  clock.GetUtcNow(), ct) is not null;
+            : await GuestTokens.ResolveAsync(db, query?[GuestTokenQuery].ToString(), sessionId,
+                  clock.GetUtcNow(), ct) is not null);
 
         if (!allowed) throw new HubException("not_found");
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(sessionId), ct);

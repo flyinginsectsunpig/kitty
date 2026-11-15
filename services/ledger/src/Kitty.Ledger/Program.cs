@@ -51,6 +51,10 @@ builder.Services.AddScoped<AuditWriter>();
 builder.Services.AddScoped<GroupMemberFilter>();
 builder.Services.AddScoped<TableSessionService>();
 builder.Services.AddScoped<GuestFilter>();
+builder.Services.AddSingleton<ListenTokens>();
+// Browsers on another origin (local dev: web on :3000, ledger on :5080) open the hub cross-origin.
+var webOrigins = builder.Configuration["Ledger:WebOrigins"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+builder.Services.AddCors(o => o.AddPolicy("hub", p => p.WithOrigins(webOrigins).AllowAnyHeader().WithMethods("GET", "POST")));
 builder.Services.AddSingleton<ITableNotifier, SignalRTableNotifier>();
 var signalR = builder.Services.AddSignalR();
 if (builder.Configuration.GetConnectionString("redis") is { Length: > 0 } redis)
@@ -67,6 +71,7 @@ if (app.Configuration.GetValue<bool>("Ledger:MigrateOnStartup"))
 if (app.Configuration.GetValue<bool>("Ledger:TrustForwardedHeaders")) app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
@@ -82,8 +87,9 @@ group.MapBalances();
 group.MapSettlements();
 group.MapActivity();
 group.MapTableSessions();
-app.MapGuestTable();
-app.MapHub<TableHub>(TableHub.Path).AllowAnonymous(); // JoinSession does the authorization
+var guestTable = app.MapGuestTable();
+ListenTokens.Map(group, guestTable);
+app.MapHub<TableHub>(TableHub.Path).AllowAnonymous().RequireCors("hub"); // JoinSession does the authorization
 app.MapInvites(group);
 
 app.Run();

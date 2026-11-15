@@ -388,6 +388,46 @@
         }
       }
     },
+    "/groups/{groupId}/table-sessions/{sessionId}/listen-token": {
+      "get": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "GetTableListenToken",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListenTokenDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/groups/{groupId}/invites": {
       "post": {
         "tags": [
@@ -1270,6 +1310,37 @@
         }
       }
     },
+    "/guest/table-sessions/{sessionId}/listen-token": {
+      "get": {
+        "tags": [
+          "Guests"
+        ],
+        "operationId": "GetTableListenTokenAsGuest",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListenTokenDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/invites/{token}": {
       "get": {
         "tags": [
@@ -1843,6 +1914,22 @@
         }
       },
       "JsonElement": {},
+      "ListenTokenDto": {
+        "required": [
+          "token",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "MapGuestDto": {
         "required": [
           "memberId"
@@ -2390,6 +2477,9 @@
       "name": "Activity"
     },
     {
+      "name": "Table"
+    },
+    {
       "name": "Invites"
     },
     {
@@ -2397,9 +2487,6 @@
     },
     {
       "name": "Settlements"
-    },
-    {
-      "name": "Table"
     }
   ]
 }

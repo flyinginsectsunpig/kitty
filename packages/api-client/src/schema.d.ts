@@ -132,6 +132,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/groups/{groupId}/table-sessions/{sessionId}/listen-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetTableListenToken"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/groups/{groupId}/invites": {
         parameters: {
             query?: never;
@@ -404,6 +420,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/guest/table-sessions/{sessionId}/listen-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetTableListenTokenAsGuest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invites/{token}": {
         parameters: {
             query?: never;
@@ -583,6 +615,11 @@ export interface components {
             displayName: string;
         };
         JsonElement: unknown;
+        ListenTokenDto: {
+            token: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
         MapGuestDto: {
             /** Format: uuid */
             memberId: null | string;
@@ -1003,6 +1040,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityDto"][];
+                };
+            };
+        };
+    };
+    GetTableListenToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListenTokenDto"];
                 };
             };
         };
@@ -1526,6 +1586,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    GetTableListenTokenAsGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListenTokenDto"];
+                };
             };
         };
     };
