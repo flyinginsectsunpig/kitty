@@ -62,8 +62,18 @@ public static class GroupEndpoints
             .Select(g => new { g.Id, g.Name, g.BaseCurrency, MemberCount = g.Members.Count })
             .ToListAsync(ct);
 
-        return Results.Ok(groups.Select(g =>
-            new GroupSummaryDto(g.Id, g.Name, g.BaseCurrency.Trim(), g.MemberCount, [])).ToList());
+        var myMembers = await db.Members.Where(m => m.UserId == user.Id).ToDictionaryAsync(m => m.GroupId, m => m.Id, ct);
+        var summaries = new List<GroupSummaryDto>(groups.Count);
+        foreach (var g in groups)
+        {
+            var nets = await Balances.BalanceQueries.NetByCurrencyAsync(db, g.Id, ct);
+            var myNet = nets.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                .Select(kv => new NetDto(kv.Key, kv.Value.GetValueOrDefault(myMembers[g.Id])))
+                .Where(n => n.NetMinor != 0)
+                .ToList();
+            summaries.Add(new GroupSummaryDto(g.Id, g.Name, g.BaseCurrency.Trim(), g.MemberCount, myNet));
+        }
+        return Results.Ok(summaries);
     }
 
     private static async Task<IResult> GetAsync(Guid groupId, LedgerDbContext db, CancellationToken ct)
