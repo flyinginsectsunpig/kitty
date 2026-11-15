@@ -1,5 +1,8 @@
 using Kitty.Ledger.Data;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Kitty.Ledger.Features;
+using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Groups;
 using Kitty.Ledger.Features.Invites;
 using Kitty.Ledger.Features.Me;
@@ -13,6 +16,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.Services.AddProblemDetails();
+builder.Services.ConfigureHttpJsonOptions(o =>
+    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<LedgerDbContext>((sp, options) =>
@@ -43,6 +48,7 @@ app.MapDefaultEndpoints();
 app.MapMe();
 var group = app.MapGroups();
 group.MapMembers();
+group.MapExpenses();
 app.MapInvites(group);
 
 app.Run();
