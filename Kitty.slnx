@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/aspire/">
+    <Project Path="aspire/Kitty.AppHost/Kitty.AppHost.csproj" />
+    <Project Path="aspire/Kitty.ServiceDefaults/Kitty.ServiceDefaults.csproj" />
+  </Folder>
   <Folder Name="/services/" />
   <Folder Name="/services/ledger/" />
   <Folder Name="/services/ledger/src/">
