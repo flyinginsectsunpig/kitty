@@ -23,7 +23,7 @@ public sealed class TableHub(LedgerDbContext db, TimeProvider clock, ListenToken
         var ct = Context.ConnectionAborted;
         var query = Context.GetHttpContext()?.Request.Query;
         var sub = Context.User?.FindFirst("sub")?.Value;
-        var allowed = listenTokens.Allows(query?[ListenTokens.Query].ToString(), sessionId) || (sub is not null
+        var allowed = await listenTokens.AllowsAsync(query?[ListenTokens.Query].ToString(), sessionId, ct) || (sub is not null
             ? await db.ReceiptSessions.AnyAsync(s => s.Id == sessionId && db.Members.Any(m => m.GroupId == s.GroupId
                   && db.Users.Any(u => u.Id == m.UserId && u.KeycloakSub == sub)), ct)
             : await GuestTokens.ResolveAsync(db, query?[GuestTokenQuery].ToString(), sessionId,

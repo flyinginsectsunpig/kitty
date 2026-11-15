@@ -112,6 +112,25 @@ public class TableHubTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Guest_listen_token_stops_working_once_the_bill_is_confirmed()
+    {
+        var (host, g, s, _, burger) = await TableAsync();
+        var join = await (await factory.CreateClient().PostAsJsonAsync($"/table-sessions/{s.Id}/join", new { displayName = "Zoe" }, Ct))
+            .ReadAsync<GuestJoinDto>();
+        var guest = factory.CreateClient();
+        guest.DefaultRequestHeaders.Authorization = new("Guest", join.GuestToken);
+        var listen = (await guest.GetFromJsonAsync<ListenTokenDto>($"/guest/table-sessions/{s.Id}/listen-token", ApiClientExtensions.Json, Ct))!;
+        Assert.True(listen.ExpiresAt <= join.ExpiresAt);
+
+        (await host.ClaimAsync(g.Id, s.Id, burger)).EnsureSuccessStatusCode();
+        (await host.PostJsonAsync($"/groups/{g.Id}/table-sessions/{s.Id}/confirm", new { })).EnsureSuccessStatusCode();
+
+        var (connection, _) = await ConnectAsync("listen_token=" + Uri.EscapeDataString(listen.Token));
+        await using var _ = connection;
+        await Assert.ThrowsAsync<HubException>(() => connection.InvokeAsync("JoinSession", s.Id, Ct));
+    }
+
+    [Fact]
     public async Task Forged_listen_token_cannot_join()
     {
         var (_, _, s, _, _) = await TableAsync();

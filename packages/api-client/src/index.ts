@@ -41,3 +41,27 @@ export function createLedgerClient(
   client.use(auth);
   return client;
 }
+
+export type TableSessionDto = Schemas["TableSessionDto"];
+export type ListenTokenDto = Schemas["ListenTokenDto"];
+
+/** A client for someone at the table without an account: only the /guest/… routes accept this token. */
+export function createGuestLedgerClient(
+  baseUrl: string,
+  guestToken: string,
+  fetchFn?: (request: Request) => Promise<Response>,
+): LedgerClient {
+  const client = createClient<paths>({ baseUrl, ...(fetchFn ? { fetch: fetchFn } : {}) });
+  client.use({
+    onRequest({ request }) {
+      request.headers.set("Authorization", `Guest ${guestToken}`);
+      return request;
+    },
+  });
+  return client;
+}
+
+/** A client with no credentials, for anonymous routes such as joining a table as a guest. */
+export function createAnonymousLedgerClient(baseUrl: string, fetchFn?: (request: Request) => Promise<Response>): LedgerClient {
+  return createClient<paths>({ baseUrl, ...(fetchFn ? { fetch: fetchFn } : {}) });
+}
