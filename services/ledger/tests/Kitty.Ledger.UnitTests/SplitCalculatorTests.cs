@@ -46,6 +46,11 @@ public class SplitCalculatorTests
         AssertError("split_duplicate_member", SplitCalculator.Calculate(1000, SplitMethod.Equal, [new(A, null), new(A, null)]));
 
     [Fact]
+    public void Exact_values_that_would_overflow_are_rejected_not_a_crash() =>
+        AssertError("split_invalid_value",
+            SplitCalculator.Calculate(1000, SplitMethod.Exact, [new(A, long.MaxValue), new(B, long.MaxValue)]));
+
+    [Fact]
     public void Empty_participants_rejected() =>
         AssertError("split_empty", SplitCalculator.Calculate(1000, SplitMethod.Equal, []));
 

@@ -19,6 +19,8 @@
     "expected": [ { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 400 }, { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 600 } ], "error": null },
   { "name": "exact must sum to total", "totalMinor": 1000, "method": "exact",
     "participants": [ { "memberId": "00000001-0000-0000-0000-000000000000", "value": 400 }, { "memberId": "00000002-0000-0000-0000-000000000000", "value": 500 } ], "expected": null, "error": "split_sum_mismatch" },
+  { "name": "exact share larger than the total", "totalMinor": 1000, "method": "exact",
+    "participants": [ { "memberId": "00000001-0000-0000-0000-000000000000", "value": 1001 }, { "memberId": "00000002-0000-0000-0000-000000000000", "value": 1 } ], "expected": null, "error": "split_invalid_value" },
   { "name": "percent must sum to 10000 bp", "totalMinor": 1000, "method": "percent",
     "participants": [ { "memberId": "00000001-0000-0000-0000-000000000000", "value": 5000 }, { "memberId": "00000002-0000-0000-0000-000000000000", "value": 4000 } ], "expected": null, "error": "split_sum_mismatch" },
   { "name": "no participants", "totalMinor": 1000, "method": "equal", "participants": [], "expected": null, "error": "split_empty" },

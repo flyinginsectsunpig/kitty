@@ -59,6 +59,16 @@ public class ExpenseValidatorTests
             Valid() with { AmountMinor = amount, Payers = [new PayerDto(A, amount)] }, Members)));
 
     [Fact]
+    public void Payer_amounts_that_would_overflow_are_invalid_not_a_crash() =>
+        Assert.Equal("validation_failed", Code(ExpenseValidator.Validate(
+            Valid() with { Payers = [new PayerDto(A, long.MaxValue), new PayerDto(B, long.MaxValue)] }, Members)));
+
+    [Fact]
+    public void Undefined_split_method_is_invalid_not_a_crash() =>
+        Assert.Equal("validation_failed", Code(ExpenseValidator.Validate(
+            Valid() with { Split = new SplitDto((SplitMethod)99, [new ParticipantDto(A, null)]) }, Members)));
+
+    [Fact]
     public void Blank_description_is_invalid() =>
         Assert.Equal("validation_failed", Code(ExpenseValidator.Validate(Valid() with { Description = "   " }, Members)));
 

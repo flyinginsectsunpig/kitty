@@ -32,7 +32,7 @@ export function previewSplit(totalMinor: number, method: SplitMethod, participan
     case "equal":
       return distribute(totalMinor, ordered, () => Math.floor(totalMinor / ordered.length));
     case "exact": {
-      if (ordered.some((p) => !isPositiveInt(p.value))) return { error: "split_invalid_value" };
+      if (ordered.some((p) => !isPositiveInt(p.value) || p.value! > totalMinor)) return { error: "split_invalid_value" };
       if (sum(ordered.map((p) => p.value!)) !== totalMinor) return { error: "split_sum_mismatch" };
       return ordered.map((p) => ({ memberId: p.memberId, minor: p.value! }));
     }

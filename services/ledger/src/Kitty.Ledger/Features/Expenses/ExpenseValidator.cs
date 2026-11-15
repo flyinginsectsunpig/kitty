@@ -32,7 +32,9 @@ public static class ExpenseValidator
         var payers = e.Payers ?? [];
         if (payers.Count == 0) return Fail("At least one payer is required.");
         if (payers.Select(p => p.MemberId).Distinct().Count() != payers.Count) return Fail("Each payer may appear only once.");
-        if (payers.Any(p => p.AmountMinor < 1)) return Fail("Each payer must have paid at least 1 minor unit.");
+        // Bounding each amount keeps the sums below from overflowing on hostile input.
+        if (payers.Any(p => p.AmountMinor is < 1 or > SplitCalculator.MaxTotalMinor))
+            return Fail("Each payer must have paid between 1 and 10,000,000,000 minor units.");
 
         var participants = e.Split?.Participants ?? [];
         if (payers.Any(p => !groupMemberIds.Contains(p.MemberId)) || participants.Any(p => !groupMemberIds.Contains(p.MemberId)))
@@ -42,6 +44,7 @@ public static class ExpenseValidator
             return Fail("Payer amounts must add up to the expense amount.", ErrorCodes.PayersSumMismatch);
 
         if (e.Split is null) return Fail("split is required.");
+        if (!Enum.IsDefined(e.Split.Method)) return Fail("split.method is not supported.");
         return SplitCalculator.Calculate(e.AmountMinor, e.Split.Method,
                 participants.Select(p => new SplitInput(p.MemberId, p.Value)).ToList()) switch
         {

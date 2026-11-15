@@ -31,7 +31,8 @@ public static class SplitCalculator
 
     private static SplitResult Exact(long totalMinor, List<SplitInput> ordered)
     {
-        if (ordered.Any(p => p.Value is null or <= 0)) return new SplitResult.Error(SplitErrors.InvalidValue);
+        // No single share can exceed the total; this also keeps the sum below from overflowing.
+        if (ordered.Any(p => p.Value is null or <= 0 || p.Value > totalMinor)) return new SplitResult.Error(SplitErrors.InvalidValue);
         if (ordered.Sum(p => p.Value!.Value) != totalMinor) return new SplitResult.Error(SplitErrors.SumMismatch);
         return new SplitResult.Ok(ordered.Select(p => new Share(p.MemberId, p.Value!.Value)).ToList());
     }

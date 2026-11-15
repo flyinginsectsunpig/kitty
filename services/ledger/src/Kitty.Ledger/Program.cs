@@ -21,7 +21,8 @@ builder.AddServiceDefaults();
 builder.Services.AddProblemDetails();
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
-    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+    // Names only: a numeric value like 99 must not bind to an undefined enum member.
+    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
     // Money is integers; never accept or advertise numbers-as-strings.
     o.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
 });

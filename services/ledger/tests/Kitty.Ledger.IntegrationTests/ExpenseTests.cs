@@ -173,6 +173,19 @@ public class ExpenseTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Numeric_split_method_returns_400_not_500()
+    {
+        var (owner, g, me, gran, _) = await ThreePersonGroupAsync();
+        var r = await owner.PostJsonAsync($"/groups/{g.Id}/expenses", new
+        {
+            id = Guid.NewGuid(), description = "Odd", category = "food", currency = "ZAR", amountMinor = 1000,
+            occurredOn = "2026-11-15", payers = new[] { new { memberId = me, amountMinor = 1000 } },
+            split = new { method = 99, participants = new[] { new { memberId = me }, new { memberId = gran } } },
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+    }
+
+    [Fact]
     public async Task Unsupported_currency_returns_400()
     {
         var (owner, g, me, gran, _) = await ThreePersonGroupAsync();
