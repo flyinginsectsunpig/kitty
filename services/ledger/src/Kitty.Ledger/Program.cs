@@ -20,7 +20,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.Services.AddProblemDetails();
 builder.Services.ConfigureHttpJsonOptions(o =>
-    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
+{
+    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+    // Money is integers; never accept or advertise numbers-as-strings.
+    o.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
+});
+builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<LedgerDbContext>((sp, options) =>
@@ -48,6 +53,7 @@ app.UseRateLimiter();
 app.UseMiddleware<IdempotencyMiddleware>();
 
 app.MapDefaultEndpoints();
+app.MapOpenApi().AllowAnonymous();
 app.MapMe();
 var group = app.MapGroups();
 group.MapMembers();
