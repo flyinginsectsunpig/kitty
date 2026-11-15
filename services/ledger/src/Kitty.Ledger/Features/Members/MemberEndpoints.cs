@@ -36,7 +36,10 @@ public static class MemberEndpoints
         return Results.Created($"/groups/{groupId}/members/{member.Id}", member.ToDto());
     }
 
-    /// <summary>You may edit your own member row or any placeholder; other people's rows are invisible (404).</summary>
+    /// <summary>
+    /// You may rename your own member row or any placeholder; other people's rows are invisible (404).
+    /// Payment details can only be set on your own row.
+    /// </summary>
     private static async Task<IResult> UpdateAsync(Guid groupId, Guid memberId, UpdateMemberDto body, HttpContext http,
         LedgerDbContext db, AuditWriter audit, CancellationToken ct)
     {
@@ -53,6 +56,9 @@ public static class MemberEndpoints
         }
         if (body.PaymentDetails is not null)
         {
+            // Payment details decide where settle-up money goes, so only the person themselves may set them.
+            if (member.UserId != caller.User.Id)
+                return ApiError.Validation("Only the member themselves can set payment details.");
             var details = body.PaymentDetails.Trim();
             if (details.Length > 500) return ApiError.Validation("paymentDetails must be at most 500 characters.");
             member.PaymentDetails = details.Length == 0 ? null : details;

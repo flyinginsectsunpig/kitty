@@ -103,6 +103,19 @@ public class GroupTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Nobody_can_set_payment_details_for_a_placeholder()
+    {
+        // Otherwise a member could put their own bank details on "Gran" and redirect settle-ups.
+        var owner = factory.NewUser("Owner");
+        var g = await owner.CreateGroupAsync();
+        var gran = await owner.AddPlaceholderAsync(g.Id, "Gran");
+
+        var r = await owner.PatchJsonAsync($"/groups/{g.Id}/members/{gran.Id}", new { paymentDetails = "Owner's account 123" });
+        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+        Assert.Equal("validation_failed", await r.ReadCodeAsync());
+    }
+
+    [Fact]
     public async Task Every_mutation_writes_an_audit_entry()
     {
         var c = factory.NewUser();
