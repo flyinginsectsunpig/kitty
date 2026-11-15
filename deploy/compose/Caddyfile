@@ -1,0 +1,27 @@
+{$KITTY_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Keycloak's admin console and admin REST API stay private (SSH tunnel to 127.0.0.1:8180).
+	@keycloakAdmin path /auth/admin /auth/admin/*
+	respond @keycloakAdmin 404
+
+	handle /auth/* {
+		reverse_proxy keycloak:8080
+	}
+
+	# Public ledger API (used by the mobile app from phase 2): /api/health → ledger /health.
+	handle_path /api/* {
+		reverse_proxy ledger:8080
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}
