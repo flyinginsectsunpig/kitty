@@ -1,5 +1,17 @@
-/** Only same-site paths are allowed as a post-sign-in destination (no open redirects). */
+const BASE = "https://kitty.invalid";
+
+/**
+ * Only same-site paths are allowed as a post-sign-in destination (no open redirects).
+ * Rejects control characters and backslashes outright (browsers strip tabs/newlines, turning
+ * "/\t/evil" into "//evil"), then requires the parsed URL to stay on our origin.
+ */
 export function safeNext(next: string | undefined, fallback = "/groups"): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return fallback;
-  return next;
+  if (!next || !next.startsWith("/") || /[\u0000-\u001f\u007f\\]/.test(next)) return fallback;
+  try {
+    const url = new URL(next, BASE);
+    if (url.origin !== BASE) return fallback;
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return fallback;
+  }
 }
