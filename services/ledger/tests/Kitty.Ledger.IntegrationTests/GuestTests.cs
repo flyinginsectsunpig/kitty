@@ -157,6 +157,37 @@ public class GuestTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Concurrent_joins_never_exceed_the_guest_cap()
+    {
+        var (_, _, _, s) = await TableAsync();
+        using var roomy = factory.WithWebHostBuilder(b => b.UseSetting("Ledger:GuestJoinsPerMinute", "1000"));
+        var results = await Task.WhenAll(Enumerable.Range(0, 45).Select(i =>
+            roomy.CreateClient().PostAsJsonAsync($"/table-sessions/{s.Id}/join", new { displayName = $"G{i}" }, Ct)));
+
+        Assert.Equal(30, results.Count(r => r.StatusCode == HttpStatusCode.Created));
+        Assert.All(results.Where(r => r.StatusCode != HttpStatusCode.Created), r => Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode));
+    }
+
+    [Fact]
+    public async Task Varying_whitespace_does_not_reset_the_guest_claim_limit()
+    {
+        var (_, _, _, s) = await TableAsync();
+        using var limited = factory.WithWebHostBuilder(b => b.UseSetting("Ledger:GuestClaimsPerMinute", "2"));
+        var join = await JoinAsync(limited.CreateClient(), s.Id);
+
+        async Task<HttpStatusCode> ClaimWith(string header)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Put, $"/guest/table-sessions/{s.Id}/items/{Burger}/claim");
+            request.Headers.TryAddWithoutValidation("Authorization", header);
+            return (await limited.CreateClient().SendAsync(request, Ct)).StatusCode;
+        }
+
+        Assert.Equal(HttpStatusCode.NoContent, await ClaimWith($"Guest {join.GuestToken}"));
+        Assert.Equal(HttpStatusCode.NoContent, await ClaimWith($"Guest  {join.GuestToken}"));
+        Assert.Equal(HttpStatusCode.TooManyRequests, await ClaimWith($"Guest {join.GuestToken}   "));
+    }
+
+    [Fact]
     public async Task Join_is_rate_limited()
     {
         var (_, _, _, s) = await TableAsync();

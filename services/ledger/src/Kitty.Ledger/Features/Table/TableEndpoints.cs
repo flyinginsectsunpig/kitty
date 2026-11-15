@@ -119,17 +119,22 @@ public static class TableEndpoints
     private static async Task<IResult> EditOpenSessionAsync(Guid groupId, Guid sessionId, HttpContext http, LedgerDbContext db,
         TableSessionService svc, AuditWriter audit, TimeProvider clock, CancellationToken ct, Func<ReceiptSession, object> apply)
     {
-        var session = await svc.LoadAsync(groupId, sessionId, ct);
-        if (session is null) return ApiError.NotFound();
         var caller = GroupMemberFilter.CallerMember(http);
-        if (session.HostUserId != caller.User.Id) return HostOnly();
-        if (StatusError(session.Status) is { } error) return error;
+        var host = await db.ReceiptSessions.Where(s => s.Id == sessionId && s.GroupId == groupId).Select(s => (Guid?)s.HostUserId).SingleOrDefaultAsync(ct);
+        if (host is null) return ApiError.NotFound();
+        if (host != caller.User.Id) return HostOnly();
 
+        // Lock the session row while it is still open (like claims), so a concurrent lock/confirm can't
+        // interleave and the version only ever moves forward.
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        if (!await BumpAsync(db, sessionId, clock, ct, SessionStatus.Open))
+            return StatusError(await db.ReceiptSessions.Where(s => s.Id == sessionId).Select(s => s.Status).SingleAsync(ct))!;
+
+        var session = (await svc.LoadAsync(groupId, sessionId, ct))!;
         var after = apply(session);
-        session.Version++;
-        session.UpdatedAt = clock.NowMicros();
         audit.Record(caller.User.Id, groupId, EntityType, session.Id, AuditActions.Updated, null, after);
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         await svc.NotifyAsync(session.Id, ct);
         return Results.Ok(await svc.ToDtoAsync(session, ct));
     }
@@ -186,21 +191,23 @@ public static class TableEndpoints
     private static async Task<IResult> MapGuestAsync(Guid groupId, Guid sessionId, Guid guestId, MapGuestDto body, HttpContext http,
         LedgerDbContext db, TableSessionService svc, AuditWriter audit, TimeProvider clock, CancellationToken ct)
     {
-        var session = await svc.LoadAsync(groupId, sessionId, ct);
-        if (session is null) return ApiError.NotFound();
         var caller = GroupMemberFilter.CallerMember(http);
-        if (session.HostUserId != caller.User.Id) return HostOnly();
-        if (session.Status is not (SessionStatus.Open or SessionStatus.Locked)) return SessionClosed();
-        var guest = session.Guests.SingleOrDefault(g => g.Id == guestId);
-        if (guest is null) return ApiError.NotFound();
+        var host = await db.ReceiptSessions.Where(s => s.Id == sessionId && s.GroupId == groupId).Select(s => (Guid?)s.HostUserId).SingleOrDefaultAsync(ct);
+        if (host is null) return ApiError.NotFound();
+        if (host != caller.User.Id) return HostOnly();
         if (body.MemberId is { } memberId && !await db.Members.AnyAsync(m => m.Id == memberId && m.GroupId == groupId, ct))
             return ApiError.BadRequest(ErrorCodes.MemberNotInGroup);
 
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        if (!await BumpAsync(db, sessionId, clock, ct, SessionStatus.Open, SessionStatus.Locked)) return SessionClosed();
+        var session = (await svc.LoadAsync(groupId, sessionId, ct))!;
+        var guest = session.Guests.SingleOrDefault(g => g.Id == guestId);
+        if (guest is null) return ApiError.NotFound();
+
         guest.MappedMemberId = body.MemberId;
-        session.Version++;
-        session.UpdatedAt = clock.NowMicros();
         audit.Record(caller.User.Id, groupId, EntityType, session.Id, AuditActions.Updated, null, new { guest = guest.Id, mappedTo = body.MemberId });
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         await svc.NotifyAsync(session.Id, ct);
         return Results.Ok(await svc.ToDtoAsync(session, ct));
     }
@@ -265,6 +272,14 @@ public static class TableEndpoints
 
         await svc.NotifyAsync(session.Id, ct);
         return Results.Ok(await svc.ToDtoAsync(session, ct));
+    }
+
+    /// <summary>Atomically bumps the version if the session is in one of the given states; takes the row lock.</summary>
+    private static async Task<bool> BumpAsync(LedgerDbContext db, Guid sessionId, TimeProvider clock, CancellationToken ct, params string[] states)
+    {
+        var now = clock.NowMicros();
+        return await db.ReceiptSessions.Where(s => s.Id == sessionId && states.Contains(s.Status))
+            .ExecuteUpdateAsync(u => u.SetProperty(s => s.Version, s => s.Version + 1).SetProperty(s => s.UpdatedAt, now), ct) == 1;
     }
 
     private static IResult? StatusError(string status) => status switch

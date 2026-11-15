@@ -1,6 +1,5 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading.RateLimiting;
+using Kitty.Ledger.Features.Table;
 using Kitty.Ledger.Infrastructure.Errors;
 
 namespace Kitty.Ledger.Infrastructure.RateLimiting;
@@ -13,7 +12,7 @@ namespace Kitty.Ledger.Infrastructure.RateLimiting;
 public static class WriteRateLimiting
 {
     public const int DefaultPerMinute = 60;
-    public const int GuestClaimsPerMinute = 120;
+    public const int DefaultGuestClaimsPerMinute = 120;
     public const int DefaultGuestJoinsPerMinute = 10;
     public const string GuestJoinPolicy = "guest-join";
 
@@ -21,6 +20,7 @@ public static class WriteRateLimiting
     {
         var perMinute = config.GetValue("Ledger:WriteRateLimitPerMinute", DefaultPerMinute);
         var joinsPerMinute = config.GetValue("Ledger:GuestJoinsPerMinute", DefaultGuestJoinsPerMinute);
+        var guestClaimsPerMinute = config.GetValue("Ledger:GuestClaimsPerMinute", DefaultGuestClaimsPerMinute);
 
         services.AddRateLimiter(options =>
         {
@@ -33,9 +33,9 @@ public static class WriteRateLimiting
 
                 if (ctx.User.FindFirst("sub")?.Value is { } sub) return Window("user:" + sub, perMinute);
 
-                var header = ctx.Request.Headers.Authorization.ToString();
-                return header.StartsWith("Guest ", StringComparison.Ordinal)
-                    ? Window("guest:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(header))), GuestClaimsPerMinute)
+                // Keyed on the token exactly as GuestFilter parses it, so varying whitespace can't mint new buckets.
+                return GuestTokens.FromHeader(ctx.Request) is { Length: > 0 } token
+                    ? Window("guest:" + GuestTokens.Hash(token), guestClaimsPerMinute)
                     : RateLimitPartition.GetNoLimiter("anonymous");
             });
 

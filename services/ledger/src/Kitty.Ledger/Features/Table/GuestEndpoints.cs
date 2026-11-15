@@ -39,11 +39,21 @@ public static class GuestEndpoints
         var name = body.DisplayName?.Trim() ?? "";
         if (name.Length is < 1 or > 40) return ApiError.Validation("displayName must be 1–40 characters.");
 
-        var session = await db.ReceiptSessions.Include(s => s.Guests).SingleOrDefaultAsync(s => s.Id == sessionId, ct);
-        if (session is null) return ApiError.NotFound();
-        if (session.Status == SessionStatus.Locked) return TableEndpoints.SessionLocked();
-        if (session.Status != SessionStatus.Open) return TableEndpoints.SessionClosed();
-        if (session.Guests.Count >= MaxGuestsPerSession) return ApiError.Validation("This table is full.");
+        // Same serialisation as claims: the conditional version bump takes the session row lock, so the
+        // guest cap and the open-status check can't be raced by concurrent joins or a lock.
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var now = clock.NowMicros();
+        var bumped = await db.ReceiptSessions.Where(s => s.Id == sessionId && s.Status == SessionStatus.Open)
+            .ExecuteUpdateAsync(u => u.SetProperty(s => s.Version, s => s.Version + 1).SetProperty(s => s.UpdatedAt, now), ct);
+        if (bumped == 0)
+            return await svc.StatusOutcomeAsync(sessionId, ct) switch
+            {
+                ChangeOutcome.NotFound => ApiError.NotFound(),
+                ChangeOutcome.Locked => TableEndpoints.SessionLocked(),
+                _ => TableEndpoints.SessionClosed(),
+            };
+        if (await db.Guests.CountAsync(g => g.SessionId == sessionId, ct) >= MaxGuestsPerSession)
+            return ApiError.Validation("This table is full.");
 
         var (token, hash) = GuestTokens.Create();
         var guest = new Guest
@@ -51,10 +61,9 @@ public static class GuestEndpoints
             Id = Guid.NewGuid(), SessionId = sessionId, DisplayName = name, TokenHash = hash,
             ExpiresAt = clock.GetUtcNow() + GuestTokens.Lifetime,
         };
-        session.Guests.Add(guest);
-        session.Version++;
-        session.UpdatedAt = clock.NowMicros();
+        db.Guests.Add(guest);
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         await svc.NotifyAsync(sessionId, ct);
         return Results.Created($"/guest/table-sessions/{sessionId}", new GuestJoinDto(guest.Id, token, guest.ExpiresAt));
     }
