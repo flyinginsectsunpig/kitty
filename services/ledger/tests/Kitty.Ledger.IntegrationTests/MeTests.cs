@@ -7,7 +7,6 @@ namespace Kitty.Ledger.IntegrationTests;
 [Collection(ApiCollection.Name)]
 public class MeTests(LedgerApiFactory factory)
 {
-    private sealed record MeDto(Guid Id, string DisplayName, string? Email);
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 

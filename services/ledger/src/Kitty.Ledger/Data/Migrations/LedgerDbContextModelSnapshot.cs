@@ -210,6 +210,7 @@ namespace Kitty.Ledger.Data.Migrations
                         .HasColumnType("character varying(43)");
 
                     b.Property<DateTimeOffset?>("UsedAt")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("UsedByUserId")
@@ -249,6 +250,7 @@ namespace Kitty.Ledger.Data.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<Guid?>("UserId")
+                        .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");

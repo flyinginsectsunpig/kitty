@@ -39,12 +39,14 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
             // Postgres treats NULLs as distinct, so many placeholders per group are allowed.
             e.HasIndex(m => new { m.GroupId, m.UserId }).IsUnique();
             e.HasOne<User>().WithMany().HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(m => m.UserId).IsConcurrencyToken(); // a placeholder is claimed at most once
         });
 
         b.Entity<Invite>(e =>
         {
             e.HasIndex(i => i.Token).IsUnique();
             e.Property(i => i.Token).HasMaxLength(43);
+            e.Property(i => i.UsedAt).IsConcurrencyToken(); // an invite is used at most once
             e.HasOne<Group>().WithMany().HasForeignKey(i => i.GroupId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Member>().WithMany().HasForeignKey(i => i.MemberId).OnDelete(DeleteBehavior.Restrict);
         });

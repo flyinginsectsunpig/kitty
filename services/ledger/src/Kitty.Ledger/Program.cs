@@ -1,5 +1,9 @@
 using Kitty.Ledger.Data;
+using Kitty.Ledger.Features;
+using Kitty.Ledger.Features.Groups;
+using Kitty.Ledger.Features.Invites;
 using Kitty.Ledger.Features.Me;
+using Kitty.Ledger.Infrastructure.Audit;
 using Kitty.Ledger.Infrastructure.Auth;
 using Kitty.Ledger.Infrastructure.Idempotency;
 using Kitty.Ledger.Infrastructure.RateLimiting;
@@ -17,6 +21,8 @@ builder.Services.AddDbContext<LedgerDbContext>((sp, options) =>
 builder.Services.AddLedgerAuth(builder.Configuration, builder.Environment);
 builder.Services.AddWriteRateLimiting(builder.Configuration);
 builder.Services.AddHostedService<IdempotencyCleanup>();
+builder.Services.AddScoped<AuditWriter>();
+builder.Services.AddScoped<GroupMemberFilter>();
 
 var app = builder.Build();
 
@@ -35,6 +41,9 @@ app.UseMiddleware<IdempotencyMiddleware>();
 
 app.MapDefaultEndpoints();
 app.MapMe();
+var group = app.MapGroups();
+group.MapMembers();
+app.MapInvites(group);
 
 app.Run();
 
