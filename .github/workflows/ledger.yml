@@ -1,0 +1,22 @@
+name: ledger
+
+on:
+  push:
+    branches: [main]
+    paths: ["services/ledger/**", "aspire/**", "contracts/**", "Directory.*.props", "global.json", ".github/workflows/ledger.yml"]
+  pull_request:
+    paths: ["services/ledger/**", "aspire/**", "contracts/**", "Directory.*.props", "global.json", ".github/workflows/ledger.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Unit and integration tests (Testcontainers)
+        run: dotnet test --solution Kitty.slnx

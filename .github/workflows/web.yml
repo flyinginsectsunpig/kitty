@@ -1,0 +1,47 @@
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/**", "packages/**", "contracts/**", "services/ledger/**", "pnpm-lock.yaml", ".github/workflows/web.yml"]
+  pull_request:
+    paths: ["apps/**", "packages/**", "contracts/**", "services/ledger/**", "pnpm-lock.yaml", ".github/workflows/web.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck
+      - run: pnpm -r test
+      - run: pnpm --filter web build
+
+  contract-drift:
+    # The committed OpenAPI document and the generated TypeScript client must match the ledger.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: OpenAPI document is current
+        run: dotnet test --project services/ledger/tests/Kitty.Ledger.IntegrationTests -- --filter-class "*OpenApiTests"
+      - name: TypeScript client is current
+        run: |
+          pnpm --filter @kitty/api-client generate
+          git diff --exit-code packages/api-client/src/schema.d.ts
