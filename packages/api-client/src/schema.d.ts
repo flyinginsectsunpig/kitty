@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/table-sessions/{sessionId}/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["JoinTableAsGuest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -356,6 +372,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/guest/table-sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetTableAsGuest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/guest/table-sessions/{sessionId}/items/{itemId}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ClaimTableItemAsGuest"];
+        post?: never;
+        delete: operations["UnclaimTableItemAsGuest"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invites/{token}": {
         parameters: {
             query?: never;
@@ -504,6 +552,13 @@ export interface components {
             memberCount: number;
             myNet: components["schemas"]["NetDto"][];
         };
+        GuestJoinDto: {
+            /** Format: uuid */
+            guestId: string;
+            guestToken: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
         InviteDto: {
             token: string;
             /** Format: date-time */
@@ -523,6 +578,9 @@ export interface components {
             quantity: number;
             /** Format: int64 */
             lineTotalMinor: number;
+        };
+        JoinTableDto: {
+            displayName: string;
         };
         JsonElement: unknown;
         MapGuestDto: {
@@ -687,6 +745,32 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    JoinTableAsGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinTableDto"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestJoinDto"];
+                };
+            };
+        };
+    };
     GetMe: {
         parameters: {
             query?: never;
@@ -1378,6 +1462,70 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TableSessionDto"];
                 };
+            };
+        };
+    };
+    GetTableAsGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableSessionDto"];
+                };
+            };
+        };
+    };
+    ClaimTableItemAsGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UnclaimTableItemAsGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

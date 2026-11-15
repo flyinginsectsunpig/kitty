@@ -73,6 +73,7 @@ services:
       Auth__Authority: https://${KITTY_HOST}/auth/realms/kitty
       Auth__Audience: kitty-ledger
       Ledger__MigrateOnStartup: "true"
+      Ledger__TrustForwardedHeaders: "true" # only reachable through Caddy
     depends_on:
       postgres: { condition: service_healthy }
     deploy:

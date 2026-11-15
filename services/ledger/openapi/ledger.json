@@ -6,6 +6,47 @@
   },
   "servers": null,
   "paths": {
+    "/table-sessions/{sessionId}/join": {
+      "post": {
+        "tags": [
+          "Guests"
+        ],
+        "operationId": "JoinTableAsGuest",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinTableDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestJoinDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/me": {
       "get": {
         "tags": [
@@ -1134,6 +1175,101 @@
         }
       }
     },
+    "/guest/table-sessions/{sessionId}": {
+      "get": {
+        "tags": [
+          "Guests"
+        ],
+        "operationId": "GetTableAsGuest",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guest/table-sessions/{sessionId}/items/{itemId}/claim": {
+      "put": {
+        "tags": [
+          "Guests"
+        ],
+        "operationId": "ClaimTableItemAsGuest",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Guests"
+        ],
+        "operationId": "UnclaimTableItemAsGuest",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/invites/{token}": {
       "get": {
         "tags": [
@@ -1609,6 +1745,27 @@
           }
         }
       },
+      "GuestJoinDto": {
+        "required": [
+          "guestId",
+          "guestToken",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "guestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "guestToken": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "InviteDto": {
         "required": [
           "token",
@@ -1671,6 +1828,17 @@
           "lineTotalMinor": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "JoinTableDto": {
+        "required": [
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
           }
         }
       },
@@ -2203,6 +2371,9 @@
     }
   },
   "tags": [
+    {
+      "name": "Guests"
+    },
     {
       "name": "Me"
     },

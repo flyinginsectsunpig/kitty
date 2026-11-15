@@ -35,10 +35,22 @@ builder.Services.AddDbContext<LedgerDbContext>((sp, options) =>
         ?? throw new InvalidOperationException("Connection string 'ledger' is not configured.")));
 builder.Services.AddLedgerAuth(builder.Configuration, builder.Environment);
 builder.Services.AddWriteRateLimiting(builder.Configuration);
+if (builder.Configuration.GetValue<bool>("Ledger:TrustForwardedHeaders"))
+{
+    // Only enable where the ledger is reachable solely through the reverse proxy (deploy/compose: Caddy),
+    // so per-IP limits see the real client address.
+    builder.Services.Configure<ForwardedHeadersOptions>(o =>
+    {
+        o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+        o.KnownIPNetworks.Clear();
+        o.KnownProxies.Clear();
+    });
+}
 builder.Services.AddHostedService<IdempotencyCleanup>();
 builder.Services.AddScoped<AuditWriter>();
 builder.Services.AddScoped<GroupMemberFilter>();
 builder.Services.AddScoped<TableSessionService>();
+builder.Services.AddScoped<GuestFilter>();
 builder.Services.AddSingleton<ITableNotifier, NoopTableNotifier>();
 
 var app = builder.Build();
@@ -49,6 +61,7 @@ if (app.Configuration.GetValue<bool>("Ledger:MigrateOnStartup"))
     await scope.ServiceProvider.GetRequiredService<LedgerDbContext>().Database.MigrateAsync();
 }
 
+if (app.Configuration.GetValue<bool>("Ledger:TrustForwardedHeaders")) app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseAuthentication();
@@ -66,6 +79,7 @@ group.MapBalances();
 group.MapSettlements();
 group.MapActivity();
 group.MapTableSessions();
+app.MapGuestTable();
 app.MapInvites(group);
 
 app.Run();

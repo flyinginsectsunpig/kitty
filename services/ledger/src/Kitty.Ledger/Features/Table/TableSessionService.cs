@@ -19,6 +19,12 @@ public sealed class TableSessionService(LedgerDbContext db, TimeProvider clock, 
             .AsSplitQuery()
             .SingleOrDefaultAsync(s => s.Id == sessionId && s.GroupId == groupId, ct);
 
+    public async Task<ReceiptSession?> LoadByIdAsync(Guid sessionId, CancellationToken ct)
+    {
+        var groupId = await db.ReceiptSessions.Where(s => s.Id == sessionId).Select(s => (Guid?)s.GroupId).SingleOrDefaultAsync(ct);
+        return groupId is null ? null : await LoadAsync(groupId.Value, sessionId, ct);
+    }
+
     public async Task<TableSessionDto> ToDtoAsync(ReceiptSession s, CancellationToken ct)
     {
         var memberNames = await db.Members.Where(m => m.GroupId == s.GroupId).ToDictionaryAsync(m => m.Id, m => m.DisplayName, ct);
