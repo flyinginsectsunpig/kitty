@@ -5,4 +5,8 @@
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\..\contracts\currencies.json" LogicalName="Kitty.Ledger.currencies.json" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
 </Project>

@@ -5,6 +5,7 @@
     <Project Path="services/ledger/src/Kitty.Ledger/Kitty.Ledger.csproj" />
   </Folder>
   <Folder Name="/services/ledger/tests/">
+    <Project Path="services/ledger/tests/Kitty.Ledger.IntegrationTests/Kitty.Ledger.IntegrationTests.csproj" />
     <Project Path="services/ledger/tests/Kitty.Ledger.UnitTests/Kitty.Ledger.UnitTests.csproj" />
   </Folder>
 </Solution>
