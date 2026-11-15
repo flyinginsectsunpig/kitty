@@ -408,7 +408,6 @@ namespace Kitty.Ledger.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Version")
-                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.HasKey("Id");

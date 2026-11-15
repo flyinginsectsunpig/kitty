@@ -6,6 +6,7 @@ using Kitty.Ledger.Features.Activity;
 using Kitty.Ledger.Features.Balances;
 using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Settlements;
+using Kitty.Ledger.Features.Table;
 using Kitty.Ledger.Features.Groups;
 using Kitty.Ledger.Features.Invites;
 using Kitty.Ledger.Features.Me;
@@ -37,6 +38,8 @@ builder.Services.AddWriteRateLimiting(builder.Configuration);
 builder.Services.AddHostedService<IdempotencyCleanup>();
 builder.Services.AddScoped<AuditWriter>();
 builder.Services.AddScoped<GroupMemberFilter>();
+builder.Services.AddScoped<TableSessionService>();
+builder.Services.AddSingleton<ITableNotifier, NoopTableNotifier>();
 
 var app = builder.Build();
 
@@ -62,6 +65,7 @@ group.MapExpenses();
 group.MapBalances();
 group.MapSettlements();
 group.MapActivity();
+group.MapTableSessions();
 app.MapInvites(group);
 
 app.Run();

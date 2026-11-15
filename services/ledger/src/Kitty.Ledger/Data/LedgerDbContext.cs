@@ -105,7 +105,7 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
             e.Property(x => x.Title).HasMaxLength(80);
             e.Property(x => x.Currency).HasMaxLength(3).IsFixedLength();
             e.Property(x => x.Status).HasMaxLength(10);
-            e.Property(x => x.Version).IsConcurrencyToken();
+            // Version is a change counter for clients, bumped atomically in SQL; claims must never conflict on it.
             e.HasIndex(x => new { x.GroupId, x.CreatedAt });
             e.HasOne<Group>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Member>().WithMany().HasForeignKey(x => x.PayerMemberId).OnDelete(DeleteBehavior.Restrict);

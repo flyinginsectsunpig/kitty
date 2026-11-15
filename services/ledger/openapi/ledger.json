@@ -666,6 +666,474 @@
         }
       }
     },
+    "/groups/{groupId}/table-sessions": {
+      "post": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "CreateTableSession",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTableSessionDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/table-sessions/{sessionId}": {
+      "get": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "GetTableSession",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/table-sessions/{sessionId}/items": {
+      "put": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "ReplaceTableItems",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceItemsDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/table-sessions/{sessionId}/charges": {
+      "put": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "ReplaceTableCharges",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceChargesDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/table-sessions/{sessionId}/items/{itemId}/claim": {
+      "put": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "ClaimTableItem",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "UnclaimTableItem",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/table-sessions/{sessionId}/lock": {
+      "post": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "LockTableSession",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/table-sessions/{sessionId}/unlock": {
+      "post": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "UnlockTableSession",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/table-sessions/{sessionId}/cancel": {
+      "post": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "CancelTableSession",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/table-sessions/{sessionId}/guests/{guestId}/map": {
+      "post": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "MapTableGuest",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "guestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MapGuestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/table-sessions/{sessionId}/confirm": {
+      "post": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "ConfirmTableSession",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/invites/{token}": {
       "get": {
         "tags": [
@@ -810,6 +1278,47 @@
           }
         }
       },
+      "ChargeWriteDto": {
+        "required": [
+          "id",
+          "kind",
+          "amountMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ClaimantDto": {
+        "required": [
+          "kind",
+          "id",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        }
+      },
       "CreateGroupDto": {
         "required": [
           "id",
@@ -841,6 +1350,31 @@
               "null",
               "string"
             ],
+            "format": "uuid"
+          }
+        }
+      },
+      "CreateTableSessionDto": {
+        "required": [
+          "id",
+          "title",
+          "currency",
+          "payerMemberId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "payerMemberId": {
+            "type": "string",
             "format": "uuid"
           }
         }
@@ -1114,7 +1648,48 @@
           }
         }
       },
+      "ItemWriteDto": {
+        "required": [
+          "id",
+          "description",
+          "quantity",
+          "lineTotalMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lineTotalMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "JsonElement": {},
+      "MapGuestDto": {
+        "required": [
+          "memberId"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "MeDto": {
         "required": [
           "id",
@@ -1243,6 +1818,59 @@
           }
         }
       },
+      "PreviewShareDto": {
+        "required": [
+          "kind",
+          "id",
+          "displayName",
+          "amountMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ReplaceChargesDto": {
+        "required": [
+          "charges"
+        ],
+        "type": "object",
+        "properties": {
+          "charges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChargeWriteDto"
+            }
+          }
+        }
+      },
+      "ReplaceItemsDto": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemWriteDto"
+            }
+          }
+        }
+      },
       "SettlementDto": {
         "required": [
           "id",
@@ -1359,6 +1987,154 @@
           "itemized"
         ]
       },
+      "TableChargeDto": {
+        "required": [
+          "id",
+          "kind",
+          "amountMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "TableGuestDto": {
+        "required": [
+          "id",
+          "displayName",
+          "mappedMemberId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "mappedMemberId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "TableItemDto": {
+        "required": [
+          "id",
+          "description",
+          "quantity",
+          "lineTotalMinor",
+          "claimants"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lineTotalMinor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "claimants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClaimantDto"
+            }
+          }
+        }
+      },
+      "TableSessionDto": {
+        "required": [
+          "id",
+          "title",
+          "currency",
+          "status",
+          "version",
+          "payerMemberId",
+          "expenseId",
+          "items",
+          "charges",
+          "guests",
+          "preview"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "payerMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expenseId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableItemDto"
+            }
+          },
+          "charges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableChargeDto"
+            }
+          },
+          "guests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableGuestDto"
+            }
+          },
+          "preview": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreviewShareDto"
+            }
+          }
+        }
+      },
       "TransferDto": {
         "required": [
           "fromMemberId",
@@ -1450,6 +2226,9 @@
     },
     {
       "name": "Settlements"
+    },
+    {
+      "name": "Table"
     }
   ]
 }

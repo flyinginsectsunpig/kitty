@@ -34,4 +34,8 @@ public static class ErrorCodes
     public const string IdempotencyKeyReused = "idempotency_key_reused";
     public const string RateLimited = "rate_limited";
     public const string EditInTable = "edit_in_table";
+    public const string SessionLocked = "session_locked";
+    public const string SessionClosed = "session_closed";
+    public const string HostOnly = "host_only";
+    public const string GuestsUnmapped = "guests_unmapped";
 }
