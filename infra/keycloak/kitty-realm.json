@@ -8,13 +8,24 @@
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
   "rememberMe": true,
-  "verifyEmail": false,
+  "verifyEmail": "${KITTY_VERIFY_EMAIL:true}",
   "sslRequired": "external",
   "accessTokenLifespan": 300,
   "ssoSessionIdleTimeout": 2592000,
   "ssoSessionMaxLifespan": 7776000,
   "offlineSessionIdleTimeout": 7776000,
   "bruteForceProtected": true,
+  "smtpServer": {
+    "host": "${SMTP_HOST:mailpit}",
+    "port": "${SMTP_PORT:1025}",
+    "from": "${SMTP_FROM:kitty@localhost}",
+    "fromDisplayName": "Kitty",
+    "auth": "${SMTP_AUTH:false}",
+    "user": "${SMTP_USER:}",
+    "password": "${SMTP_PASSWORD:}",
+    "starttls": "${SMTP_STARTTLS:false}",
+    "ssl": "${SMTP_SSL:false}"
+  },
   "webAuthnPolicyPasswordlessPasskeysEnabled": true,
   "clients": [
     {
@@ -58,7 +69,7 @@
       "providerId": "google",
       "displayName": "Google",
       "enabled": "${GOOGLE_ENABLED:false}",
-      "trustEmail": true,
+      "trustEmail": false,
       "firstBrokerLoginFlowAlias": "first broker login",
       "config": {
         "clientId": "${GOOGLE_CLIENT_ID:unset}",

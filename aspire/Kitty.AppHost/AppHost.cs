@@ -6,9 +6,14 @@ var postgres = builder.AddPostgres("postgres")
     .WithDataVolume("kitty-pgdata");
 var ledgerDb = postgres.AddDatabase("ledger-db", databaseName: "ledger");
 
+// Catches Keycloak's verification emails locally (UI on the "ui" endpoint).
+var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.33.1")
+    .WithHttpEndpoint(targetPort: 8025, name: "ui")
+    .WithEndpoint(targetPort: 1025, name: "smtp");
+
 var keycloak = builder.AddKeycloak("keycloak", port: 8180)
-    .WithDataVolume("kitty-keycloak")
-    .WithRealmImport("../../infra/keycloak");
+    .WithRealmImport("../../infra/keycloak")
+    .WaitFor(mailpit);
 
 var realmUrl = ReferenceExpression.Create($"{keycloak.GetEndpoint("http")}/realms/kitty");
 
