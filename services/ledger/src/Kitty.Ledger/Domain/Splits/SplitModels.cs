@@ -1,6 +1,7 @@
 namespace Kitty.Ledger.Domain.Splits;
 
-public enum SplitMethod { Equal, Exact, Percent, Shares }
+/// <summary>Itemized shares come from a confirmed table session, never from a split request.</summary>
+public enum SplitMethod { Equal, Exact, Percent, Shares, Itemized }
 
 /// <summary>
 /// One participant's split input. Value meaning depends on the method:

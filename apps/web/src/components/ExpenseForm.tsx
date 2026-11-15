@@ -33,7 +33,7 @@ export function ExpenseForm({
   const nameOf = (id: string) => members.find((m) => m.id === id)?.displayName ?? "Someone";
 
   const preview = useMemo(() => {
-    if ("error" in dto) return null;
+    if ("error" in dto || dto.split.method === "itemized") return null;
     const participants = dto.split.participants.map((p) => ({ memberId: p.memberId, value: p.value ?? null }));
     return previewSplit(dto.amountMinor, dto.split.method, participants);
   }, [dto]);

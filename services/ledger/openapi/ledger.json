@@ -1355,7 +1355,8 @@
           "equal",
           "exact",
           "percent",
-          "shares"
+          "shares",
+          "itemized"
         ]
       },
       "TransferDto": {

@@ -410,7 +410,7 @@ export interface components {
             participants: components["schemas"]["ParticipantDto"][];
         };
         /** @enum {unknown} */
-        SplitMethod: "equal" | "exact" | "percent" | "shares";
+        SplitMethod: "equal" | "exact" | "percent" | "shares" | "itemized";
         TransferDto: {
             /** Format: uuid */
             fromMemberId: string;

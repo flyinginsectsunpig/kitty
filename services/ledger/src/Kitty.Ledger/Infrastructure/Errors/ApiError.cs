@@ -33,4 +33,5 @@ public static class ErrorCodes
     public const string RequestInProgress = "request_in_progress";
     public const string IdempotencyKeyReused = "idempotency_key_reused";
     public const string RateLimited = "rate_limited";
+    public const string EditInTable = "edit_in_table";
 }

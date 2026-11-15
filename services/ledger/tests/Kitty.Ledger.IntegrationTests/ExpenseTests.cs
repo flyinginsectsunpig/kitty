@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Kitty.Ledger.IntegrationTests;
 
@@ -170,6 +172,29 @@ public class ExpenseTests(LedgerApiFactory factory)
         Assert.Equal([20, 20, 5], sizes);
         Assert.Equal(45, seen.Select(e => e.Id).Distinct().Count());
         Assert.Equal(seen.Select(e => e.OccurredOn).OrderDescending(), seen.Select(e => e.OccurredOn));
+    }
+
+    [Fact]
+    public async Task Itemized_expense_cannot_be_edited_directly()
+    {
+        var (owner, g, me, gran, _) = await ThreePersonGroupAsync();
+        var e = await owner.AddEqualAsync(g.Id, 1000, me, [me, gran]);
+        using (var scope = factory.Services.CreateScope())
+        {
+            // Stand-in for an expense confirmed from a table session (Task 4 creates these for real).
+            var db = scope.ServiceProvider.GetRequiredService<Kitty.Ledger.Data.LedgerDbContext>();
+            var row = await db.Expenses.SingleAsync(x => x.Id == e.Id, Ct);
+            row.SplitMethod = Kitty.Ledger.Domain.Splits.SplitMethod.Itemized;
+            await db.SaveChangesAsync(Ct);
+        }
+
+        var r = await owner.PutJsonAsync($"/groups/{g.Id}/expenses/{e.Id}",
+            ExpenseData.Equal(e.Id, 1200, me, [me, gran], version: 1));
+        Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
+        Assert.Equal("edit_in_table", await r.ReadCodeAsync());
+
+        var listed = (await owner.GetFromJsonAsync<ExpenseDto>($"/groups/{g.Id}/expenses/{e.Id}", ApiClientExtensions.Json, Ct))!;
+        Assert.Equal("itemized", listed.Split.Method);
     }
 
     [Fact]

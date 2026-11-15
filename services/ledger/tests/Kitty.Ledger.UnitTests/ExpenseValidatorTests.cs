@@ -69,6 +69,11 @@ public class ExpenseValidatorTests
             Valid() with { Split = new SplitDto((SplitMethod)99, [new ParticipantDto(A, null)]) }, Members)));
 
     [Fact]
+    public void Itemized_expenses_cannot_be_written_directly() =>
+        Assert.Equal("validation_failed", Code(ExpenseValidator.Validate(
+            Valid() with { Split = new SplitDto(SplitMethod.Itemized, [new ParticipantDto(A, null)]) }, Members)));
+
+    [Fact]
     public void Blank_description_is_invalid() =>
         Assert.Equal("validation_failed", Code(ExpenseValidator.Validate(Valid() with { Description = "   " }, Members)));
 

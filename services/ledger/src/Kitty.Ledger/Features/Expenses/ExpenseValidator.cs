@@ -45,6 +45,7 @@ public static class ExpenseValidator
 
         if (e.Split is null) return Fail("split is required.");
         if (!Enum.IsDefined(e.Split.Method)) return Fail("split.method is not supported.");
+        if (e.Split.Method == SplitMethod.Itemized) return Fail("Itemized expenses are created from a table session.");
         return SplitCalculator.Calculate(e.AmountMinor, e.Split.Method,
                 participants.Select(p => new SplitInput(p.MemberId, p.Value)).ToList()) switch
         {
