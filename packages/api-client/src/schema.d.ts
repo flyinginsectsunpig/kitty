@@ -155,7 +155,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["GetExpense"];
         put: operations["UpdateExpense"];
         post?: never;
         delete: operations["DeleteExpense"];
@@ -742,6 +742,29 @@ export interface operations {
         responses: {
             /** @description Created */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpenseDto"];
+                };
+            };
+        };
+    };
+    GetExpense: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                expenseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

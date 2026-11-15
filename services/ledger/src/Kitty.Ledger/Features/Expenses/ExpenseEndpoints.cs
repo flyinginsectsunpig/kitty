@@ -23,6 +23,7 @@ public static class ExpenseEndpoints
         var expenses = group.MapGroup("/expenses").WithTags("Expenses");
         expenses.MapPost("/", CreateAsync).WithName("CreateExpense").Produces<ExpenseDto>(StatusCodes.Status201Created);
         expenses.MapGet("/", ListAsync).WithName("ListExpenses").Produces<ExpensePageDto>();
+        expenses.MapGet("/{expenseId:guid}", GetAsync).WithName("GetExpense").Produces<ExpenseDto>();
         expenses.MapPut("/{expenseId:guid}", UpdateAsync).WithName("UpdateExpense").Produces<ExpenseDto>();
         expenses.MapDelete("/{expenseId:guid}", DeleteAsync).WithName("DeleteExpense").Produces(StatusCodes.Status204NoContent);
     }
@@ -49,6 +50,13 @@ public static class ExpenseEndpoints
         audit.Record(caller.User.Id, groupId, EntityType, expense.Id, AuditActions.Created, null, dto);
         await db.SaveChangesAsync(ct);
         return Results.Created($"/groups/{groupId}/expenses/{expense.Id}", dto);
+    }
+
+    private static async Task<IResult> GetAsync(Guid groupId, Guid expenseId, LedgerDbContext db, CancellationToken ct)
+    {
+        var expense = await db.Expenses.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == expenseId && x.GroupId == groupId && x.DeletedAt == null, ct);
+        return expense is null ? ApiError.NotFound() : Results.Ok(expense.ToDto());
     }
 
     private static async Task<IResult> UpdateAsync(Guid groupId, Guid expenseId, ExpenseWriteDto body, HttpContext http,

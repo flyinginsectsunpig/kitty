@@ -20,7 +20,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, account }) {
       if (account) {
-        return { ...token, accessToken: account.access_token, refreshToken: account.refresh_token, expiresAt: account.expires_at };
+        return {
+          ...token,
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token,
+          expiresAt: account.expires_at,
+          idToken: account.id_token,
+        };
       }
       return refreshAccessToken(token as AuthToken, Math.floor(Date.now() / 1000));
     },

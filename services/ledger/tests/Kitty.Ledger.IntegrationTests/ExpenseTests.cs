@@ -182,6 +182,20 @@ public class ExpenseTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Get_single_expense_and_404_once_deleted()
+    {
+        var (owner, g, me, gran, _) = await ThreePersonGroupAsync();
+        var e = await owner.AddEqualAsync(g.Id, 500, me, [me, gran]);
+
+        var got = (await owner.GetFromJsonAsync<ExpenseDto>($"/groups/{g.Id}/expenses/{e.Id}", ApiClientExtensions.Json, Ct))!;
+        Assert.Equal(e.Id, got.Id);
+        Assert.Equal(500, got.AmountMinor);
+
+        (await owner.DeleteAsync($"/groups/{g.Id}/expenses/{e.Id}", key: null)).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.NotFound, (await owner.GetAsync($"/groups/{g.Id}/expenses/{e.Id}", Ct)).StatusCode);
+    }
+
+    [Fact]
     public async Task Other_group_members_cannot_see_expenses()
     {
         var (owner, g, me, gran, _) = await ThreePersonGroupAsync();

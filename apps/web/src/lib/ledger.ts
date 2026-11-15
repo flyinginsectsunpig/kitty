@@ -1,6 +1,6 @@
 import "server-only";
 import { createLedgerClient, type LedgerClient, type LedgerProblem } from "@kitty/api-client";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getAccessToken } from "@/auth/token";
 
 /** A ledger client for the signed-in user; sends them to sign in when there is no valid session. */
@@ -17,15 +17,9 @@ export function problemCode(error: unknown): string {
   return (error as LedgerProblem | undefined)?.code ?? "unexpected";
 }
 
-/** Throws for errors a page cannot recover from (the error boundary shows them). */
+/** Returns the data, renders the 404 page for not_found, and throws for anything else (error boundary). */
 export function unwrap<T>(result: { data?: T; error?: unknown; response: Response }): T {
   if (result.data !== undefined) return result.data;
-  if (result.response.status === 404) throw new NotFoundError();
+  if (result.response.status === 404) notFound();
   throw new Error(`Ledger request failed (${result.response.status}): ${problemCode(result.error)}`);
-}
-
-export class NotFoundError extends Error {
-  constructor() {
-    super("Not found");
-  }
 }

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
-import { auth, signOut } from "@/auth/config";
+import { auth } from "@/auth/config";
+import { signOutEverywhere } from "@/auth/sign-out";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,12 +22,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               kitty
             </Link>
             {session && (
-              <form
-                action={async () => {
-                  "use server";
-                  await signOut({ redirectTo: "/" });
-                }}
-              >
+              <form action={signOutEverywhere}>
                 <button className="text-sm text-stone-500 hover:text-stone-900 dark:hover:text-stone-100">Sign out</button>
               </form>
             )}
