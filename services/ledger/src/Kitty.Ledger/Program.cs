@@ -51,7 +51,10 @@ builder.Services.AddScoped<AuditWriter>();
 builder.Services.AddScoped<GroupMemberFilter>();
 builder.Services.AddScoped<TableSessionService>();
 builder.Services.AddScoped<GuestFilter>();
-builder.Services.AddSingleton<ITableNotifier, NoopTableNotifier>();
+builder.Services.AddSingleton<ITableNotifier, SignalRTableNotifier>();
+var signalR = builder.Services.AddSignalR();
+if (builder.Configuration.GetConnectionString("redis") is { Length: > 0 } redis)
+    signalR.AddStackExchangeRedis(redis, o => o.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("kitty"));
 
 var app = builder.Build();
 
@@ -80,6 +83,7 @@ group.MapSettlements();
 group.MapActivity();
 group.MapTableSessions();
 app.MapGuestTable();
+app.MapHub<TableHub>(TableHub.Path).AllowAnonymous(); // JoinSession does the authorization
 app.MapInvites(group);
 
 app.Run();

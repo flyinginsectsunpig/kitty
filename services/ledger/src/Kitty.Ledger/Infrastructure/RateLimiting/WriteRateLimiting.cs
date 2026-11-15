@@ -29,7 +29,7 @@ public static class WriteRateLimiting
                 var method = ctx.Request.Method;
                 var mutating = HttpMethods.IsPost(method) || HttpMethods.IsPut(method)
                                || HttpMethods.IsPatch(method) || HttpMethods.IsDelete(method);
-                if (!mutating) return RateLimitPartition.GetNoLimiter("reads");
+                if (!mutating || ctx.Request.Path.StartsWithSegments("/hubs")) return RateLimitPartition.GetNoLimiter("reads");
 
                 if (ctx.User.FindFirst("sub")?.Value is { } sub) return Window("user:" + sub, perMinute);
 

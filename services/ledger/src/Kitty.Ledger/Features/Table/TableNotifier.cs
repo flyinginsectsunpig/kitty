@@ -5,8 +5,3 @@ public interface ITableNotifier
 {
     Task NotifyAsync(Guid sessionId, int version, CancellationToken ct);
 }
-
-public sealed class NoopTableNotifier : ITableNotifier
-{
-    public Task NotifyAsync(Guid sessionId, int version, CancellationToken ct) => Task.CompletedTask;
-}
