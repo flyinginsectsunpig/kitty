@@ -72,7 +72,11 @@ public static class GuestEndpoints
     private static async Task<IResult> GetAsync(Guid sessionId, HttpContext http, TableSessionService svc, CancellationToken ct)
     {
         var session = await svc.LoadByIdAsync(sessionId, ct);
-        return session is null ? ApiError.NotFound() : Results.Ok(await svc.ToDtoAsync(session, ct));
+        // The guest row from this same snapshot, so "who am I" matches the claims and shares beside it.
+        var me = session?.Guests.SingleOrDefault(g => g.Id == GuestFilter.CurrentGuest(http).Id);
+        return session is null || me is null
+            ? ApiError.NotFound()
+            : Results.Ok(await svc.ToDtoAsync(session, TableSessionService.ViewerFor(me), ct));
     }
 
     private static async Task<IResult> ClaimAsync(Guid sessionId, Guid itemId, bool claimed, HttpContext http, TableSessionService svc,

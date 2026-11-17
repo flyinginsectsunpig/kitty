@@ -4,12 +4,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Kitty.Ledger.Features.Table;
 
-public sealed record SessionChanged(Guid SessionId, int Version);
+public sealed record SessionChanged(Guid SessionId, int Version, string Status);
 
 /// <summary>
-/// Live table updates. Connections join a session's group only after the same checks REST uses:
-/// a member of the session's group (bearer token), or that session's guest (guest_token). Events carry only
-/// the session id and version; clients re-fetch through REST, so authorization lives in one place.
+/// Live table updates. Connections join a session's group only after the same checks REST uses: a read-only
+/// listen token for that session, a member of the session's group (bearer token), or that session's guest
+/// (guest_token). Events carry only the session id, version and status; clients re-fetch through REST, so
+/// authorization for the bill's contents lives in one place.
 /// </summary>
 public sealed class TableHub(LedgerDbContext db, TimeProvider clock, ListenTokens listenTokens) : Hub
 {
@@ -38,6 +39,6 @@ public sealed class TableHub(LedgerDbContext db, TimeProvider clock, ListenToken
 
 public sealed class SignalRTableNotifier(IHubContext<TableHub> hub) : ITableNotifier
 {
-    public Task NotifyAsync(Guid sessionId, int version, CancellationToken ct) =>
-        hub.Clients.Group(TableHub.GroupName(sessionId)).SendAsync("SessionChanged", new SessionChanged(sessionId, version), ct);
+    public Task NotifyAsync(Guid sessionId, int version, string status, CancellationToken ct) =>
+        hub.Clients.Group(TableHub.GroupName(sessionId)).SendAsync("SessionChanged", new SessionChanged(sessionId, version, status), ct);
 }

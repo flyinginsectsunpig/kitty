@@ -8,9 +8,18 @@ namespace Kitty.Ledger.Features.Table;
 
 public enum ChangeOutcome { Ok, NotFound, Locked, Closed }
 
-/// <summary>Session reads and the claim path shared by members (Task 4) and guests (Task 5).</summary>
+/// <summary>Session reads and the claim path shared by members and guests.</summary>
 public sealed class TableSessionService(LedgerDbContext db, TimeProvider clock, ITableNotifier notifier)
 {
+    public static TableViewerDto ViewerFor(Member member) => new(ClaimantKinds.Member, member.Id);
+
+    /// <summary>A guest as the table sees them: the member the host matched them to, once matched.</summary>
+    public static TableViewerDto ViewerFor(Guest guest) =>
+        guest.MappedMemberId is { } memberId ? new(ClaimantKinds.Member, memberId) : new(ClaimantKinds.Guest, guest.Id);
+
+    public Task<bool> ExistsInGroupAsync(Guid groupId, Guid sessionId, CancellationToken ct) =>
+        db.ReceiptSessions.AnyAsync(s => s.Id == sessionId && s.GroupId == groupId, ct);
+
     public Task<ReceiptSession?> LoadAsync(Guid groupId, Guid sessionId, CancellationToken ct) =>
         db.ReceiptSessions
             .Include(s => s.Items.OrderBy(i => i.Position)).ThenInclude(i => i.Claims)
@@ -25,7 +34,7 @@ public sealed class TableSessionService(LedgerDbContext db, TimeProvider clock, 
         return groupId is null ? null : await LoadAsync(groupId.Value, sessionId, ct);
     }
 
-    public async Task<TableSessionDto> ToDtoAsync(ReceiptSession s, CancellationToken ct)
+    public async Task<TableSessionDto> ToDtoAsync(ReceiptSession s, TableViewerDto viewer, CancellationToken ct)
     {
         var memberNames = await db.Members.Where(m => m.GroupId == s.GroupId).ToDictionaryAsync(m => m.Id, m => m.DisplayName, ct);
         var guests = s.Guests.ToDictionary(g => g.Id);
@@ -39,7 +48,7 @@ public sealed class TableSessionService(LedgerDbContext db, TimeProvider clock, 
                 : new(ClaimantKinds.Guest, guest.Id, guest.DisplayName);
         }
 
-        var items = s.Items.Select(i => new TableItemDto(i.Id, i.Description, i.Quantity, i.LineTotalMinor,
+        var items = s.Items.OrderBy(i => i.Position).Select(i => new TableItemDto(i.Id, i.Description, i.Quantity, i.LineTotalMinor,
             i.Claims.Select(Effective).DistinctBy(c => c.Id).ToList())).ToList();
 
         var people = items.SelectMany(i => i.Claimants).DistinctBy(c => c.Id).ToDictionary(c => c.Id);
@@ -51,7 +60,8 @@ public sealed class TableSessionService(LedgerDbContext db, TimeProvider clock, 
             _ => [],
         };
 
-        return new TableSessionDto(s.Id, s.Title, s.Currency.Trim(), s.Status, s.Version, s.PayerMemberId, s.ExpenseId, items,
+        return new TableSessionDto(s.Id, s.Title, s.Currency.Trim(), s.Status, s.Version, s.PayerMemberId,
+            memberNames.GetValueOrDefault(s.PayerMemberId, "Someone"), s.ExpenseId, viewer, items,
             s.Charges.Select(c => new TableChargeDto(c.Id, c.Kind, c.AmountMinor)).ToList(),
             s.Guests.Select(g => new TableGuestDto(g.Id, g.DisplayName, g.MappedMemberId)).ToList(),
             preview);
@@ -93,7 +103,7 @@ public sealed class TableSessionService(LedgerDbContext db, TimeProvider clock, 
 
     public async Task NotifyAsync(Guid sessionId, CancellationToken ct)
     {
-        var version = await db.ReceiptSessions.Where(s => s.Id == sessionId).Select(s => s.Version).SingleAsync(ct);
-        await notifier.NotifyAsync(sessionId, version, ct);
+        var current = await db.ReceiptSessions.Where(s => s.Id == sessionId).Select(s => new { s.Version, s.Status }).SingleAsync(ct);
+        await notifier.NotifyAsync(sessionId, current.Version, current.Status, ct);
     }
 }

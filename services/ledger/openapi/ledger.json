@@ -2328,7 +2328,9 @@
           "status",
           "version",
           "payerMemberId",
+          "payerDisplayName",
           "expenseId",
+          "viewer",
           "items",
           "charges",
           "guests",
@@ -2357,12 +2359,18 @@
             "type": "string",
             "format": "uuid"
           },
+          "payerDisplayName": {
+            "type": "string"
+          },
           "expenseId": {
             "type": [
               "null",
               "string"
             ],
             "format": "uuid"
+          },
+          "viewer": {
+            "$ref": "#/components/schemas/TableViewerDto"
           },
           "items": {
             "type": "array",
@@ -2387,6 +2395,22 @@
             "items": {
               "$ref": "#/components/schemas/PreviewShareDto"
             }
+          }
+        }
+      },
+      "TableViewerDto": {
+        "required": [
+          "kind",
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },

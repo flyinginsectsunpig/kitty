@@ -8,6 +8,7 @@ using Kitty.Ledger.Infrastructure;
 using Kitty.Ledger.Infrastructure.Audit;
 using Kitty.Ledger.Infrastructure.Errors;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Kitty.Ledger.Features.Table;
 
@@ -60,11 +61,11 @@ public static class TableEndpoints
         db.ReceiptSessions.Add(session);
         audit.Record(caller.User.Id, groupId, EntityType, session.Id, AuditActions.Created, null, new { session.Title, session.Currency });
         await db.SaveChangesAsync(ct);
-        return Results.Created($"/groups/{groupId}/table-sessions/{session.Id}", await svc.ToDtoAsync(session, ct));
+        return Results.Created($"/groups/{groupId}/table-sessions/{session.Id}", await svc.ToDtoAsync(session, Viewer(http), ct));
     }
 
-    private static async Task<IResult> GetAsync(Guid groupId, Guid sessionId, TableSessionService svc, CancellationToken ct) =>
-        await svc.LoadAsync(groupId, sessionId, ct) is { } s ? Results.Ok(await svc.ToDtoAsync(s, ct)) : ApiError.NotFound();
+    private static async Task<IResult> GetAsync(Guid groupId, Guid sessionId, HttpContext http, TableSessionService svc, CancellationToken ct) =>
+        await svc.LoadAsync(groupId, sessionId, ct) is { } s ? Results.Ok(await svc.ToDtoAsync(s, Viewer(http), ct)) : ApiError.NotFound();
 
     private static async Task<IResult> ReplaceItemsAsync(Guid groupId, Guid sessionId, ReplaceItemsDto body, HttpContext http,
         LedgerDbContext db, TableSessionService svc, AuditWriter audit, TimeProvider clock, CancellationToken ct)
@@ -103,14 +104,26 @@ public static class TableEndpoints
         LedgerDbContext db, TableSessionService svc, AuditWriter audit, TimeProvider clock, CancellationToken ct)
     {
         var charges = body.Charges ?? [];
-        if (charges.Count > MaxCharges || charges.Select(c => c.Id).Distinct().Count() != charges.Count
+        if (charges.Count > MaxCharges || charges.Select(c => c.Id).Distinct().Count() != charges.Count || charges.Any(c => c.Id == Guid.Empty)
             || charges.Any(c => !ChargeKinds.All.Contains(c.Kind ?? "") || c.AmountMinor is < 0 or > SplitCalculator.MaxTotalMinor))
             return ApiError.Validation("Charges are tip, service, delivery or other, each a non-negative amount (VAT is already in item prices).");
 
         return await EditOpenSessionAsync(groupId, sessionId, http, db, svc, audit, clock, ct, session =>
         {
-            session.Charges.Clear();
-            session.Charges.AddRange(charges.Select(c => new ReceiptCharge { Id = c.Id, SessionId = session.Id, Kind = c.Kind, AmountMinor = c.AmountMinor }));
+            // Matched by id like items, so re-sending the same list (same ids) is an update, not a clash.
+            var wanted = charges.Select(c => c.Id).ToHashSet();
+            session.Charges.RemoveAll(c => !wanted.Contains(c.Id));
+            foreach (var input in charges)
+            {
+                var charge = session.Charges.SingleOrDefault(c => c.Id == input.Id);
+                if (charge is null)
+                {
+                    charge = new ReceiptCharge { Id = input.Id, SessionId = session.Id, Kind = input.Kind };
+                    session.Charges.Add(charge);
+                }
+                charge.Kind = input.Kind;
+                charge.AmountMinor = input.AmountMinor;
+            }
             return new { charges = charges.Select(c => new { c.Kind, c.AmountMinor }) };
         });
     }
@@ -120,7 +133,7 @@ public static class TableEndpoints
         TableSessionService svc, AuditWriter audit, TimeProvider clock, CancellationToken ct, Func<ReceiptSession, object> apply)
     {
         var caller = GroupMemberFilter.CallerMember(http);
-        var host = await db.ReceiptSessions.Where(s => s.Id == sessionId && s.GroupId == groupId).Select(s => (Guid?)s.HostUserId).SingleOrDefaultAsync(ct);
+        var host = await HostOfAsync(db, groupId, sessionId, ct);
         if (host is null) return ApiError.NotFound();
         if (host != caller.User.Id) return HostOnly();
 
@@ -128,22 +141,30 @@ public static class TableEndpoints
         // interleave and the version only ever moves forward.
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         if (!await BumpAsync(db, sessionId, clock, ct, SessionStatus.Open))
-            return StatusError(await db.ReceiptSessions.Where(s => s.Id == sessionId).Select(s => s.Status).SingleAsync(ct))!;
+            return WrongState(await CurrentStatusAsync(db, sessionId, ct));
 
         var session = (await svc.LoadAsync(groupId, sessionId, ct))!;
         var after = apply(session);
         audit.Record(caller.User.Id, groupId, EntityType, session.Id, AuditActions.Updated, null, after);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // Item and charge ids are client-generated; one that already belongs to another bill is refused.
+            return ApiError.Conflict(ErrorCodes.AlreadyExists, "One of these ids is already used on another bill.");
+        }
         await tx.CommitAsync(ct);
         await svc.NotifyAsync(session.Id, ct);
-        return Results.Ok(await svc.ToDtoAsync(session, ct));
+        return Results.Ok(await svc.ToDtoAsync(session, Viewer(http), ct));
     }
 
     private static async Task<IResult> ClaimAsync(Guid groupId, Guid sessionId, Guid itemId, bool claimed, HttpContext http,
         TableSessionService svc, CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
-        if (await svc.LoadAsync(groupId, sessionId, ct) is null) return ApiError.NotFound();
+        if (!await svc.ExistsInGroupAsync(groupId, sessionId, ct)) return ApiError.NotFound();
         return await svc.SetClaimAsync(sessionId, itemId, ClaimantKinds.Member, caller.Member.Id, claimed, ct) switch
         {
             ChangeOutcome.Ok => Results.NoContent(),
@@ -153,31 +174,36 @@ public static class TableEndpoints
         };
     }
 
+    /// <summary>Moves the session from one state to another; repeating a move that already happened is fine.</summary>
     private static async Task<IResult> TransitionAsync(Guid groupId, Guid sessionId, string from, string to, HttpContext http,
         LedgerDbContext db, TableSessionService svc, AuditWriter audit, TimeProvider clock, CancellationToken ct)
     {
-        var session = await svc.LoadAsync(groupId, sessionId, ct);
-        if (session is null) return ApiError.NotFound();
         var caller = GroupMemberFilter.CallerMember(http);
-        if (session.HostUserId != caller.User.Id) return HostOnly();
+        var host = await HostOfAsync(db, groupId, sessionId, ct);
+        if (host is null) return ApiError.NotFound();
+        if (host != caller.User.Id) return HostOnly();
 
-        var now = clock.NowMicros();
-        var changed = await db.ReceiptSessions.Where(s => s.Id == sessionId && s.Status == from)
-            .ExecuteUpdateAsync(u => u.SetProperty(s => s.Status, to).SetProperty(s => s.Version, s => s.Version + 1).SetProperty(s => s.UpdatedAt, now), ct);
-        if (changed == 0)
+        // The status change and its audit entry commit together.
+        await using (var tx = await db.Database.BeginTransactionAsync(ct))
         {
-            var current = await db.ReceiptSessions.Where(s => s.Id == sessionId).Select(s => s.Status).SingleAsync(ct);
-            if (current != to) return current == SessionStatus.Locked ? SessionLocked() : SessionClosed();
-        }
-        else
-        {
-            audit.Record(caller.User.Id, groupId, EntityType, sessionId, AuditActions.Updated, new { status = from }, new { status = to });
-            await db.SaveChangesAsync(ct);
-            await svc.NotifyAsync(sessionId, ct);
+            var now = clock.NowMicros();
+            var changed = await db.ReceiptSessions.Where(s => s.Id == sessionId && s.Status == from)
+                .ExecuteUpdateAsync(u => u.SetProperty(s => s.Status, to).SetProperty(s => s.Version, s => s.Version + 1).SetProperty(s => s.UpdatedAt, now), ct);
+            if (changed == 0)
+            {
+                var current = await CurrentStatusAsync(db, sessionId, ct);
+                if (current != to) return WrongState(current);
+            }
+            else
+            {
+                audit.Record(caller.User.Id, groupId, EntityType, sessionId, AuditActions.Updated, new { status = from }, new { status = to });
+                await db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+                await svc.NotifyAsync(sessionId, ct);
+            }
         }
 
-        db.ChangeTracker.Clear();
-        return Results.Ok(await svc.ToDtoAsync((await svc.LoadAsync(groupId, sessionId, ct))!, ct));
+        return Results.Ok(await svc.ToDtoAsync((await svc.LoadAsync(groupId, sessionId, ct))!, Viewer(http), ct));
     }
 
     private static async Task<IResult> CancelAsync(Guid groupId, Guid sessionId, HttpContext http, LedgerDbContext db,
@@ -192,7 +218,7 @@ public static class TableEndpoints
         LedgerDbContext db, TableSessionService svc, AuditWriter audit, TimeProvider clock, CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
-        var host = await db.ReceiptSessions.Where(s => s.Id == sessionId && s.GroupId == groupId).Select(s => (Guid?)s.HostUserId).SingleOrDefaultAsync(ct);
+        var host = await HostOfAsync(db, groupId, sessionId, ct);
         if (host is null) return ApiError.NotFound();
         if (host != caller.User.Id) return HostOnly();
         if (body.MemberId is { } memberId && !await db.Members.AnyAsync(m => m.Id == memberId && m.GroupId == groupId, ct))
@@ -209,12 +235,13 @@ public static class TableEndpoints
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         await svc.NotifyAsync(session.Id, ct);
-        return Results.Ok(await svc.ToDtoAsync(session, ct));
+        return Results.Ok(await svc.ToDtoAsync(session, Viewer(http), ct));
     }
 
     /// <summary>
     /// Turns the session into one itemized expense. Idempotent: confirming again returns the same expense.
-    /// The status update takes the session row lock first, so no claim can land between reading and confirming.
+    /// The status update takes the session row lock first, so no claim can land between reading and confirming;
+    /// any validation failure after it leaves the transaction uncommitted, so the status rolls back.
     /// </summary>
     private static async Task<IResult> ConfirmAsync(Guid groupId, Guid sessionId, HttpContext http, LedgerDbContext db,
         TableSessionService svc, AuditWriter audit, TimeProvider clock, CancellationToken ct)
@@ -223,7 +250,7 @@ public static class TableEndpoints
         var existing = await db.ReceiptSessions.AsNoTracking().SingleOrDefaultAsync(s => s.Id == sessionId && s.GroupId == groupId, ct);
         if (existing is null) return ApiError.NotFound();
         if (existing.HostUserId != caller.User.Id) return HostOnly();
-        if (existing.Status == SessionStatus.Confirmed) return Results.Ok(await svc.ToDtoAsync((await svc.LoadAsync(groupId, sessionId, ct))!, ct));
+        if (existing.Status == SessionStatus.Confirmed) return Results.Ok(await svc.ToDtoAsync((await svc.LoadAsync(groupId, sessionId, ct))!, Viewer(http), ct));
         if (existing.Status == SessionStatus.Cancelled) return SessionClosed();
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -234,10 +261,10 @@ public static class TableEndpoints
                 .SetProperty(s => s.UpdatedAt, now), ct);
         if (claimed == 0)
         {
+            // Someone else confirmed or cancelled in the meantime.
             await tx.RollbackAsync(ct);
-            db.ChangeTracker.Clear();
             var after = (await svc.LoadAsync(groupId, sessionId, ct))!;
-            return after.Status == SessionStatus.Confirmed ? Results.Ok(await svc.ToDtoAsync(after, ct)) : SessionClosed();
+            return after.Status == SessionStatus.Confirmed ? Results.Ok(await svc.ToDtoAsync(after, Viewer(http), ct)) : SessionClosed();
         }
 
         var session = (await svc.LoadAsync(groupId, sessionId, ct))!;
@@ -271,8 +298,16 @@ public static class TableEndpoints
         await tx.CommitAsync(ct);
 
         await svc.NotifyAsync(session.Id, ct);
-        return Results.Ok(await svc.ToDtoAsync(session, ct));
+        return Results.Ok(await svc.ToDtoAsync(session, Viewer(http), ct));
     }
+
+    private static TableViewerDto Viewer(HttpContext http) => TableSessionService.ViewerFor(GroupMemberFilter.CallerMember(http).Member);
+
+    private static Task<Guid?> HostOfAsync(LedgerDbContext db, Guid groupId, Guid sessionId, CancellationToken ct) =>
+        db.ReceiptSessions.Where(s => s.Id == sessionId && s.GroupId == groupId).Select(s => (Guid?)s.HostUserId).SingleOrDefaultAsync(ct);
+
+    private static Task<string> CurrentStatusAsync(LedgerDbContext db, Guid sessionId, CancellationToken ct) =>
+        db.ReceiptSessions.Where(s => s.Id == sessionId).Select(s => s.Status).SingleAsync(ct);
 
     /// <summary>Atomically bumps the version if the session is in one of the given states; takes the row lock.</summary>
     private static async Task<bool> BumpAsync(LedgerDbContext db, Guid sessionId, TimeProvider clock, CancellationToken ct, params string[] states)
@@ -282,12 +317,9 @@ public static class TableEndpoints
             .ExecuteUpdateAsync(u => u.SetProperty(s => s.Version, s => s.Version + 1).SetProperty(s => s.UpdatedAt, now), ct) == 1;
     }
 
-    private static IResult? StatusError(string status) => status switch
-    {
-        SessionStatus.Open => null,
-        SessionStatus.Locked => SessionLocked(),
-        _ => SessionClosed(),
-    };
+    /// <summary>The 409 for an action the session's current state doesn't allow.</summary>
+    private static IResult WrongState(string status) =>
+        status is SessionStatus.Confirmed or SessionStatus.Cancelled ? SessionClosed() : SessionLocked();
 
     private static IResult HostOnly() => ApiError.Problem(StatusCodes.Status403Forbidden, ErrorCodes.HostOnly, "Only the person running this table can do that.");
     public static IResult SessionLocked() => ApiError.Conflict(ErrorCodes.SessionLocked, "The host has locked this bill.");

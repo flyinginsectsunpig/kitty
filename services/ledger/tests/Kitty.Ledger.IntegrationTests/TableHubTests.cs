@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 
 namespace Kitty.Ledger.IntegrationTests;
 
-public sealed record SessionChanged(Guid SessionId, int Version);
+public sealed record SessionChanged(Guid SessionId, int Version, string Status);
 
 [Collection(ApiCollection.Name)]
 public class TableHubTests(LedgerApiFactory factory)
@@ -61,6 +61,26 @@ public class TableHubTests(LedgerApiFactory factory)
         var changed = await NextAsync(events);
         Assert.Equal(s.Id, changed.SessionId);
         Assert.Equal((await host.GetSessionAsync(g.Id, s.Id)).Version, changed.Version);
+        Assert.Equal("open", changed.Status);
+    }
+
+    [Fact]
+    public async Task Confirm_event_carries_the_closing_status()
+    {
+        // Guests lose access when the bill is confirmed, so the event itself must say how it ended.
+        var (host, g, s, friendSub, burger) = await TableAsync();
+        var (connection, events) = await ConnectAsync("", TestTokens.For(friendSub, "Friend", "f@example.com"));
+        await using var _ = connection;
+        await connection.InvokeAsync("JoinSession", s.Id, Ct);
+
+        (await host.ClaimAsync(g.Id, s.Id, burger)).EnsureSuccessStatusCode();
+        (await host.PostJsonAsync($"/groups/{g.Id}/table-sessions/{s.Id}/confirm", new { })).EnsureSuccessStatusCode();
+
+        var claim = await NextAsync(events);
+        var confirm = await NextAsync(events);
+        Assert.Equal("open", claim.Status);
+        Assert.Equal("confirmed", confirm.Status);
+        Assert.Equal(claim.Version + 1, confirm.Version);
     }
 
     [Fact]

@@ -57,6 +57,29 @@ public class GuestTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Guest_view_names_the_guest_and_follows_the_hosts_mapping()
+    {
+        var (host, g, _, s) = await TableAsync();
+        var gran = await host.AddPlaceholderAsync(g.Id, "Gran");
+        var join = await JoinAsync(factory.CreateClient(), s.Id, "Gran's phone");
+        var guest = AsGuest(factory.CreateClient(), join.GuestToken);
+        (await guest.PutAsync($"/guest/table-sessions/{s.Id}/items/{Salad}/claim", null, Ct)).EnsureSuccessStatusCode();
+        (await host.ClaimAsync(g.Id, s.Id, Burger)).EnsureSuccessStatusCode(); // nothing left unclaimed, so the salad is the guest's whole share
+
+        var before = (await guest.GetFromJsonAsync<TableSessionDto>($"/guest/table-sessions/{s.Id}", ApiClientExtensions.Json, Ct))!;
+        Assert.Equal(new TableViewerDto("guest", join.GuestId), before.Viewer);
+        Assert.Equal("Host", before.PayerDisplayName);
+
+        (await host.PostJsonAsync($"/groups/{g.Id}/table-sessions/{s.Id}/guests/{join.GuestId}/map", new { memberId = gran.Id })).EnsureSuccessStatusCode();
+
+        // Once matched to Gran, the guest's own screen must still recognise their claims and share.
+        var after = (await guest.GetFromJsonAsync<TableSessionDto>($"/guest/table-sessions/{s.Id}", ApiClientExtensions.Json, Ct))!;
+        Assert.Equal(new TableViewerDto("member", gran.Id), after.Viewer);
+        Assert.Equal(after.Viewer.Id, Assert.Single(after.Items.Single(i => i.Id == Salad).Claimants).Id);
+        Assert.Equal(8000, after.Preview.Single(p => p.Id == after.Viewer.Id).AmountMinor);
+    }
+
+    [Fact]
     public async Task Guest_token_is_scoped_to_one_session()
     {
         var (_, _, _, s) = await TableAsync();

@@ -748,12 +748,19 @@ export interface components {
             version: number;
             /** Format: uuid */
             payerMemberId: string;
+            payerDisplayName: string;
             /** Format: uuid */
             expenseId: null | string;
+            viewer: components["schemas"]["TableViewerDto"];
             items: components["schemas"]["TableItemDto"][];
             charges: components["schemas"]["TableChargeDto"][];
             guests: components["schemas"]["TableGuestDto"][];
             preview: components["schemas"]["PreviewShareDto"][];
+        };
+        TableViewerDto: {
+            kind: string;
+            /** Format: uuid */
+            id: string;
         };
         TransferDto: {
             /** Format: uuid */
