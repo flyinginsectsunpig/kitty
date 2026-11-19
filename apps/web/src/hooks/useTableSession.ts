@@ -1,7 +1,8 @@
 "use client";
 
-import { HubConnectionBuilder, LogLevel, type HubConnection } from "@microsoft/signalr";
+import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import { useCallback, useEffect, useReducer } from "react";
+import { keepLive, type LiveHub } from "@/lib/live-connection";
 import { fetchListenToken, fetchTableState } from "@/lib/table-client";
 import { initialTableState, needsRefresh, retryDelayMs, tableReducer, type TableSession } from "@/lib/table-state";
 
@@ -18,48 +19,16 @@ export function useTableSession(initial: TableSession, hubUrl: string, groupId: 
 
   useEffect(() => {
     if (closed) return;
-    let stopped = false;
-    let connection: HubConnection | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-
-    const connect = async (attempt: number) => {
-      if (stopped) return;
-      try {
-        const token = await fetchListenToken(sessionId, groupId);
-        if (stopped) return;
-        if (!token) {
-          // Nothing to listen to (access ended): one re-fetch settles whether the bill is closed.
-          dispatch({ type: "reconnected" });
-          return;
-        }
-
-        const next = new HubConnectionBuilder()
-          .withUrl(`${hubUrl}?listen_token=${encodeURIComponent(token)}`, { withCredentials: false })
-          .withAutomaticReconnect({ nextRetryDelayInMilliseconds: (context) => retryDelayMs(context.previousRetryCount) })
-          .configureLogging(LogLevel.Warning)
-          .build();
-        connection = next;
-        next.on("SessionChanged", (e: { version: number; status: string }) =>
-          dispatch({ type: "changed", version: e.version, status: e.status }));
-        next.onreconnected(() => {
-          dispatch({ type: "reconnected" });
-          void next.invoke("JoinSession", sessionId).catch(() => undefined);
-        });
-
-        await next.start();
-        if (stopped) {
-          void next.stop();
-          return;
-        }
-        await next.invoke("JoinSession", sessionId);
-        dispatch({ type: "reconnected" }); // pick up anything that changed between rendering the page and now
-      } catch {
-        void connection?.stop();
-        connection = null;
-        if (!stopped) retryTimer = setTimeout(() => void connect(attempt + 1), retryDelayMs(attempt));
-      }
-    };
-    void connect(0);
+    const stopLive = keepLive({
+      fetchToken: () => fetchListenToken(sessionId, groupId),
+      createHub: (token) => signalRHub(hubUrl, token, sessionId),
+      onChanged: (e) => dispatch({ type: "changed", version: e.version, status: e.status }),
+      onResync: () => dispatch({ type: "reconnected" }),
+      schedule: (fn, ms) => {
+        const timer = setTimeout(fn, ms);
+        return () => clearTimeout(timer);
+      },
+    });
 
     const refreshWhenBack = () => {
       if (document.visibilityState === "visible") dispatch({ type: "reconnected" });
@@ -68,11 +37,9 @@ export function useTableSession(initial: TableSession, hubUrl: string, groupId: 
     window.addEventListener("online", refreshWhenBack);
 
     return () => {
-      stopped = true;
-      clearTimeout(retryTimer);
+      stopLive();
       document.removeEventListener("visibilitychange", refreshWhenBack);
       window.removeEventListener("online", refreshWhenBack);
-      void connection?.stop();
     };
   }, [hubUrl, sessionId, groupId, closed]);
 
@@ -108,4 +75,21 @@ export function useTableSession(initial: TableSession, hubUrl: string, groupId: 
   }, []);
 
   return { session: state.session, closed: state.closed, apply };
+}
+
+/** A SignalR connection to the table hub, opened with one bill's listen token. */
+function signalRHub(hubUrl: string, token: string, sessionId: string): LiveHub {
+  const connection = new HubConnectionBuilder()
+    .withUrl(`${hubUrl}?listen_token=${encodeURIComponent(token)}`, { withCredentials: false })
+    .withAutomaticReconnect({ nextRetryDelayInMilliseconds: (context) => retryDelayMs(context.previousRetryCount) })
+    .configureLogging(LogLevel.Warning)
+    .build();
+  return {
+    start: () => connection.start(),
+    stop: () => connection.stop(),
+    joinSession: () => connection.invoke("JoinSession", sessionId),
+    onChanged: (cb) => connection.on("SessionChanged", cb),
+    onReconnected: (cb) => connection.onreconnected(() => cb()),
+    onClosed: (cb) => connection.onclose(() => cb()),
+  };
 }
