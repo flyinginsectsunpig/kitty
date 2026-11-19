@@ -23,9 +23,14 @@ export default async function GroupPage({
     <section className="space-y-6">
       <GroupNav groupId={id} groupName={group.name} active="" />
 
-      <Link href={`/groups/${id}/expenses/new`} className="btn-primary w-full text-base">
-        Add an expense
-      </Link>
+      <div className="grid grid-cols-2 gap-2">
+        <Link href={`/groups/${id}/expenses/new`} className="btn-primary text-base">
+          Add an expense
+        </Link>
+        <Link href={`/groups/${id}/table/new`} className="btn-secondary text-base">
+          Split a bill at the table
+        </Link>
+      </div>
 
       <div className="card space-y-3">
         <h2 className="font-semibold">Balances</h2>

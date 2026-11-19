@@ -15,6 +15,11 @@ const messages: Record<string, string> = {
   rate_limited: "That's a lot of changes at once. Wait a minute and try again.",
   request_in_progress: "Still saving your last change. Try again in a moment.",
   not_found: "We couldn't find that.",
+  session_locked: "The host has locked this bill.",
+  session_closed: "This bill is already split or was cancelled.",
+  host_only: "Only the person running the table can do that.",
+  guests_unmapped: "Match every guest who claimed something to someone in the group first.",
+  edit_in_table: "This bill was split at the table. Delete it and split it again to change it.",
 };
 
 export function errorMessage(code: string | undefined): string | null {
