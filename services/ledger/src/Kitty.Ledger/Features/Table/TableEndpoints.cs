@@ -21,6 +21,7 @@ public static class TableEndpoints
     public static void MapTableSessions(this RouteGroupBuilder group)
     {
         var sessions = group.MapGroup("/table-sessions").WithTags("Table");
+        sessions.MapGet("/", ListActiveAsync).WithName("ListActiveTableSessions").Produces<IReadOnlyList<ActiveTableDto>>();
         sessions.MapPost("/", CreateAsync).WithName("CreateTableSession").Produces<TableSessionDto>(StatusCodes.Status201Created);
         sessions.MapGet("/{sessionId:guid}", GetAsync).WithName("GetTableSession").Produces<TableSessionDto>();
         sessions.MapPut("/{sessionId:guid}/items", ReplaceItemsAsync).WithName("ReplaceTableItems").Produces<TableSessionDto>();
@@ -62,6 +63,18 @@ public static class TableEndpoints
         audit.Record(caller.User.Id, groupId, EntityType, session.Id, AuditActions.Created, null, new { session.Title, session.Currency });
         await db.SaveChangesAsync(ct);
         return Results.Created($"/groups/{groupId}/table-sessions/{session.Id}", await svc.ToDtoAsync(session, Viewer(http), ct));
+    }
+
+    /// <summary>Bills still being split (open or locked), newest first, so anyone in the group can get back to one.</summary>
+    private static async Task<IResult> ListActiveAsync(Guid groupId, HttpContext http, LedgerDbContext db, CancellationToken ct)
+    {
+        var me = GroupMemberFilter.CallerMember(http).User.Id;
+        var active = await db.ReceiptSessions.AsNoTracking()
+            .Where(s => s.GroupId == groupId && (s.Status == SessionStatus.Open || s.Status == SessionStatus.Locked))
+            .OrderByDescending(s => s.CreatedAt).ThenBy(s => s.Id)
+            .Select(s => new ActiveTableDto(s.Id, s.Title, s.Status, s.HostUserId == me))
+            .ToListAsync(ct);
+        return Results.Ok(active);
     }
 
     private static async Task<IResult> GetAsync(Guid groupId, Guid sessionId, HttpContext http, TableSessionService svc, CancellationToken ct) =>

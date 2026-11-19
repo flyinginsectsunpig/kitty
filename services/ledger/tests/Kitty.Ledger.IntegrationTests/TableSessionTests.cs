@@ -12,6 +12,7 @@ public sealed record TableViewerDto(string Kind, Guid Id);
 public sealed record TableSessionDto(Guid Id, string Title, string Currency, string Status, int Version, Guid PayerMemberId,
     string PayerDisplayName, Guid? ExpenseId, TableViewerDto Viewer, List<TableItemDto> Items, List<TableChargeDto> Charges,
     List<TableGuestDto> Guests, List<PreviewShareDto> Preview);
+public sealed record ActiveTableDto(Guid Id, string Title, string Status, bool HostedByMe);
 
 public static class TableData
 {
@@ -242,5 +243,25 @@ public class TableSessionTests(LedgerApiFactory factory)
         var stranger = factory.NewUser("Eve");
         Assert.Equal(HttpStatusCode.NotFound,
             (await stranger.GetAsync($"/groups/{g.Id}/table-sessions/{s.Id}", TestContext.Current.CancellationToken)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Group_lists_its_open_bills_so_people_can_get_back_to_them()
+    {
+        var (host, friend, g, hostMember, _, open) = await TableAsync();
+        var locked = await host.CreateSessionAsync(g.Id, hostMember, "Drinks");
+        (await host.PostJsonAsync($"/groups/{g.Id}/table-sessions/{locked.Id}/lock", new { })).EnsureSuccessStatusCode();
+        var cancelled = await host.CreateSessionAsync(g.Id, hostMember, "Never mind");
+        (await host.PostJsonAsync($"/groups/{g.Id}/table-sessions/{cancelled.Id}/cancel", new { })).EnsureSuccessStatusCode();
+
+        var url = $"/groups/{g.Id}/table-sessions";
+        var forHost = await host.GetFromJsonAsync<List<ActiveTableDto>>(url, ApiClientExtensions.Json, TestContext.Current.CancellationToken);
+        Assert.Equal([new ActiveTableDto(locked.Id, "Drinks", "locked", true), new ActiveTableDto(open.Id, "Dinner", "open", true)], forHost);
+
+        var forFriend = await friend.GetFromJsonAsync<List<ActiveTableDto>>(url, ApiClientExtensions.Json, TestContext.Current.CancellationToken);
+        Assert.All(forFriend!, t => Assert.False(t.HostedByMe));
+
+        var stranger = factory.NewUser("Eve");
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.GetAsync(url, TestContext.Current.CancellationToken)).StatusCode);
     }
 }

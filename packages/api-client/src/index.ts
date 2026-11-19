@@ -43,6 +43,7 @@ export function createLedgerClient(
 }
 
 export type TableSessionDto = Schemas["TableSessionDto"];
+export type ActiveTableDto = Schemas["ActiveTableDto"];
 export type ListenTokenDto = Schemas["ListenTokenDto"];
 
 /** A client for someone at the table without an account: only the /guest/… routes accept this token. */

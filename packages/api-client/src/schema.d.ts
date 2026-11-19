@@ -235,7 +235,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["ListActiveTableSessions"];
         put?: never;
         post: operations["CreateTableSession"];
         delete?: never;
@@ -472,6 +472,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ActiveTableDto: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            status: string;
+            hostedByMe: boolean;
+        };
         ActivityDto: {
             /** Format: uuid */
             id: string;
@@ -1266,6 +1273,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ListActiveTableSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveTableDto"][];
+                };
             };
         };
     };

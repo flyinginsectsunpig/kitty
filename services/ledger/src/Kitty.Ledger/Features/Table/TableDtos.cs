@@ -35,3 +35,6 @@ public sealed record TableSessionDto(
     IReadOnlyList<TableChargeDto> Charges,
     IReadOnlyList<TableGuestDto> Guests,
     IReadOnlyList<PreviewShareDto> Preview);
+
+/// <summary>A bill still being split, for the group page.</summary>
+public sealed record ActiveTableDto(Guid Id, string Title, string Status, bool HostedByMe);
