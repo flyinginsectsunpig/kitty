@@ -6,8 +6,9 @@ import {
   type ListenTokenDto,
   type TableSessionDto,
 } from "@kitty/api-client";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getAccessToken } from "@/auth/token";
+import { forwardedFor } from "./client-ip";
 import { isUuid } from "./ids";
 import { getLedger, problemCode } from "./ledger";
 
@@ -122,6 +123,8 @@ export async function joinAsGuest(sessionId: string, displayName: string): Promi
   const { data, error } = await createAnonymousLedgerClient(ledgerUrl()).POST("/table-sessions/{sessionId}/join", {
     params: { path: { sessionId } },
     body: { displayName },
+    // Joins are limited per client address, so pass on the real one (set in deploy/compose).
+    headers: forwardedFor(await headers(), process.env.TRUST_PROXY_HEADERS === "true"),
   });
   if (error || !data) return problemCode(error);
 

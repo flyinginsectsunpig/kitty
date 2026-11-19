@@ -222,4 +222,29 @@ public class GuestTests(LedgerApiFactory factory)
         var r = await anonymous.PostAsJsonAsync($"/table-sessions/{s.Id}/join", new { displayName = "One too many" }, Ct);
         Assert.Equal(HttpStatusCode.TooManyRequests, r.StatusCode);
     }
+
+    [Fact]
+    public async Task Behind_the_proxy_each_client_ip_gets_its_own_join_limit()
+    {
+        // In production every join arrives from the web server, which passes on the client address.
+        var (_, _, _, s) = await TableAsync();
+        using var proxied = factory.WithWebHostBuilder(b => b
+            .UseSetting("Ledger:TrustForwardedHeaders", "true")
+            .UseSetting("Ledger:GuestJoinsPerMinute", "1"));
+        var web = proxied.CreateClient();
+
+        Task<HttpResponseMessage> JoinFrom(string ip, string name)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, $"/table-sessions/{s.Id}/join")
+            {
+                Content = JsonContent.Create(new { displayName = name }),
+            };
+            request.Headers.Add("X-Forwarded-For", ip);
+            return web.SendAsync(request, Ct);
+        }
+
+        Assert.Equal(HttpStatusCode.Created, (await JoinFrom("203.0.113.1", "A")).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await JoinFrom("203.0.113.1", "B")).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await JoinFrom("203.0.113.2", "C")).StatusCode);
+    }
 }

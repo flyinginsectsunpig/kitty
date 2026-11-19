@@ -104,6 +104,7 @@ services:
       AUTH_KEYCLOAK_SECRET: ${KITTY_WEB_CLIENT_SECRET}
       AUTH_KEYCLOAK_ISSUER: https://${KITTY_HOST}/auth/realms/kitty
       LEDGER_URL: http://ledger:8080
+      TRUST_PROXY_HEADERS: "true" # only reachable through Caddy; passes guests' addresses on for the join limit
       # Browsers open the live table connection through Caddy (same origin, so no CORS needed).
       LEDGER_PUBLIC_URL: https://${KITTY_HOST}/api
     depends_on: [ledger, keycloak]
