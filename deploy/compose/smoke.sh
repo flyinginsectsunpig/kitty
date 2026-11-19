@@ -17,6 +17,8 @@ check() { # name expected actual
 status() { "${CURL[@]}" -o /dev/null -w '%{http_code}' "$1"; }
 
 check "web home page" 200 "$(status "$BASE/")"
+# Auth.js lives under /api/auth on the web app, inside the /api prefix that otherwise goes to the ledger.
+check "sign-in endpoints reach the web app" 1 "$("${CURL[@]}" "$BASE/api/auth/csrf" | grep -c '"csrfToken"')"
 check "ledger health" 200 "$(status "$BASE/api/health")"
 check "ledger rejects anonymous calls" 401 "$(status "$BASE/api/me")"
 check "live table updates are reachable" 200 "$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/hubs/table/negotiate?negotiateVersion=1")"
