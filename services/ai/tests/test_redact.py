@@ -7,6 +7,13 @@ def test_card_numbers_are_redacted():
     assert redact("Card 4111111111111111") == "Card [card]"
 
 
+def test_card_followed_by_an_amount_or_expiry_on_the_same_line():
+    # OCR joins a printed line into one string, so other numbers often sit right after the card number.
+    assert redact("VISA 4111 1111 1111 1111 187,00") == "VISA [card] 187,00"
+    assert redact("Card 4111 1111 1111 1111 12/27") == "Card [card] 12/27"
+    assert redact("REF 9 4111111111111111 00") == "REF 9 [card] 00"
+
+
 def test_number_that_fails_luhn_is_kept():
     # A barcode or reference number, not a card.
     assert redact("Ref 4111111111111112") == "Ref 4111111111111112"
@@ -31,6 +38,16 @@ def test_names_after_labels():
     assert redact("SERVER: Ana-Marie") == "SERVER: [name]"
     assert redact("Operator: 0042 Lerato") == "Operator: [name]"
     assert redact("Card holder: J SMITH") == "Card holder: [name]"
+
+
+def test_names_after_labels_mid_line():
+    assert redact("Table 12 Waiter: Sipho Covers 4") == "Table 12 Waiter: [name]"
+    assert redact("Tbl 5   Server: Thandi M") == "Tbl 5   Server: [name]"
+    assert redact("Tbl 5   Server: Thandi   Covers 4") == "Tbl 5   Server: [name]   Covers 4"
+
+
+def test_label_words_inside_item_names_are_left_alone():
+    assert redact("Chef's special waiter tip jar 10,00") == "Chef's special waiter tip jar 10,00"
 
 
 def test_prices_and_dates_survive():
