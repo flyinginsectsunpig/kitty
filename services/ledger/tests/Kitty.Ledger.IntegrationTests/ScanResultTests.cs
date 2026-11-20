@@ -5,6 +5,10 @@ using Confluent.SchemaRegistry;
 using Confluent.SchemaRegistry.Serdes;
 using Timestamp = Google.Protobuf.WellKnownTypes.Timestamp;
 using Kitty.Contracts.Events.V1;
+using Kitty.Ledger.Data;
+using Kitty.Ledger.Features.Scans;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Kitty.Ledger.IntegrationTests;
 
@@ -87,6 +91,55 @@ public class ScanResultTests(LedgerApiFactory factory)
         Assert.Equal(typed, Assert.Single(s.Items).Id);
         Assert.Equal(["Burger", "Coke"], s.Scan!.SuggestedItems!.Select(i => i.Description));
         Assert.Equal(1700, s.Scan.SuggestedCharges!.Single().AmountMinor);
+    }
+
+    [Fact]
+    public async Task Result_never_overwrites_a_typed_tip()
+    {
+        var host = factory.NewUser("Host");
+        var g = await host.CreateGroupAsync();
+        var session = await host.CreateSessionAsync(g.Id, g.Members[0].Id);
+        (await host.PutJsonAsync($"/groups/{g.Id}/table-sessions/{session.Id}/charges",
+            new { charges = new[] { new { id = Guid.NewGuid(), kind = "tip", amountMinor = 5000 } } })).EnsureSuccessStatusCode();
+        var (scanId, _) = await host.ScanAsync(g.Id, session.Id);
+
+        await PublishAsync(Parsed(session.Id, scanId));
+        var s = await WaitForAsync(host, g.Id, session.Id, x => x.Scan?.Status == "parsed");
+
+        Assert.Equal(5000, s.Charges.Single().AmountMinor);
+        Assert.Empty(s.Items);
+        Assert.Equal(2, s.Scan!.SuggestedItems!.Count);
+    }
+
+    [Fact]
+    public async Task Result_waits_for_a_save_in_progress_and_then_only_suggests()
+    {
+        // The host's save holds the bill's row lock; a scan result arriving meanwhile must not read the bill as
+        // empty and add its items next to the typed ones.
+        var host = factory.NewUser("Host");
+        var g = await host.CreateGroupAsync();
+        var session = await host.CreateSessionAsync(g.Id, g.Members[0].Id);
+        var (scanId, _) = await host.ScanAsync(g.Id, session.Id);
+
+        using var saving = factory.Services.CreateScope();
+        var db = saving.ServiceProvider.GetRequiredService<LedgerDbContext>();
+        await using var tx = await db.Database.BeginTransactionAsync(Ct);
+        await db.Database.ExecuteSqlInterpolatedAsync($"""UPDATE "ReceiptSessions" SET "Version" = "Version" + 1 WHERE "Id" = {session.Id}""", Ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "ReceiptItems" ("Id", "SessionId", "Description", "Quantity", "LineTotalMinor", "Position") VALUES ({Guid.NewGuid()}, {session.Id}, 'Pizza', 1, 15000, 0)""", Ct);
+
+        var applying = Task.Run(async () =>
+        {
+            using var scope = factory.Services.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<ScanResultHandler>().ApplyAsync(Parsed(session.Id, scanId), Ct);
+        }, Ct);
+        await Task.Delay(1000, Ct);
+        await tx.CommitAsync(Ct);
+        await applying;
+
+        var s = (await host.GetFromJsonAsync<SessionWithScanDto>($"/groups/{g.Id}/table-sessions/{session.Id}", ApiClientExtensions.Json, Ct))!;
+        Assert.Equal(["Pizza"], s.Items.Select(i => i.Description));
+        Assert.Equal(2, s.Scan!.SuggestedItems!.Count);
     }
 
     [Fact]

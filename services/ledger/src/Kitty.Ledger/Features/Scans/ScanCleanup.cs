@@ -47,15 +47,18 @@ public sealed class ScanCleanup(IServiceScopeFactory scopes, ReceiptBlobs blobs,
         var svc = scope.ServiceProvider.GetRequiredService<TableSessionService>();
         var now = clock.NowMicros();
 
-        var stuck = await db.ReceiptScans.Where(s => s.Status == ScanStatus.Parsing && s.UploadedAt < now - ParsingTimeout).ToListAsync(ct);
-        foreach (var scan in stuck)
+        var candidates = await db.ReceiptScans.Where(s => s.Status == ScanStatus.Parsing && s.UploadedAt < now - ParsingTimeout)
+            .Select(s => new { s.Id, s.SessionId }).ToListAsync(ct);
+        var stuck = new List<Guid>();
+        foreach (var scan in candidates)
         {
-            scan.Status = ScanStatus.Failed;
-            scan.FailureReason = "timed_out";
-            scan.FinishedAt = now;
+            // Conditional, so a result that landed since the query above is never overwritten.
+            var changed = await db.ReceiptScans.Where(s => s.Id == scan.Id && s.Status == ScanStatus.Parsing)
+                .ExecuteUpdateAsync(u => u.SetProperty(s => s.Status, ScanStatus.Failed)
+                    .SetProperty(s => s.FailureReason, "timed_out").SetProperty(s => s.FinishedAt, now), ct);
+            if (changed == 1) stuck.Add(scan.SessionId);
         }
-        await db.SaveChangesAsync(ct);
-        foreach (var sessionId in stuck.Select(s => s.SessionId).Distinct())
+        foreach (var sessionId in stuck.Distinct())
         {
             // Only bills still on screen need to hear about it. A closed bill's UpdatedAt is when it closed,
             // which the 90-day photo deletion below counts from, so it must not move.

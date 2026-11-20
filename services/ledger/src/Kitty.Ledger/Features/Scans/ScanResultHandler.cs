@@ -25,10 +25,19 @@ public sealed class ScanResultHandler(LedgerDbContext db, TableSessionService sv
             $"""INSERT INTO "InboxMessages" ("EventId", "Topic", "ProcessedAt") VALUES ({result.EventId}, {Topics.ReceiptParsed}, {now}) ON CONFLICT DO NOTHING""", ct);
         if (fresh == 0) return; // seen before
 
-        var scan = await db.ReceiptScans.SingleOrDefaultAsync(s => s.Id == scanId, ct);
-        if (scan is null || scan.Status != ScanStatus.Parsing)
+        var sessionId = await db.ReceiptScans.Where(s => s.Id == scanId).Select(s => (Guid?)s.SessionId).SingleOrDefaultAsync(ct);
+        if (sessionId is null)
         {
-            await tx.CommitAsync(ct); // a late result for a replaced or finished scan
+            await tx.CommitAsync(ct);
+            return;
+        }
+        // Take the bill's row lock before reading anything, as every edit of the bill does: a save, a new scan or
+        // the timeout running at the same moment then happens wholly before or after this.
+        await db.Database.ExecuteSqlInterpolatedAsync($"""SELECT 1 FROM "ReceiptSessions" WHERE "Id" = {sessionId} FOR UPDATE""", ct);
+        var scan = await db.ReceiptScans.SingleAsync(s => s.Id == scanId, ct);
+        if (scan.Status != ScanStatus.Parsing)
+        {
+            await tx.CommitAsync(ct); // a late result for a replaced, timed-out or finished scan
             return;
         }
 
@@ -39,7 +48,8 @@ public sealed class ScanResultHandler(LedgerDbContext db, TableSessionService sv
             scan.Status = ScanStatus.Parsed;
             scan.SuggestionJson = ScanViews.Serialize(suggestion);
             var session = await db.ReceiptSessions.Include(s => s.Items).Include(s => s.Charges).SingleAsync(s => s.Id == scan.SessionId, ct);
-            if (session.Status == SessionStatus.Open && session.Items.Count == 0)
+            // Only a bill with nothing typed on it (no items, no tip) is filled; otherwise the host chooses.
+            if (session.Status == SessionStatus.Open && session.Items.Count == 0 && session.Charges.Count == 0)
             {
                 Replace(session, suggestion);
                 scan.AppliedAt = now;
@@ -52,10 +62,12 @@ public sealed class ScanResultHandler(LedgerDbContext db, TableSessionService sv
         }
 
         await db.SaveChangesAsync(ct);
-        await db.ReceiptSessions.Where(s => s.Id == scan.SessionId)
+        // A closed bill keeps its UpdatedAt (when it closed): the 90-day photo deletion counts from it.
+        var live = await db.ReceiptSessions
+            .Where(s => s.Id == scan.SessionId && (s.Status == SessionStatus.Open || s.Status == SessionStatus.Locked))
             .ExecuteUpdateAsync(u => u.SetProperty(s => s.Version, s => s.Version + 1).SetProperty(s => s.UpdatedAt, now), ct);
         await tx.CommitAsync(ct);
-        await svc.NotifyAsync(scan.SessionId, ct);
+        if (live == 1) await svc.NotifyAsync(scan.SessionId, ct);
     }
 
     /// <summary>Puts the suggestion on the bill in place of its items and charges (claims on removed items go with them).</summary>
