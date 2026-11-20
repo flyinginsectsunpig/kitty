@@ -1,0 +1,43 @@
+name: evals
+
+# Receipt-reading accuracy against labelled receipts. Nightly and on demand only: it calls the model's free
+# tier, so it never runs on pull requests.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: Receipts to score
+        default: "50"
+  schedule:
+    - cron: "17 2 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  receipts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/ai
+    env:
+      AI_GEMINI_API_KEY: ${{ secrets.AI_GEMINI_API_KEY }}
+    steps:
+      - name: Skip without a model key
+        if: env.AI_GEMINI_API_KEY == ''
+        working-directory: .
+        run: echo "::notice::AI_GEMINI_API_KEY is not set; receipt evals skipped."
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        if: env.AI_GEMINI_API_KEY != ''
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        if: env.AI_GEMINI_API_KEY != ''
+        with:
+          version: "0.12.24"
+      - if: env.AI_GEMINI_API_KEY != ''
+        run: uv sync --frozen --no-dev
+      - name: Fetch the bootstrap set (CORD-v2)
+        if: env.AI_GEMINI_API_KEY != ''
+        run: uv run python evals/fetch_cord.py --out "$RUNNER_TEMP/cord" --limit "${{ inputs.limit || '50' }}"
+      - name: Score
+        if: env.AI_GEMINI_API_KEY != ''
+        run: uv run python evals/run_receipts.py --data "$RUNNER_TEMP/cord" --min-total-accuracy 0.9
