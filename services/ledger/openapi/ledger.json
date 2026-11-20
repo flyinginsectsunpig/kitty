@@ -1346,6 +1346,55 @@
         }
       }
     },
+    "/groups/{groupId}/table-sessions/{sessionId}/scans/{scanId}/apply": {
+      "post": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "ApplyReceiptScan",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/guest/table-sessions/{sessionId}": {
       "get": {
         "tags": [

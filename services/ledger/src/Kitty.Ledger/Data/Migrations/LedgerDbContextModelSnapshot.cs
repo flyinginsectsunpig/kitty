@@ -222,6 +222,25 @@ namespace Kitty.Ledger.Data.Migrations
                     b.ToTable("IdempotencyRecords");
                 });
 
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.InboxMessage", b =>
+                {
+                    b.Property<string>("EventId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("EventId");
+
+                    b.ToTable("InboxMessages");
+                });
+
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.Invite", b =>
                 {
                     b.Property<Guid>("Id")

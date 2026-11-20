@@ -51,6 +51,7 @@ if (builder.Configuration.GetValue<bool>("Ledger:TrustForwardedHeaders"))
 builder.Services.AddHostedService<IdempotencyCleanup>();
 builder.Services.AddScoped<AuditWriter>();
 builder.Services.AddScoped<Outbox>();
+builder.Services.AddScoped<Kitty.Ledger.Features.Scans.ScanResultHandler>();
 builder.Services.AddSingleton(new Azure.Storage.Blobs.BlobServiceClient(builder.Configuration.GetConnectionString("blobs")
     ?? throw new InvalidOperationException("Connection string 'blobs' (receipt photo storage) is not configured.")));
 builder.Services.AddSingleton<ReceiptBlobs>();
@@ -62,6 +63,7 @@ if (KafkaOptions.From(builder.Configuration) is { } kafka)
         new Confluent.SchemaRegistry.CachedSchemaRegistryClient(new Confluent.SchemaRegistry.SchemaRegistryConfig { Url = kafka.SchemaRegistryUrl }));
     builder.Services.AddSingleton<EventSerializers>();
     builder.Services.AddHostedService<OutboxRelay>();
+    builder.Services.AddHostedService<InboxConsumer>();
 }
 builder.Services.AddScoped<GroupMemberFilter>();
 builder.Services.AddScoped<TableSessionService>();

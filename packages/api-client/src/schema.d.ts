@@ -420,6 +420,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/groups/{groupId}/table-sessions/{sessionId}/scans/{scanId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ApplyReceiptScan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/guest/table-sessions/{sessionId}": {
         parameters: {
             query?: never;
@@ -1645,6 +1661,30 @@ export interface operations {
         };
     };
     ConfirmReceiptUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+                scanId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableSessionDto"];
+                };
+            };
+        };
+    };
+    ApplyReceiptScan: {
         parameters: {
             query?: never;
             header?: never;

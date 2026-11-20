@@ -5,6 +5,7 @@ using Kitty.Ledger.Data.Entities;
 using Kitty.Ledger.Features.Groups;
 using Kitty.Ledger.Features.Table;
 using Kitty.Ledger.Infrastructure;
+using Kitty.Ledger.Infrastructure.Audit;
 using Kitty.Ledger.Infrastructure.Blob;
 using Kitty.Ledger.Infrastructure.Errors;
 using Kitty.Ledger.Infrastructure.Messaging;
@@ -24,6 +25,7 @@ public static class ScanEndpoints
     {
         sessions.MapPost("/{sessionId:guid}/scans", StartAsync).WithName("StartReceiptScan").Produces<StartScanResultDto>(StatusCodes.Status201Created);
         sessions.MapPost("/{sessionId:guid}/scans/{scanId:guid}/uploaded", ConfirmUploadAsync).WithName("ConfirmReceiptUpload").Produces<TableSessionDto>();
+        sessions.MapPost("/{sessionId:guid}/scans/{scanId:guid}/apply", ApplyAsync).WithName("ApplyReceiptScan").Produces<TableSessionDto>();
     }
 
     private static async Task<IResult> StartAsync(Guid groupId, Guid sessionId, StartScanDto body, HttpContext http, LedgerDbContext db,
@@ -102,6 +104,34 @@ public static class ScanEndpoints
         await tx.CommitAsync(ct);
 
         foreach (var old in replaced) await blobs.DeleteAsync(old.BlobName, ct);
+        await svc.NotifyAsync(sessionId, ct);
+        return await CurrentAsync(svc, groupId, sessionId, http, ct);
+    }
+
+    /// <summary>The host chooses to replace the bill's items and charges with what the scan read.</summary>
+    private static async Task<IResult> ApplyAsync(Guid groupId, Guid sessionId, Guid scanId, HttpContext http, LedgerDbContext db,
+        TableSessionService svc, AuditWriter audit, TimeProvider clock, CancellationToken ct)
+    {
+        if (await HostCheckAsync(db, groupId, sessionId, http, ct) is { } denied) return denied;
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        if (!await TableEndpoints.BumpAsync(db, sessionId, clock, ct, SessionStatus.Open))
+            return TableEndpoints.WrongState(await TableEndpoints.CurrentStatusAsync(db, sessionId, ct));
+        var scan = await db.ReceiptScans.SingleOrDefaultAsync(s => s.Id == scanId && s.SessionId == sessionId, ct);
+        if (scan is null) return ApiError.NotFound();
+        if (scan.Status != ScanStatus.Parsed || ScanViews.Suggestion(scan) is not { } suggestion)
+            return ApiError.Conflict(ErrorCodes.NoSuggestion, "This scan has nothing to apply.");
+
+        var session = (await svc.LoadAsync(groupId, sessionId, ct))!;
+        // Re-applying must not collide with the same ids still on the bill from last time: give this copy new ones.
+        var copy = new ScanSuggestion(
+            suggestion.Items.Select(i => i with { Id = Guid.NewGuid() }).ToList(),
+            suggestion.Charges.Select(c => c with { Id = Guid.NewGuid() }).ToList());
+        ScanResultHandler.Replace(session, copy);
+        scan.AppliedAt = clock.NowMicros();
+        audit.Record(GroupMemberFilter.CallerMember(http).User.Id, groupId, TableEndpoints.EntityType, sessionId, AuditActions.Updated, null,
+            new { appliedScan = scanId, items = copy.Items.Count });
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         await svc.NotifyAsync(sessionId, ct);
         return await CurrentAsync(svc, groupId, sessionId, http, ct);
     }

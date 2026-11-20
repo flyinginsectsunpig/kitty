@@ -19,6 +19,7 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
     public DbSet<Guest> Guests => Set<Guest>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<ReceiptScan> ReceiptScans => Set<ReceiptScan>();
+    public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -164,6 +165,13 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
             e.Property(x => x.SuggestionJson).HasColumnType("jsonb");
             e.HasIndex(x => new { x.SessionId, x.CreatedAt });
             e.HasOne<ReceiptSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<InboxMessage>(e =>
+        {
+            e.HasKey(m => m.EventId);
+            e.Property(m => m.EventId).HasMaxLength(64);
+            e.Property(m => m.Topic).HasMaxLength(100);
         });
 
         b.Entity<OutboxMessage>(e =>
