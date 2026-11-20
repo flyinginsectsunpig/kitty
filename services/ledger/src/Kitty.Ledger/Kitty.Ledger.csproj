@@ -12,6 +12,12 @@
     <PackageReference Include="Npgsql.OpenTelemetry" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Event contracts shared with the ai service (contracts/proto). Messages only; no gRPC services yet. -->
+    <Protobuf Include="..\..\..\..\contracts\proto\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="None" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\aspire\Kitty.ServiceDefaults\Kitty.ServiceDefaults.csproj" />

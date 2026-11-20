@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package kitty.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "Kitty.Contracts.Events.V1";
+
+// A host's receipt photo is in blob storage and ready to read. Topic receipt.uploaded (and
+// receipt.uploaded.retry), keyed by session id.
+message ReceiptUploaded {
+  string event_id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  string scan_id = 3;
+  string session_id = 4;
+  string group_id = 5;
+  string blob_name = 6;
+  string currency = 7;
+  string content_type = 8;
+  // 0 for the first try; the ai service increments it on each retry.
+  int32 attempt = 9;
+}
+
+// What the ai service made of a scan. Topic receipt.parsed, keyed by session id.
+message ReceiptResult {
+  string event_id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  string scan_id = 3;
+  string session_id = 4;
+  oneof outcome {
+    ParsedReceipt parsed = 5;
+    ScanFailure failed = 6;
+  }
+}
+
+message ParsedReceipt {
+  string merchant = 1;
+  // yyyy-mm-dd, or empty when the receipt shows no date.
+  string receipt_date = 2;
+  string currency = 3;
+  repeated ParsedItem items = 4;
+  repeated ParsedCharge charges = 5;
+  int64 total_minor = 6;
+}
+
+message ParsedItem {
+  string description = 1;
+  int32 quantity = 2;
+  int64 line_total_minor = 3;
+}
+
+message ParsedCharge {
+  // tip | service | delivery | other
+  string kind = 1;
+  int64 amount_minor = 2;
+}
+
+message ScanFailure {
+  enum Reason {
+    REASON_UNSPECIFIED = 0;
+    UNREADABLE = 1;
+    NO_ITEMS = 2;
+    TOTALS_MISMATCH = 3;
+    RATE_LIMITED = 4;
+    MODEL_UNAVAILABLE = 5;
+  }
+  Reason reason = 1;
+}
