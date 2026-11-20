@@ -56,6 +56,7 @@ builder.Services.AddSingleton(new Azure.Storage.Blobs.BlobServiceClient(builder.
     ?? throw new InvalidOperationException("Connection string 'blobs' (receipt photo storage) is not configured.")));
 builder.Services.AddSingleton<ReceiptBlobs>();
 builder.Services.AddHostedService<ReceiptBlobsSetup>();
+builder.Services.AddHostedService<Kitty.Ledger.Features.Scans.ScanCleanup>();
 if (KafkaOptions.From(builder.Configuration) is { } kafka)
 {
     builder.Services.AddSingleton(kafka);
