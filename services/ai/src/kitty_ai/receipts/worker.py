@@ -34,6 +34,9 @@ RECEIPT_PARSED = "receipt.parsed"
 CONTAINER = "receipts"
 NOT_BEFORE = "not_before"
 DEFAULT_RETRY_DELAYS = (30.0, 60.0, 120.0, 300.0)
+MAX_PHOTO_BYTES = 10 * 1024 * 1024  # the ledger's limit; the upload URL stays valid after its check
+# Starts of one attempt that never finished (the process died reading it) before it is failed as unreadable.
+MAX_STARTS = 3
 SERDE = {"use.deprecated.format": False}
 Reason = pb.ScanFailure.Reason
 
@@ -50,10 +53,23 @@ class ProcessedEvents:
                 "CREATE TABLE IF NOT EXISTS ai.processed_events "
                 "(event_id text PRIMARY KEY, processed_at timestamptz NOT NULL DEFAULT now())"
             )
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS ai.event_attempts (event_id text PRIMARY KEY, attempts int NOT NULL)"
+            )
 
     def seen(self, key: str) -> bool:
         with self._lock, psycopg.connect(self._dsn, autocommit=True) as conn:
             return conn.execute("SELECT 1 FROM ai.processed_events WHERE event_id = %s", (key,)).fetchone() is not None
+
+    def started(self, key: str) -> int:
+        """Counts a start of this attempt and returns how many there have been (crashes leave it counted)."""
+        with self._lock, psycopg.connect(self._dsn, autocommit=True) as conn:
+            row = conn.execute(
+                "INSERT INTO ai.event_attempts (event_id, attempts) VALUES (%s, 1) "
+                "ON CONFLICT (event_id) DO UPDATE SET attempts = ai.event_attempts.attempts + 1 RETURNING attempts",
+                (key,),
+            ).fetchone()
+            return row[0]
 
     def mark(self, key: str) -> None:
         with self._lock, psycopg.connect(self._dsn, autocommit=True) as conn:
@@ -170,17 +186,23 @@ class Worker:
         key = f"{event.event_id}:{event.attempt}"
         if self._processed.seen(key):
             return
-        outcome = self._read_receipt(event)
+        outcome = self._read_receipt(event, key)
         if outcome is None:  # rate limited, and another retry is due
             self._retry_later(event)
         else:
             self._publish(event, outcome)
         self._processed.mark(key)
 
-    def _read_receipt(self, event: pb.ReceiptUploaded) -> pb.ParsedReceipt | int | None:
+    def _read_receipt(self, event: pb.ReceiptUploaded, key: str) -> pb.ParsedReceipt | int | None:
+        if self._processed.started(key) > MAX_STARTS:
+            log.error("Scan %s crashed the reader %d times; failing it", event.scan_id, MAX_STARTS)
+            return Reason.UNREADABLE
         try:
-            image = self._photos.download_blob(event.blob_name).readall()
+            # Never more than the limit plus one byte, however big the blob has grown.
+            image = self._photos.download_blob(event.blob_name, offset=0, length=MAX_PHOTO_BYTES + 1).readall()
         except ResourceNotFoundError:
+            return Reason.UNREADABLE
+        if len(image) > MAX_PHOTO_BYTES:
             return Reason.UNREADABLE
         try:
             return process(image, self._ocr, self._extractor, event.currency)

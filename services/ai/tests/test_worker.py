@@ -145,3 +145,47 @@ def test_missing_photo_fails(settings):
     finally:
         worker.stop()
     assert result.failed.reason == Reason.UNREADABLE
+
+
+class CountingOcr(FakeOcr):
+    def __init__(self, text: str):
+        super().__init__(text)
+        self.calls = 0
+
+    def read(self, image: bytes) -> str:
+        self.calls += 1
+        return super().read(image)
+
+
+def test_oversized_photo_is_unreadable_and_never_reaches_ocr(settings):
+    # The upload URL stays valid after the ledger checked the photo, so it may have grown since.
+    event = upload_event()
+    put_photo(settings, event.blob_name, b"\xff\xd8\xff" + b"\0" * (10 * 1024 * 1024))
+    ocr = CountingOcr("Burger 120,00\nTOTAL 120,00")
+    worker = start(settings, ocr, FakeExtractor(), event, photo=False)
+    try:
+        (result,) = results_for(settings, event.scan_id)
+    finally:
+        worker.stop()
+    assert result.failed.reason == Reason.UNREADABLE
+    assert ocr.calls == 0
+
+
+def test_an_upload_that_keeps_crashing_the_service_is_failed(settings):
+    # Each start is counted before the photo is read; after 3 the next delivery gives up instead of crashing again.
+    import psycopg
+
+    from kitty_ai.settings import postgres_conninfo
+
+    event = upload_event()
+    worker = Worker(settings, FakeOcr("Burger 120,00\nTOTAL 120,00"), FakeExtractor())  # creates the tables
+    with psycopg.connect(postgres_conninfo(settings.postgres_dsn), autocommit=True) as conn:
+        conn.execute("INSERT INTO ai.event_attempts (event_id, attempts) VALUES (%s, 3)", (f"{event.event_id}:0",))
+    put_photo(settings, event.blob_name)
+    worker.start()
+    publish_upload(settings, event)
+    try:
+        (result,) = results_for(settings, event.scan_id)
+    finally:
+        worker.stop()
+    assert result.failed.reason == Reason.UNREADABLE

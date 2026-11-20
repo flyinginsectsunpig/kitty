@@ -738,6 +738,7 @@ dependencies = [
     { name = "google-genai" },
     { name = "httpx" },
     { name = "onnxruntime" },
+    { name = "pillow" },
     { name = "protobuf" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
@@ -749,7 +750,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "grpcio-tools" },
-    { name = "pillow" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "testcontainers", extra = ["azurite"] },
@@ -763,6 +763,7 @@ requires-dist = [
     { name = "google-genai", specifier = "==3.0.0" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "onnxruntime", specifier = "==1.31.1" },
+    { name = "pillow", specifier = "==13.0.0" },
     { name = "protobuf", specifier = "==7.36.2" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.8" },
     { name = "pydantic", specifier = "==2.14.3" },
@@ -774,7 +775,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "grpcio-tools", specifier = "==1.85.1" },
-    { name = "pillow", specifier = "==13.0.0" },
     { name = "pytest", specifier = "==9.2.0" },
     { name = "ruff", specifier = "==0.17.4" },
     { name = "testcontainers", extras = ["azurite", "kafka", "postgres"], specifier = "==4.15.0" },
