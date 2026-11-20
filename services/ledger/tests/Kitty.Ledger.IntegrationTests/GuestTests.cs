@@ -161,6 +161,24 @@ public class GuestTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Once_matched_the_member_and_their_guest_can_each_untap_what_either_tapped()
+    {
+        // The guest and the member are one person once matched, so either screen shows both taps as theirs.
+        var (host, g, hostMember, s) = await TableAsync();
+        var join = await JoinAsync(factory.CreateClient(), s.Id, "My other phone");
+        var guest = AsGuest(factory.CreateClient(), join.GuestToken);
+        (await guest.PutAsync($"/guest/table-sessions/{s.Id}/items/{Salad}/claim", null, Ct)).EnsureSuccessStatusCode();
+        (await host.ClaimAsync(g.Id, s.Id, Burger)).EnsureSuccessStatusCode();
+        (await host.PostJsonAsync($"/groups/{g.Id}/table-sessions/{s.Id}/guests/{join.GuestId}/map", new { memberId = hostMember })).EnsureSuccessStatusCode();
+
+        (await host.DeleteAsync($"/groups/{g.Id}/table-sessions/{s.Id}/items/{Salad}/claim", key: null)).EnsureSuccessStatusCode();
+        (await guest.DeleteAsync($"/guest/table-sessions/{s.Id}/items/{Burger}/claim", Ct)).EnsureSuccessStatusCode();
+
+        var after = await host.GetSessionAsync(g.Id, s.Id);
+        Assert.All(after.Items, i => Assert.Empty(i.Claimants));
+    }
+
+    [Fact]
     public async Task Mapped_guest_claims_count_for_the_member_on_confirm()
     {
         var (host, g, _, s) = await TableAsync();

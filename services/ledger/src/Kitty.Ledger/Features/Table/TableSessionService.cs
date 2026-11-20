@@ -85,7 +85,21 @@ public sealed class TableSessionService(LedgerDbContext db, TimeProvider clock, 
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""INSERT INTO "ItemClaims" ("ItemId", "ClaimantKind", "ClaimantId") VALUES ({itemId}, {claimantKind}, {claimantId}) ON CONFLICT DO NOTHING""", ct);
         else
-            await db.ItemClaims.Where(c => c.ItemId == itemId && c.ClaimantKind == claimantKind && c.ClaimantId == claimantId).ExecuteDeleteAsync(ct);
+        {
+            // A guest matched to a member is that member, and both screens show either's taps as theirs,
+            // so un-tapping removes the member's claim and those of every guest matched to them.
+            var member = claimantKind == ClaimantKinds.Member
+                ? claimantId
+                : await db.Guests.Where(g => g.Id == claimantId).Select(g => g.MappedMemberId).SingleOrDefaultAsync(ct);
+            var sameGuests = member is { } m
+                ? db.Guests.Where(g => g.SessionId == sessionId && g.MappedMemberId == m).Select(g => g.Id)
+                : db.Guests.Where(g => g.Id == claimantId).Select(g => g.Id);
+            await db.ItemClaims
+                .Where(c => c.ItemId == itemId && (
+                    (c.ClaimantKind == ClaimantKinds.Member && c.ClaimantId == member) ||
+                    (c.ClaimantKind == ClaimantKinds.Guest && (c.ClaimantId == claimantId || sameGuests.Contains(c.ClaimantId)))))
+                .ExecuteDeleteAsync(ct);
+        }
 
         await tx.CommitAsync(ct);
         await NotifyAsync(sessionId, ct);
