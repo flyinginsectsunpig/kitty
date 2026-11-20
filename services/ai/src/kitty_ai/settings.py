@@ -16,3 +16,4 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-flash-latest"
     ollama_url: str = ""
     ollama_model: str = "qwen2.5:3b"
+    consumer_group: str = "ai-receipts"
