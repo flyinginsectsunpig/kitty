@@ -388,6 +388,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/groups/{groupId}/table-sessions/{sessionId}/scans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StartReceiptScan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/table-sessions/{sessionId}/scans/{scanId}/uploaded": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ConfirmReceiptUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/guest/table-sessions/{sessionId}": {
         parameters: {
             query?: never;
@@ -721,6 +753,21 @@ export interface components {
         };
         /** @enum {unknown} */
         SplitMethod: "equal" | "exact" | "percent" | "shares" | "itemized";
+        StartScanDto: {
+            /** Format: uuid */
+            id: string;
+            contentType: string;
+        };
+        StartScanResultDto: {
+            /** Format: uuid */
+            scanId: string;
+            /** Format: uri */
+            uploadUrl: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: int64 */
+            maxBytes: number;
+        };
         TableChargeDto: {
             /** Format: uuid */
             id: string;
@@ -745,6 +792,14 @@ export interface components {
             lineTotalMinor: number;
             claimants: components["schemas"]["ClaimantDto"][];
         };
+        TableScanDto: {
+            /** Format: uuid */
+            id: string;
+            status: string;
+            failureReason: null | string;
+            suggestedItems: null | components["schemas"]["ItemWriteDto"][];
+            suggestedCharges: null | components["schemas"]["ChargeWriteDto"][];
+        };
         TableSessionDto: {
             /** Format: uuid */
             id: string;
@@ -763,6 +818,7 @@ export interface components {
             charges: components["schemas"]["TableChargeDto"][];
             guests: components["schemas"]["TableGuestDto"][];
             preview: components["schemas"]["PreviewShareDto"][];
+            scan: null | components["schemas"]["TableScanDto"];
         };
         TableViewerDto: {
             kind: string;
@@ -1545,6 +1601,57 @@ export interface operations {
             path: {
                 groupId: string;
                 sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableSessionDto"];
+                };
+            };
+        };
+    };
+    StartReceiptScan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartScanDto"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartScanResultDto"];
+                };
+            };
+        };
+    };
+    ConfirmReceiptUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+                scanId: string;
             };
             cookie?: never;
         };

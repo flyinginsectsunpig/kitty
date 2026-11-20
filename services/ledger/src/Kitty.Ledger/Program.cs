@@ -14,6 +14,7 @@ using Kitty.Ledger.Infrastructure.Audit;
 using Kitty.Ledger.Infrastructure.Auth;
 using Kitty.Ledger.Infrastructure.Idempotency;
 using Kitty.Ledger.Infrastructure.Messaging;
+using Kitty.Ledger.Infrastructure.Blob;
 using Kitty.Ledger.Infrastructure.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
@@ -50,6 +51,10 @@ if (builder.Configuration.GetValue<bool>("Ledger:TrustForwardedHeaders"))
 builder.Services.AddHostedService<IdempotencyCleanup>();
 builder.Services.AddScoped<AuditWriter>();
 builder.Services.AddScoped<Outbox>();
+builder.Services.AddSingleton(new Azure.Storage.Blobs.BlobServiceClient(builder.Configuration.GetConnectionString("blobs")
+    ?? throw new InvalidOperationException("Connection string 'blobs' (receipt photo storage) is not configured.")));
+builder.Services.AddSingleton<ReceiptBlobs>();
+builder.Services.AddHostedService<ReceiptBlobsSetup>();
 if (KafkaOptions.From(builder.Configuration) is { } kafka)
 {
     builder.Services.AddSingleton(kafka);

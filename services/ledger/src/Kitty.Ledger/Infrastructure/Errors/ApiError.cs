@@ -38,4 +38,8 @@ public static class ErrorCodes
     public const string SessionClosed = "session_closed";
     public const string HostOnly = "host_only";
     public const string GuestsUnmapped = "guests_unmapped";
+    public const string UploadMissing = "upload_missing";
+    public const string UploadTooLarge = "upload_too_large";
+    public const string UploadNotImage = "upload_not_image";
+    public const string NoSuggestion = "no_suggestion";
 }

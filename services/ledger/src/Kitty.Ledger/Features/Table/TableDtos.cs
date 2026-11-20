@@ -34,7 +34,8 @@ public sealed record TableSessionDto(
     IReadOnlyList<TableItemDto> Items,
     IReadOnlyList<TableChargeDto> Charges,
     IReadOnlyList<TableGuestDto> Guests,
-    IReadOnlyList<PreviewShareDto> Preview);
+    IReadOnlyList<PreviewShareDto> Preview,
+    Kitty.Ledger.Features.Scans.TableScanDto? Scan);
 
 /// <summary>A bill still being split, for the group page.</summary>
 public sealed record ActiveTableDto(Guid Id, string Title, string Status, bool HostedByMe);

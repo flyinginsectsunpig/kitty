@@ -6,12 +6,13 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Testcontainers.Azurite;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redpanda;
 
 namespace Kitty.Ledger.IntegrationTests;
 
-/// <summary>Boots the ledger against a throwaway Postgres (pgvector image, same as production) and Redpanda (Kafka + schema registry).</summary>
+/// <summary>Boots the ledger against a throwaway Postgres (pgvector image, same as production), Redpanda (Kafka + schema registry) and Azurite (blob storage).</summary>
 public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("pgvector/pgvector:pg17")
@@ -20,10 +21,15 @@ public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLif
 
     private readonly RedpandaContainer _redpanda = new RedpandaBuilder("docker.redpanda.com/redpandadata/redpanda:v26.2.6").Build();
 
+    // Azurite lags the newest storage API versions the SDK sends, so skip its version check (as the Aspire host does).
+    private readonly AzuriteContainer _azurite = new AzuriteBuilder("mcr.microsoft.com/azure-storage/azurite:3.37.0")
+        .WithCommand("--skipApiVersionCheck").Build();
+
+    public string BlobConnectionString => _azurite.GetConnectionString();
     public string KafkaBootstrap => _redpanda.GetBootstrapAddress();
     public string SchemaRegistryUrl => _redpanda.GetSchemaRegistryAddress();
 
-    public async ValueTask InitializeAsync() => await Task.WhenAll(_postgres.StartAsync(), _redpanda.StartAsync());
+    public async ValueTask InitializeAsync() => await Task.WhenAll(_postgres.StartAsync(), _redpanda.StartAsync(), _azurite.StartAsync());
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -32,6 +38,7 @@ public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLif
         builder.UseSetting("Ledger:MigrateOnStartup", "true");
         builder.UseSetting("ConnectionStrings:kafka", KafkaBootstrap);
         builder.UseSetting("Kafka:SchemaRegistryUrl", SchemaRegistryUrl);
+        builder.UseSetting("ConnectionStrings:blobs", BlobConnectionString);
         builder.UseSetting("Auth:Authority", TestTokens.Issuer);
         builder.UseSetting("Auth:Audience", TestTokens.Audience);
         // Every test-server request has the same (unknown) client IP; the join limit has its own dedicated test.
@@ -63,6 +70,7 @@ public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLif
         await base.DisposeAsync();
         await _postgres.DisposeAsync();
         await _redpanda.DisposeAsync();
+        await _azurite.DisposeAsync();
     }
 }
 

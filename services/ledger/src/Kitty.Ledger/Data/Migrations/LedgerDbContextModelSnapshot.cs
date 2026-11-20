@@ -410,6 +410,58 @@ namespace Kitty.Ledger.Data.Migrations
                     b.ToTable("ReceiptItems");
                 });
 
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptScan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AppliedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("BlobDeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("BlobName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("SuggestionJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset?>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SessionId", "CreatedAt");
+
+                    b.ToTable("ReceiptScans");
+                });
+
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -677,6 +729,15 @@ namespace Kitty.Ledger.Data.Migrations
                 {
                     b.HasOne("Kitty.Ledger.Data.Entities.ReceiptSession", null)
                         .WithMany("Items")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptScan", b =>
+                {
+                    b.HasOne("Kitty.Ledger.Data.Entities.ReceiptSession", null)
+                        .WithMany()
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
