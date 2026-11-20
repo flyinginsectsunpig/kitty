@@ -37,9 +37,9 @@ Keycloak requires email verification (it stops account takeover through Google s
 Create a free Resend account, verify a sending domain or use their test domain, create an API key,
 and put it in `SMTP_PASSWORD`.
 
-## 3a. Receipt scanning (optional)
+## 3a. Receipt scanning
 
-Create a free API key in Google AI Studio and put it in `GEMINI_API_KEY`. Photos never leave the server:
+Optional: create a free API key in Google AI Studio and put it in `GEMINI_API_KEY`. Photos never leave the server:
 the ai service reads the text itself, removes card numbers, phone numbers and staff names, and sends only
 that text to Gemini's free tier (Google may use it to improve its products; the app says so next to the
 scan button). Without a key the scan button still uploads, then tells the host to type the items.
@@ -75,6 +75,10 @@ deploy/compose/smoke.sh kitty-yourname.duckdns.org
 ```
 
 Pin `KITTY_TAG=sha-…` to roll back to a known build.
+
+**Upgrading to receipt scanning (phase 2b):** add `BLOB_ACCOUNT_KEY` (`openssl rand -base64 32`) and
+`AI_DB_PASSWORD` (`openssl rand -hex 24`) to `.env` before `up`; compose refuses to start without them.
+`GEMINI_API_KEY` stays optional.
 
 ## Keycloak admin console
 

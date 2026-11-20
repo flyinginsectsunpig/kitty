@@ -48,7 +48,10 @@ class ProcessedEvents:
         self._dsn = dsn
         self._lock = threading.Lock()
         with psycopg.connect(dsn, autocommit=True) as conn:
-            conn.execute("CREATE SCHEMA IF NOT EXISTS ai")
+            # In production the schema already exists, owned by role "ai", which may not create schemas
+            # (and CREATE SCHEMA IF NOT EXISTS checks that right even when the schema is there).
+            if conn.execute("SELECT 1 FROM pg_namespace WHERE nspname = 'ai'").fetchone() is None:
+                conn.execute("CREATE SCHEMA ai")
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS ai.processed_events "
                 "(event_id text PRIMARY KEY, processed_at timestamptz NOT NULL DEFAULT now())"

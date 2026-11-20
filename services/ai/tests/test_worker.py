@@ -212,3 +212,33 @@ def test_reader_thread_restarts_after_an_unexpected_error(settings):
         worker.stop()
     assert failed == [RECEIPT_UPLOADED]
     assert result.WhichOneof("outcome") == "parsed"
+
+
+def test_dedupe_works_for_a_role_that_owns_only_schema_ai(settings):
+    # Production connects as role "ai", which owns schema ai and may not create schemas (ai-db-setup.sql).
+    import psycopg
+
+    from kitty_ai.receipts.worker import ProcessedEvents
+    from kitty_ai.settings import postgres_conninfo
+
+    admin = postgres_conninfo(settings.postgres_dsn)
+    ProcessedEvents(admin)  # schema and tables exist, as after an earlier version
+    with psycopg.connect(admin, autocommit=True) as conn:
+        conn.execute("DROP ROLE IF EXISTS ai_limited_test")
+        conn.execute("CREATE ROLE ai_limited_test LOGIN PASSWORD 'limited'")
+        conn.execute("ALTER SCHEMA ai OWNER TO ai_limited_test")
+        for table in ("processed_events", "event_attempts"):
+            conn.execute(f"ALTER TABLE ai.{table} OWNER TO ai_limited_test")
+    limited = psycopg.conninfo.make_conninfo(admin, user="ai_limited_test", password="limited")
+    try:
+        events = ProcessedEvents(limited)
+        key = f"{uuid.uuid4()}:0"
+        assert events.started(key) == 1
+        events.mark(key)
+        assert events.seen(key)
+    finally:
+        with psycopg.connect(admin, autocommit=True) as conn:
+            conn.execute("ALTER SCHEMA ai OWNER TO CURRENT_USER")
+            for table in ("processed_events", "event_attempts"):
+                conn.execute(f"ALTER TABLE ai.{table} OWNER TO CURRENT_USER")
+            conn.execute("DROP ROLE ai_limited_test")

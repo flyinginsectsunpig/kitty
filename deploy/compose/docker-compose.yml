@@ -117,6 +117,21 @@ services:
     deploy:
       resources: { limits: { memory: 256m } }
 
+  ai-db-setup:
+    # One-shot, every start: gives the ai service its own role, limited to schema "ai" (ai-db-setup.sql).
+    image: pgvector/pgvector:pg17
+    restart: "no"
+    command: ["psql", "-v", "ai_password=${AI_DB_PASSWORD:?set AI_DB_PASSWORD}", "-f", "/setup/ai-db-setup.sql"]
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ledger
+    volumes:
+      - ./ai-db-setup.sql:/setup/ai-db-setup.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+
   ai:
     <<: *restart
     image: ${KITTY_IMAGE_PREFIX}kitty-ai:${KITTY_TAG:-latest}
@@ -124,7 +139,7 @@ services:
       AI_KAFKA_BOOTSTRAP: redpanda:9092
       AI_SCHEMA_REGISTRY_URL: http://redpanda:8081
       AI_BLOB_CONNECTION_STRING: ${BLOB_CONNECTION_STRING:-DefaultEndpointsProtocol=http;AccountName=kitty;AccountKey=${BLOB_ACCOUNT_KEY};BlobEndpoint=http://azurite:10000/kitty;}
-      AI_POSTGRES_DSN: host=postgres port=5432 dbname=ledger user=postgres password=${POSTGRES_PASSWORD}
+      AI_POSTGRES_DSN: host=postgres port=5432 dbname=ledger user=ai password=${AI_DB_PASSWORD}
       # Empty: scans fail fast with "type the items" and everything else keeps working.
       AI_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     healthcheck:
@@ -135,7 +150,7 @@ services:
       retries: 3
       start_period: 60s
     depends_on:
-      postgres: { condition: service_healthy }
+      ai-db-setup: { condition: service_completed_successfully }
       redpanda: { condition: service_healthy }
       azurite: { condition: service_started }
     deploy:
