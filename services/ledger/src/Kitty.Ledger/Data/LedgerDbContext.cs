@@ -17,6 +17,7 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
     public DbSet<ReceiptItem> ReceiptItems => Set<ReceiptItem>();
     public DbSet<ItemClaim> ItemClaims => Set<ItemClaim>();
     public DbSet<Guest> Guests => Set<Guest>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -150,6 +151,15 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
             e.Property(r => r.RequestHash).HasMaxLength(64);
             e.Property(r => r.Status).HasMaxLength(12);
             e.HasIndex(r => r.CreatedAt);
+        });
+
+        b.Entity<OutboxMessage>(e =>
+        {
+            e.Property(m => m.Topic).HasMaxLength(100);
+            e.Property(m => m.Key).HasMaxLength(100);
+            e.Property(m => m.Type).HasMaxLength(200);
+            // The relay only ever looks at unsent rows, oldest first.
+            e.HasIndex(m => new { m.OccurredAt, m.Id }).HasFilter("\"SentAt\" IS NULL");
         });
     }
 }

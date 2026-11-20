@@ -13,6 +13,7 @@ using Kitty.Ledger.Features.Me;
 using Kitty.Ledger.Infrastructure.Audit;
 using Kitty.Ledger.Infrastructure.Auth;
 using Kitty.Ledger.Infrastructure.Idempotency;
+using Kitty.Ledger.Infrastructure.Messaging;
 using Kitty.Ledger.Infrastructure.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
@@ -48,6 +49,15 @@ if (builder.Configuration.GetValue<bool>("Ledger:TrustForwardedHeaders"))
 }
 builder.Services.AddHostedService<IdempotencyCleanup>();
 builder.Services.AddScoped<AuditWriter>();
+builder.Services.AddScoped<Outbox>();
+if (KafkaOptions.From(builder.Configuration) is { } kafka)
+{
+    builder.Services.AddSingleton(kafka);
+    builder.Services.AddSingleton<Confluent.SchemaRegistry.ISchemaRegistryClient>(_ =>
+        new Confluent.SchemaRegistry.CachedSchemaRegistryClient(new Confluent.SchemaRegistry.SchemaRegistryConfig { Url = kafka.SchemaRegistryUrl }));
+    builder.Services.AddSingleton<EventSerializers>();
+    builder.Services.AddHostedService<OutboxRelay>();
+}
 builder.Services.AddScoped<GroupMemberFilter>();
 builder.Services.AddScoped<TableSessionService>();
 builder.Services.AddScoped<GuestFilter>();
@@ -61,6 +71,8 @@ if (builder.Configuration.GetConnectionString("redis") is { Length: > 0 } redis)
     signalR.AddStackExchangeRedis(redis, o => o.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("kitty"));
 
 var app = builder.Build();
+if (KafkaOptions.From(app.Configuration) is null)
+    app.Logger.LogWarning("Kafka is not configured (ConnectionStrings:kafka); events stay in the outbox until it is.");
 
 if (app.Configuration.GetValue<bool>("Ledger:MigrateOnStartup"))
 {

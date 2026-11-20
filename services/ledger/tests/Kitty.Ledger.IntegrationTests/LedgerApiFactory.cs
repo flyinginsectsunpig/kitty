@@ -7,23 +7,31 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Testcontainers.PostgreSql;
+using Testcontainers.Redpanda;
 
 namespace Kitty.Ledger.IntegrationTests;
 
-/// <summary>Boots the ledger against a throwaway Postgres (pgvector image, same as production).</summary>
+/// <summary>Boots the ledger against a throwaway Postgres (pgvector image, same as production) and Redpanda (Kafka + schema registry).</summary>
 public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("pgvector/pgvector:pg17")
         .WithDatabase("ledger")
         .Build();
 
-    public async ValueTask InitializeAsync() => await _postgres.StartAsync();
+    private readonly RedpandaContainer _redpanda = new RedpandaBuilder("docker.redpanda.com/redpandadata/redpanda:v26.2.6").Build();
+
+    public string KafkaBootstrap => _redpanda.GetBootstrapAddress();
+    public string SchemaRegistryUrl => _redpanda.GetSchemaRegistryAddress();
+
+    public async ValueTask InitializeAsync() => await Task.WhenAll(_postgres.StartAsync(), _redpanda.StartAsync());
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:ledger", _postgres.GetConnectionString());
         builder.UseSetting("Ledger:MigrateOnStartup", "true");
+        builder.UseSetting("ConnectionStrings:kafka", KafkaBootstrap);
+        builder.UseSetting("Kafka:SchemaRegistryUrl", SchemaRegistryUrl);
         builder.UseSetting("Auth:Authority", TestTokens.Issuer);
         builder.UseSetting("Auth:Audience", TestTokens.Audience);
         // Every test-server request has the same (unknown) client IP; the join limit has its own dedicated test.
@@ -54,6 +62,7 @@ public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLif
     {
         await base.DisposeAsync();
         await _postgres.DisposeAsync();
+        await _redpanda.DisposeAsync();
     }
 }
 
