@@ -9,6 +9,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { useTableSession } from "@/hooks/useTableSession";
 import { errorMessage } from "@/lib/errors";
 import { rowsAction } from "@/lib/receipt-upload";
+import { settle } from "@/lib/settle";
 import { tipToMinor, type TableSession } from "@/lib/table-state";
 import { ItemList, PreviewTotals } from "./ItemList";
 import { ReceiptScan } from "./ReceiptScan";
@@ -77,7 +78,7 @@ export function HostTable({
 
   async function run(action: () => Promise<Result>) {
     setBusy(true);
-    const result = await action();
+    const result = await settle(action); // never throws, so busy always clears
     apply(result.session);
     setError(result.error ? (errorMessage(result.error) ?? "Something went wrong.") : null);
     setBusy(false);

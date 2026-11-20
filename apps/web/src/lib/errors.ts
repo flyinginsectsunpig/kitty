@@ -25,6 +25,7 @@ const messages: Record<string, string> = {
   upload_missing: "The photo didn't arrive. Try again.",
   upload_failed: "The photo couldn't be uploaded. Check your connection and try again.",
   no_suggestion: "There's nothing from the scan to use.",
+  network: "Couldn't reach Kitty. Check your connection and try again.",
 };
 
 export function errorMessage(code: string | undefined): string | null {

@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { MAX_PHOTO_BYTES, rowsAction, scanStatusMessage, uploadReceipt, type ScanView } from "@/lib/receipt-upload";
+import { settle } from "@/lib/settle";
 
 const photo = (type = "image/jpeg", size = 2048) => new File([new Uint8Array(size)], "receipt.jpg", { type });
 const started = { scanId: "scan-1", uploadUrl: "https://kitty.example/blob/kitty/receipts/s/scan-1?sig=abc" };
@@ -37,6 +38,16 @@ describe("uploadReceipt", () => {
     const result = await uploadReceipt(photo(), async () => ({ error: "session_locked" }), vi.fn(), put);
     expect(result).toEqual({ session: null, error: "session_locked" });
     expect(put).not.toHaveBeenCalled();
+  });
+
+  test("losing the connection at any step is reported, not thrown", async () => {
+    const offline = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    expect(await uploadReceipt(photo(), offline, vi.fn(), vi.fn())).toEqual({ session: null, error: "upload_failed" });
+    expect(await uploadReceipt(photo(), async () => started, vi.fn(), offline)).toEqual({ session: null, error: "upload_failed" });
+    const putOk = async () => new Response(null, { status: 201 });
+    expect(await uploadReceipt(photo(), async () => started, offline, putOk)).toEqual({ session: null, error: "upload_failed" });
   });
 
   test("a failed upload is reported and never confirmed", async () => {
@@ -97,5 +108,18 @@ describe("rowsAction (rows typed, items the rows were built from, items on the b
   });
   test("nothing changed", () => {
     expect(rowsAction("v1", "v1", "v1")).toBe("keep");
+  });
+});
+
+describe("settle", () => {
+  test("an action that throws (the network dropped) becomes an error, so the screen never stays busy", async () => {
+    const result = await settle(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    expect(result).toEqual({ session: null, error: "network" });
+  });
+  test("results pass through", async () => {
+    const ok = { session: null, error: "session_locked" };
+    expect(await settle(async () => ok)).toBe(ok);
   });
 });

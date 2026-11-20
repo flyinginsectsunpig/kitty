@@ -25,16 +25,21 @@ export async function uploadReceipt(
   if (!PHOTO_TYPES.includes(file.type)) return { session: null, error: "upload_not_image" };
   if (file.size > MAX_PHOTO_BYTES) return { session: null, error: "upload_too_large" };
 
-  const started = await start(file.type);
-  if ("error" in started) return { session: null, error: started.error };
+  // Phones at a table drop signal: any step that throws is an upload that didn't happen, not a crash.
+  try {
+    const started = await start(file.type);
+    if ("error" in started) return { session: null, error: started.error };
 
-  const uploaded = await put(started.uploadUrl, {
-    method: "PUT",
-    headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": file.type },
-    body: file,
-  });
-  if (!uploaded.ok) return { session: null, error: "upload_failed" };
-  return confirm(started.scanId);
+    const uploaded = await put(started.uploadUrl, {
+      method: "PUT",
+      headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": file.type },
+      body: file,
+    });
+    if (!uploaded.ok) return { session: null, error: "upload_failed" };
+    return await confirm(started.scanId);
+  } catch {
+    return { session: null, error: "upload_failed" };
+  }
 }
 
 const FAILURES: Record<string, string> = {
