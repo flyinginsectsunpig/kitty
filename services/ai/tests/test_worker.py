@@ -189,3 +189,26 @@ def test_an_upload_that_keeps_crashing_the_service_is_failed(settings):
     finally:
         worker.stop()
     assert result.failed.reason == Reason.UNREADABLE
+
+
+def test_reader_thread_restarts_after_an_unexpected_error(settings):
+    event = upload_event()
+    put_photo(settings, event.blob_name)
+    worker = Worker(settings, FakeOcr("Burger 120,00\nTOTAL 120,00"), FakeExtractor(), restart_delay=0.1)
+    real_run, failed = worker._run, []
+
+    def flaky(topic, group):
+        if topic == RECEIPT_UPLOADED and not failed:
+            failed.append(topic)
+            raise RuntimeError("consumer commit failed")
+        real_run(topic, group)
+
+    worker._run = flaky
+    worker.start()
+    publish_upload(settings, event)
+    try:
+        (result,) = results_for(settings, event.scan_id)
+    finally:
+        worker.stop()
+    assert failed == [RECEIPT_UPLOADED]
+    assert result.WhichOneof("outcome") == "parsed"

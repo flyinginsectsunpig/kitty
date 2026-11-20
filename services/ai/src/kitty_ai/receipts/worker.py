@@ -99,11 +99,14 @@ def _now() -> Timestamp:
 
 
 class Worker:
-    def __init__(self, settings: Settings, ocr: Ocr, extractor: Extractor, retry_delays=DEFAULT_RETRY_DELAYS):
+    def __init__(
+        self, settings: Settings, ocr: Ocr, extractor: Extractor, retry_delays=DEFAULT_RETRY_DELAYS, restart_delay=5.0
+    ):
         self._settings = settings
         self._ocr = ocr
         self._extractor = extractor
         self._retry_delays = tuple(retry_delays)
+        self._restart_delay = restart_delay
         registry = SchemaRegistryClient({"url": settings.schema_registry_url})
         self._read_upload = ProtobufDeserializer(pb.ReceiptUploaded, SERDE)
         self._write_upload = ProtobufSerializer(pb.ReceiptUploaded, registry, SERDE)
@@ -120,15 +123,15 @@ class Worker:
 
     @property
     def running(self) -> bool:
-        return any(t.is_alive() for t in self._threads)
+        return bool(self._threads) and all(t.is_alive() for t in self._threads)
 
     def start(self) -> None:
         ensure_topics(self._settings.kafka_bootstrap)
         group = self._settings.consumer_group
         self._threads = [
-            threading.Thread(target=self._run, args=(RECEIPT_UPLOADED, group), name="receipts", daemon=True),
+            threading.Thread(target=self._keep_running, args=(RECEIPT_UPLOADED, group), name="receipts", daemon=True),
             threading.Thread(
-                target=self._run, args=(RECEIPT_RETRY, f"{group}.retry"), name="receipt-retries", daemon=True
+                target=self._keep_running, args=(RECEIPT_RETRY, f"{group}.retry"), name="receipt-retries", daemon=True
             ),
         ]
         for t in self._threads:
@@ -139,6 +142,15 @@ class Worker:
         for t in self._threads:
             t.join(timeout=10)
         self._producer.flush(10)
+
+    def _keep_running(self, topic: str, group: str) -> None:
+        """Runs a reader until stopped; anything unexpected (a failed commit, a lost connection) starts it afresh."""
+        while not self._stop.is_set():
+            try:
+                self._run(topic, group)
+            except Exception:
+                log.exception("The %s reader failed; restarting it", topic)
+                self._stop.wait(self._restart_delay)
 
     def _run(self, topic: str, group: str) -> None:
         consumer = Consumer(

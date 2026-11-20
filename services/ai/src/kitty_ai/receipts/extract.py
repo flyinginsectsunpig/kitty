@@ -22,7 +22,7 @@ SYSTEM = (
 
 
 class RateLimited(Exception):
-    """The model provider is throttling us; try again later."""
+    """The model is busy (throttled, overloaded or slow to answer); try again later."""
 
 
 class ModelUnavailable(Exception):
@@ -45,8 +45,11 @@ def _validated(raw: str | None) -> ExtractedReceipt:
 
 
 class GeminiExtractor:
+    # A stalled request must not hold the reader forever (the client's own default is no timeout).
+    TIMEOUT_MS = 30_000
+
     def __init__(self, api_key: str = "", model: str = "gemini-flash-latest", client=None):
-        self._client = client or genai.Client(api_key=api_key)
+        self._client = client or genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=self.TIMEOUT_MS))
         self._model = model
 
     def extract(self, text: str) -> ExtractedReceipt:
@@ -62,9 +65,11 @@ class GeminiExtractor:
                 ),
             )
         except errors.APIError as e:
-            if e.code == 429:
+            if e.code == 429 or e.code >= 500:  # throttled or overloaded: busy, not switched off
                 raise RateLimited(str(e)) from e
-            raise ModelUnavailable(str(e)) from e
+            raise ModelUnavailable(str(e)) from e  # e.g. a missing or rejected key
+        except httpx.TimeoutException as e:
+            raise RateLimited(str(e)) from e
         if isinstance(response.parsed, ExtractedReceipt):
             return response.parsed
         return _validated(response.text)
@@ -85,10 +90,12 @@ class OllamaExtractor:
         }
         try:
             response = self._client.post("/api/chat", json=body)
+        except httpx.TimeoutException as e:
+            raise RateLimited(str(e)) from e
         except httpx.HTTPError as e:
             raise ModelUnavailable(str(e)) from e
-        if response.status_code == 429:
-            raise RateLimited(response.text)
+        if response.status_code == 429 or response.status_code >= 500:
+            raise RateLimited(response.text[:200])
         if response.is_error:
             raise ModelUnavailable(f"{response.status_code}: {response.text[:200]}")
         return _validated(response.json().get("message", {}).get("content"))

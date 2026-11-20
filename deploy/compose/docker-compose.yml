@@ -127,6 +127,13 @@ services:
       AI_POSTGRES_DSN: host=postgres port=5432 dbname=ledger user=postgres password=${POSTGRES_PASSWORD}
       # Empty: scans fail fast with "type the items" and everything else keeps working.
       AI_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    healthcheck:
+      # 503 when a receipt reader has stopped.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     depends_on:
       postgres: { condition: service_healthy }
       redpanda: { condition: service_healthy }

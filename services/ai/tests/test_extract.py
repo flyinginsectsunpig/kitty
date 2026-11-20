@@ -61,10 +61,35 @@ def test_gemini_maps_429_to_rate_limited():
         gemini(FakeModels(error=error)).extract("x")
 
 
-def test_gemini_other_errors_are_unavailable():
+def test_gemini_overload_is_retried_later():
+    # Free-tier Gemini is often briefly overloaded: that is "busy", not "switched off".
     error = errors.ServerError(503, {"error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}})
+    with pytest.raises(RateLimited):
+        gemini(FakeModels(error=error)).extract("x")
+
+
+def test_gemini_timeout_is_retried_later():
+    with pytest.raises(RateLimited):
+        gemini(FakeModels(error=httpx.ReadTimeout("slow"))).extract("x")
+
+
+def test_gemini_rejecting_the_key_is_unavailable():
+    error = errors.ClientError(403, {"error": {"code": 403, "message": "bad key", "status": "PERMISSION_DENIED"}})
     with pytest.raises(ModelUnavailable):
         gemini(FakeModels(error=error)).extract("x")
+
+
+def test_gemini_client_has_a_request_timeout(monkeypatch):
+    seen = {}
+
+    def fake_client(**kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(models=FakeModels())
+
+    monkeypatch.setattr("kitty_ai.receipts.extract.genai.Client", fake_client)
+    GeminiExtractor(api_key="k")
+    assert seen["api_key"] == "k"
+    assert seen["http_options"].timeout == 30_000
 
 
 def test_gemini_output_that_is_not_a_receipt_is_unusable():
@@ -87,6 +112,12 @@ def test_ollama_request_sends_schema():
     assert (body["model"], body["stream"]) == ("qwen-test", False)
     assert body["format"] == ExtractedReceipt.model_json_schema()
     assert body["messages"][-1] == {"role": "user", "content": "Burger 120,00"}
+
+
+def test_ollama_overloaded_is_retried_later():
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(503)), base_url="http://ollama:11434")
+    with pytest.raises(RateLimited):
+        OllamaExtractor(model="m", client=client).extract("x")
 
 
 def test_ollama_down_is_unavailable():
