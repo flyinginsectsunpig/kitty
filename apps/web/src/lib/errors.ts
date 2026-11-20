@@ -20,6 +20,11 @@ const messages: Record<string, string> = {
   host_only: "Only the person running the table can do that.",
   guests_unmapped: "Match every guest who claimed something to someone in the group first.",
   edit_in_table: "This bill was split at the table. Delete it and split it again to change it.",
+  upload_not_image: "That isn't a photo Kitty can read. Use a JPEG, PNG or WebP picture of the receipt.",
+  upload_too_large: "That photo is over 10 MB. Try a smaller one.",
+  upload_missing: "The photo didn't arrive. Try again.",
+  upload_failed: "The photo couldn't be uploaded. Check your connection and try again.",
+  no_suggestion: "There's nothing from the scan to use.",
 };
 
 export function errorMessage(code: string | undefined): string | null {
