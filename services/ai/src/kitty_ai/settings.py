@@ -1,4 +1,24 @@
+import psycopg.conninfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DOTNET_KEYS = {
+    "host": "host",
+    "server": "host",
+    "port": "port",
+    "username": "user",
+    "user id": "user",
+    "password": "password",
+    "database": "dbname",
+}
+
+
+def postgres_conninfo(dsn: str) -> str:
+    """Accepts a libpq string (URI or key=value) or the .NET style Aspire hands out (Host=..;Username=..)."""
+    if ";" not in dsn:
+        return dsn
+    pairs = (part.split("=", 1) for part in dsn.split(";") if "=" in part)
+    known = {_DOTNET_KEYS[k.strip().lower()]: v for k, v in pairs if k.strip().lower() in _DOTNET_KEYS}
+    return psycopg.conninfo.make_conninfo(**known)
 
 
 class Settings(BaseSettings):

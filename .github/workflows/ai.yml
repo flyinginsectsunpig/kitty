@@ -1,0 +1,33 @@
+name: ai
+
+on:
+  workflow_call: # images.yml runs these before publishing
+  push:
+    branches: [main]
+    paths: ["services/ai/**", "contracts/**", ".github/workflows/ai.yml"]
+  pull_request:
+    paths: ["services/ai/**", "contracts/**", ".github/workflows/ai.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/ai
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.12.24"
+      - run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check && uv run ruff format --check
+      - name: Generated contracts match contracts/proto
+        run: |
+          uv run python scripts/gen_contracts.py
+          git diff --exit-code -- src/kitty_ai/contracts
+      - name: Tests (real OCR; Redpanda, Azurite and Postgres via Testcontainers)
+        run: uv run pytest

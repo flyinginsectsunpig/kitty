@@ -13,9 +13,20 @@ See [the design](docs/superpowers/specs/2026-11-15-kitty-design.md).
 - **Split a bill at the table:** the host enters the bill, everyone scans a QR code and taps what they had —
   live, on their own phones, no account needed for guests. Shared plates and the tip are split fairly, and
   confirming turns it into one expense. VAT is never added on top (South African prices include it).
+- **Scan the receipt:** photograph the bill and its items and tip fill in by themselves. The photo stays on
+  Kitty's server; only the text, with card numbers, phone numbers and names removed, goes to an AI model.
 
 ## Local dev
 
+Needs the .NET 10 SDK, Node 24 with corepack (`corepack pnpm install` once), Docker, and
+[uv](https://docs.astral.sh/uv/) on your PATH (it sets up the Python ai service).
+
 ```bash
 dotnet run --project aspire/Kitty.AppHost
+```
+
+Receipt scanning uses Gemini when you give it a key (otherwise scans fail fast and you type the items):
+
+```bash
+dotnet user-secrets set Parameters:gemini-api-key <key> --project aspire/Kitty.AppHost
 ```

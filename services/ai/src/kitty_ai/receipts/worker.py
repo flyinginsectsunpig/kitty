@@ -23,7 +23,7 @@ from kitty_ai.contracts.kitty.events.v1 import receipts_pb2 as pb
 from kitty_ai.receipts.extract import Extractor, RateLimited
 from kitty_ai.receipts.ocr import Ocr
 from kitty_ai.receipts.pipeline import process
-from kitty_ai.settings import Settings
+from kitty_ai.settings import Settings, postgres_conninfo
 
 log = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ class Worker:
         self._photos = BlobServiceClient.from_connection_string(settings.blob_connection_string).get_container_client(
             CONTAINER
         )
-        self._processed = ProcessedEvents(settings.postgres_dsn)
+        self._processed = ProcessedEvents(postgres_conninfo(settings.postgres_dsn))
         self._stop = threading.Event()
         self._threads: list[threading.Thread] = []
 

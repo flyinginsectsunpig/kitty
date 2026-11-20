@@ -13,10 +13,12 @@ jobs:
     uses: ./.github/workflows/ledger.yml
   web-tests:
     uses: ./.github/workflows/web.yml
+  ai-tests:
+    uses: ./.github/workflows/ai.yml
 
   build:
     # Only images whose tests passed are published (the runbook deploys :latest).
-    needs: [ledger-tests, web-tests]
+    needs: [ledger-tests, web-tests, ai-tests]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -25,6 +27,8 @@ jobs:
             dockerfile: services/ledger/Dockerfile
           - name: kitty-web
             dockerfile: apps/web/Dockerfile
+          - name: kitty-ai
+            dockerfile: services/ai/Dockerfile
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0

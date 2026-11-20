@@ -28,6 +28,23 @@
 		reverse_proxy web:3000
 	}
 
+	# Receipt photos: browsers PUT them with a signed, write-only URL from the ledger. Only uploads pass;
+	# nothing can be read back through here.
+	@blobUpload {
+		path /blob/*
+		method PUT
+	}
+	handle @blobUpload {
+		request_body {
+			max_size 11MB
+		}
+		uri strip_prefix /blob
+		reverse_proxy azurite:10000
+	}
+	handle /blob/* {
+		respond 404
+	}
+
 	# Public ledger API (used by the mobile app from phase 2): /api/health → ledger /health.
 	handle_path /api/* {
 		reverse_proxy ledger:8080

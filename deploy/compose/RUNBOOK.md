@@ -1,4 +1,4 @@
-# Deploying Kitty on Oracle Always Free (phase 1)
+# Deploying Kitty on Oracle Always Free
 
 One small ARM server runs everything with Docker Compose: Postgres, Keycloak, the ledger, the web
 app and Caddy (automatic HTTPS). Cost: R0. Phase 5 replaces this with k3s, Helm and Argo CD.
@@ -36,6 +36,18 @@ reserved IP. The IP is static, so no updater is needed.
 Keycloak requires email verification (it stops account takeover through Google sign-in).
 Create a free Resend account, verify a sending domain or use their test domain, create an API key,
 and put it in `SMTP_PASSWORD`.
+
+## 3a. Receipt scanning (optional)
+
+Create a free API key in Google AI Studio and put it in `GEMINI_API_KEY`. Photos never leave the server:
+the ai service reads the text itself, removes card numbers, phone numbers and staff names, and sends only
+that text to Gemini's free tier (Google may use it to improve its products; the app says so next to the
+scan button). Without a key the scan button still uploads, then tells the host to type the items.
+
+Receipt photos are stored in Azurite on the server (`BLOB_ACCOUNT_KEY` protects them) and deleted 90 days
+after the bill closes. To use a real Azure storage account instead, set `BLOB_CONNECTION_STRING` to its
+connection string, set `BLOB_PUBLIC_URL=` (empty, so browsers upload to Azure directly), and add a CORS
+rule on the account allowing `PUT` from `https://<your host>`.
 
 ## 4. Configure and start
 
