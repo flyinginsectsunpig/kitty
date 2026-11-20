@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createLedgerClient } from "../src/index";
+import { createGuestLedgerClient, createLedgerClient } from "../src/index";
 
 function recordingFetch() {
   const requests: Request[] = [];
@@ -33,6 +33,13 @@ describe("createLedgerClient", () => {
     const client = createLedgerClient("http://ledger.test", async () => "tok", fetchFn);
     await client.PATCH("/me", { body: { displayName: "New" }, headers: { "Idempotency-Key": "form-key-1" } });
     expect(requests[0]!.headers.get("idempotency-key")).toBe("form-key-1");
+  });
+
+  test("a guest client sends the guest token, never a bearer token", async () => {
+    const { requests, fetchFn } = recordingFetch();
+    const guest = createGuestLedgerClient("http://ledger.test", "guest-tok", fetchFn);
+    await guest.GET("/guest/table-sessions/{sessionId}", { params: { path: { sessionId: "00000000-0000-0000-0000-000000000001" } } });
+    expect(requests[0]!.headers.get("authorization")).toBe("Guest guest-tok");
   });
 
   test("reads never get an Idempotency-Key", async () => {

@@ -19,6 +19,30 @@ export default async function EditExpensePage({
     await ledger.GET("/groups/{groupId}/expenses/{expenseId}", { params: { path: { groupId: id, expenseId } } }),
   );
 
+  const deleteForm = (
+    <form action={deleteExpense}>
+      <input type="hidden" name="groupId" value={id} />
+      <input type="hidden" name="expenseId" value={expense.id} />
+      <input type="hidden" name="idempotencyKey" value={crypto.randomUUID()} />
+      <button className="btn-secondary w-full text-owes">Delete expense</button>
+    </form>
+  );
+
+  if (expense.split.method === "itemized") {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">{expense.description}</h1>
+        <ErrorBanner code={error} />
+        <p className="card text-sm text-stone-600 dark:text-stone-400">
+          This bill was split item by item at the table, so it can&apos;t be edited here. To change it, delete it and split
+          the bill again.
+        </p>
+        {deleteForm}
+      </section>
+    );
+  }
+
+  const method = expense.split.method;
   const exp = exponent(expense.currency);
   const valueText = (memberId: string): string => {
     const p = expense.split.participants.find((x) => x.memberId === memberId);
@@ -47,7 +71,7 @@ export default async function EditExpensePage({
           amount: toDecimalString(expense.amountMinor, exp),
           occurredOn: expense.occurredOn,
           payerId: expense.payers[0]?.memberId ?? me.id,
-          method: expense.split.method,
+          method,
           participants: group.members.map((m) => ({
             memberId: m.id,
             included: expense.split.participants.some((p) => p.memberId === m.id),
@@ -55,12 +79,7 @@ export default async function EditExpensePage({
           })),
         }}
       />
-      <form action={deleteExpense}>
-        <input type="hidden" name="groupId" value={id} />
-        <input type="hidden" name="expenseId" value={expense.id} />
-        <input type="hidden" name="idempotencyKey" value={crypto.randomUUID()} />
-        <button className="btn-secondary w-full text-owes">Delete expense</button>
-      </form>
+      {deleteForm}
     </section>
   );
 }

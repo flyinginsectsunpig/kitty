@@ -23,6 +23,11 @@
 		respond 404
 	}
 
+	# Auth.js (sign-in, the Keycloak callback, sign-out) is part of the web app, under /api/auth.
+	handle /api/auth/* {
+		reverse_proxy web:3000
+	}
+
 	# Public ledger API (used by the mobile app from phase 2): /api/health → ledger /health.
 	handle_path /api/* {
 		reverse_proxy ledger:8080

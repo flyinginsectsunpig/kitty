@@ -14,18 +14,44 @@ export default async function GroupPage({
   const { id } = await params;
   const { cursor } = await searchParams;
   const { ledger, group, me, nameOf } = await loadGroup(id);
-  const [balances, page] = await Promise.all([
+  const [balances, page, tables] = await Promise.all([
     ledger.GET("/groups/{groupId}/balances", { params: { path: { groupId: id } } }).then(unwrap),
     ledger.GET("/groups/{groupId}/expenses", { params: { path: { groupId: id }, query: { cursor, limit: 30 } } }).then(unwrap),
+    ledger.GET("/groups/{groupId}/table-sessions", { params: { path: { groupId: id } } }).then(unwrap),
   ]);
 
   return (
     <section className="space-y-6">
       <GroupNav groupId={id} groupName={group.name} active="" />
 
-      <Link href={`/groups/${id}/expenses/new`} className="btn-primary w-full text-base">
-        Add an expense
-      </Link>
+      <div className="grid grid-cols-2 gap-2">
+        <Link href={`/groups/${id}/expenses/new`} className="btn-primary text-base">
+          Add an expense
+        </Link>
+        <Link href={`/groups/${id}/table/new`} className="btn-secondary text-base">
+          Split a bill at the table
+        </Link>
+      </div>
+
+      {tables.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="font-semibold">Bills being split</h2>
+          <ul className="space-y-2">
+            {tables.map((t) => (
+              <li key={t.id}>
+                {/* The host goes back to running the bill; anyone else to claiming on it. */}
+                <Link href={t.hostedByMe ? `/groups/${id}/table/${t.id}` : `/t/${t.id}?g=${id}`}
+                  className="card flex items-center justify-between gap-3 hover:border-brand-500">
+                  <span className="min-w-0 truncate font-medium">{t.title}</span>
+                  <span className="shrink-0 text-sm text-stone-500">
+                    {t.status === "locked" ? "locked" : "open"} · {t.hostedByMe ? "you're hosting" : "tap what you had"}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="card space-y-3">
         <h2 className="font-semibold">Balances</h2>

@@ -5,6 +5,9 @@ var postgres = builder.AddPostgres("postgres")
     .WithImageTag("pg17"); // ephemeral in dev, like Keycloak: both reset on every run
 var ledgerDb = postgres.AddDatabase("ledger-db", databaseName: "ledger");
 
+// SignalR backplane for live table updates (correct across ledger replicas).
+var redis = builder.AddRedis("redis");
+
 // Catches Keycloak's verification emails locally (UI on the "ui" endpoint).
 var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.33.1")
     .WithHttpEndpoint(targetPort: 8025, name: "ui")
@@ -22,7 +25,10 @@ var ledger = builder.AddProject<Projects.Kitty_Ledger>("ledger")
     .WaitFor(keycloak)
     .WithEnvironment("Auth__Authority", realmUrl)
     .WithEnvironment("Auth__Audience", "kitty-ledger")
-    .WithEnvironment("Ledger__MigrateOnStartup", "true");
+    .WithEnvironment("Ledger__MigrateOnStartup", "true")
+    .WithReference(redis)
+    .WaitFor(redis)
+    .WithEnvironment("Ledger__WebOrigins", "http://localhost:3000");
 
 // Generated once and kept in user secrets; signs the web session cookie.
 var authSecret = builder.AddParameter("auth-secret",
@@ -35,6 +41,7 @@ builder.AddJavaScriptApp("web", "../../apps/web", "dev")
     .WithReference(ledger)
     .WaitFor(ledger)
     .WithEnvironment("LEDGER_URL", ledger.GetEndpoint("http"))
+    .WithEnvironment("LEDGER_PUBLIC_URL", ledger.GetEndpoint("http")) // the browser opens the live connection here
     .WithEnvironment("AUTH_URL", "http://localhost:3000")
     .WithEnvironment("AUTH_SECRET", authSecret)
     .WithEnvironment("AUTH_KEYCLOAK_ID", "kitty-web")

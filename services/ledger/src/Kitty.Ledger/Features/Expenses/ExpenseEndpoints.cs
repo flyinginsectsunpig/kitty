@@ -65,6 +65,8 @@ public static class ExpenseEndpoints
         var caller = GroupMemberFilter.CallerMember(http);
         var expense = await db.Expenses.SingleOrDefaultAsync(x => x.Id == expenseId && x.GroupId == groupId && x.DeletedAt == null, ct);
         if (expense is null) return ApiError.NotFound();
+        if (expense.SplitMethod == SplitMethod.Itemized)
+            return ApiError.Conflict(ErrorCodes.EditInTable, "This expense was split at the table. Delete it and split the bill again.");
         if (body.Version is null) return ApiError.Validation("version is required when updating an expense.");
         if (body.Version != expense.Version) return VersionConflict();
 

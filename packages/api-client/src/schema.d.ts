@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/table-sessions/{sessionId}/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["JoinTableAsGuest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -116,6 +132,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/groups/{groupId}/table-sessions/{sessionId}/listen-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetTableListenToken"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/groups/{groupId}/invites": {
         parameters: {
             query?: never;
@@ -196,6 +228,214 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/groups/{groupId}/table-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListActiveTableSessions"];
+        put?: never;
+        post: operations["CreateTableSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/table-sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetTableSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/table-sessions/{sessionId}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ReplaceTableItems"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/table-sessions/{sessionId}/charges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ReplaceTableCharges"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/table-sessions/{sessionId}/items/{itemId}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ClaimTableItem"];
+        post?: never;
+        delete: operations["UnclaimTableItem"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/table-sessions/{sessionId}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LockTableSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/table-sessions/{sessionId}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UnlockTableSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/table-sessions/{sessionId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CancelTableSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/table-sessions/{sessionId}/guests/{guestId}/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MapTableGuest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/table-sessions/{sessionId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ConfirmTableSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/guest/table-sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetTableAsGuest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/guest/table-sessions/{sessionId}/items/{itemId}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ClaimTableItemAsGuest"];
+        post?: never;
+        delete: operations["UnclaimTableItemAsGuest"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/guest/table-sessions/{sessionId}/listen-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetTableListenTokenAsGuest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invites/{token}": {
         parameters: {
             query?: never;
@@ -232,6 +472,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ActiveTableDto: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            status: string;
+            hostedByMe: boolean;
+        };
         ActivityDto: {
             /** Format: uuid */
             id: string;
@@ -251,6 +498,19 @@ export interface components {
         BalancesDto: {
             currencies: components["schemas"]["CurrencyBalanceDto"][];
         };
+        ChargeWriteDto: {
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            /** Format: int64 */
+            amountMinor: number;
+        };
+        ClaimantDto: {
+            kind: string;
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+        };
         CreateGroupDto: {
             /** Format: uuid */
             id: string;
@@ -260,6 +520,14 @@ export interface components {
         CreateInviteDto: {
             /** Format: uuid */
             memberId: null | string;
+        };
+        CreateTableSessionDto: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            currency: string;
+            /** Format: uuid */
+            payerMemberId: string;
         };
         CurrencyBalanceDto: {
             currency: string;
@@ -323,6 +591,13 @@ export interface components {
             memberCount: number;
             myNet: components["schemas"]["NetDto"][];
         };
+        GuestJoinDto: {
+            /** Format: uuid */
+            guestId: string;
+            guestToken: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
         InviteDto: {
             token: string;
             /** Format: date-time */
@@ -334,7 +609,28 @@ export interface components {
             /** Format: date-time */
             expiresAt: string;
         };
+        ItemWriteDto: {
+            /** Format: uuid */
+            id: string;
+            description: string;
+            /** Format: int32 */
+            quantity: number;
+            /** Format: int64 */
+            lineTotalMinor: number;
+        };
+        JoinTableDto: {
+            displayName: string;
+        };
         JsonElement: unknown;
+        ListenTokenDto: {
+            token: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        MapGuestDto: {
+            /** Format: uuid */
+            memberId: null | string;
+        };
         MeDto: {
             /** Format: uuid */
             id: string;
@@ -373,6 +669,20 @@ export interface components {
             /** Format: int64 */
             amountMinor: number;
         };
+        PreviewShareDto: {
+            kind: string;
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            /** Format: int64 */
+            amountMinor: number;
+        };
+        ReplaceChargesDto: {
+            charges: components["schemas"]["ChargeWriteDto"][];
+        };
+        ReplaceItemsDto: {
+            items: components["schemas"]["ItemWriteDto"][];
+        };
         SettlementDto: {
             /** Format: uuid */
             id: string;
@@ -410,7 +720,55 @@ export interface components {
             participants: components["schemas"]["ParticipantDto"][];
         };
         /** @enum {unknown} */
-        SplitMethod: "equal" | "exact" | "percent" | "shares";
+        SplitMethod: "equal" | "exact" | "percent" | "shares" | "itemized";
+        TableChargeDto: {
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            /** Format: int64 */
+            amountMinor: number;
+        };
+        TableGuestDto: {
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            /** Format: uuid */
+            mappedMemberId: null | string;
+        };
+        TableItemDto: {
+            /** Format: uuid */
+            id: string;
+            description: string;
+            /** Format: int32 */
+            quantity: number;
+            /** Format: int64 */
+            lineTotalMinor: number;
+            claimants: components["schemas"]["ClaimantDto"][];
+        };
+        TableSessionDto: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            currency: string;
+            status: string;
+            /** Format: int32 */
+            version: number;
+            /** Format: uuid */
+            payerMemberId: string;
+            payerDisplayName: string;
+            /** Format: uuid */
+            expenseId: null | string;
+            viewer: components["schemas"]["TableViewerDto"];
+            items: components["schemas"]["TableItemDto"][];
+            charges: components["schemas"]["TableChargeDto"][];
+            guests: components["schemas"]["TableGuestDto"][];
+            preview: components["schemas"]["PreviewShareDto"][];
+        };
+        TableViewerDto: {
+            kind: string;
+            /** Format: uuid */
+            id: string;
+        };
         TransferDto: {
             /** Format: uuid */
             fromMemberId: string;
@@ -438,6 +796,32 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    JoinTableAsGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinTableDto"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestJoinDto"];
+                };
+            };
+        };
+    };
     GetMe: {
         parameters: {
             query?: never;
@@ -674,6 +1058,29 @@ export interface operations {
             };
         };
     };
+    GetTableListenToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListenTokenDto"];
+                };
+            };
+        };
+    };
     CreateInvite: {
         parameters: {
             query?: never;
@@ -866,6 +1273,377 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ListActiveTableSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveTableDto"][];
+                };
+            };
+        };
+    };
+    CreateTableSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTableSessionDto"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableSessionDto"];
+                };
+            };
+        };
+    };
+    GetTableSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableSessionDto"];
+                };
+            };
+        };
+    };
+    ReplaceTableItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceItemsDto"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableSessionDto"];
+                };
+            };
+        };
+    };
+    ReplaceTableCharges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceChargesDto"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableSessionDto"];
+                };
+            };
+        };
+    };
+    ClaimTableItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UnclaimTableItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LockTableSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UnlockTableSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CancelTableSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableSessionDto"];
+                };
+            };
+        };
+    };
+    MapTableGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+                guestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MapGuestDto"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableSessionDto"];
+                };
+            };
+        };
+    };
+    ConfirmTableSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableSessionDto"];
+                };
+            };
+        };
+    };
+    GetTableAsGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableSessionDto"];
+                };
+            };
+        };
+    };
+    ClaimTableItemAsGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UnclaimTableItemAsGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetTableListenTokenAsGuest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListenTokenDto"];
+                };
             };
         };
     };

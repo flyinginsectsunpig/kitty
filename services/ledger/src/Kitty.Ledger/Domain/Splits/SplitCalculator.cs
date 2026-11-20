@@ -25,6 +25,7 @@ public static class SplitCalculator
             SplitMethod.Exact => Exact(totalMinor, ordered),
             SplitMethod.Percent => Weighted(totalMinor, ordered, FullPercentBasisPoints, mustSumTo: FullPercentBasisPoints),
             SplitMethod.Shares => Weighted(totalMinor, ordered, MaxShareWeight, mustSumTo: null),
+            SplitMethod.Itemized => new SplitResult.Error(SplitErrors.InvalidValue), // see ItemizedSplitCalculator
             _ => throw new ArgumentOutOfRangeException(nameof(method), method, null),
         };
     }

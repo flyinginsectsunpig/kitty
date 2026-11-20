@@ -151,6 +151,42 @@ namespace Kitty.Ledger.Data.Migrations
                     b.ToTable("Groups");
                 });
 
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.Guest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("MappedMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MappedMemberId");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("Guests");
+                });
+
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.IdempotencyRecord", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -228,6 +264,23 @@ namespace Kitty.Ledger.Data.Migrations
                     b.ToTable("Invites");
                 });
 
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ItemClaim", b =>
+                {
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClaimantKind")
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
+                    b.Property<Guid>("ClaimantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ItemId", "ClaimantKind", "ClaimantId");
+
+                    b.ToTable("ItemClaims");
+                });
+
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.Member", b =>
                 {
                     b.Property<Guid>("Id")
@@ -261,6 +314,111 @@ namespace Kitty.Ledger.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Members");
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptCharge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SessionId");
+
+                    b.ToTable("ReceiptCharge");
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<long>("LineTotalMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SessionId");
+
+                    b.ToTable("ReceiptItems");
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .IsFixedLength();
+
+                    b.Property<Guid?>("ExpenseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("HostUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PayerMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpenseId");
+
+                    b.HasIndex("PayerMemberId");
+
+                    b.HasIndex("GroupId", "CreatedAt");
+
+                    b.ToTable("ReceiptSessions");
                 });
 
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.Settlement", b =>
@@ -413,6 +571,20 @@ namespace Kitty.Ledger.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.Guest", b =>
+                {
+                    b.HasOne("Kitty.Ledger.Data.Entities.Member", null)
+                        .WithMany()
+                        .HasForeignKey("MappedMemberId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Kitty.Ledger.Data.Entities.ReceiptSession", null)
+                        .WithMany("Guests")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.Invite", b =>
                 {
                     b.HasOne("Kitty.Ledger.Data.Entities.Group", null)
@@ -427,6 +599,15 @@ namespace Kitty.Ledger.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ItemClaim", b =>
+                {
+                    b.HasOne("Kitty.Ledger.Data.Entities.ReceiptItem", null)
+                        .WithMany("Claims")
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.Member", b =>
                 {
                     b.HasOne("Kitty.Ledger.Data.Entities.Group", null)
@@ -439,6 +620,44 @@ namespace Kitty.Ledger.Data.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptCharge", b =>
+                {
+                    b.HasOne("Kitty.Ledger.Data.Entities.ReceiptSession", null)
+                        .WithMany("Charges")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptItem", b =>
+                {
+                    b.HasOne("Kitty.Ledger.Data.Entities.ReceiptSession", null)
+                        .WithMany("Items")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptSession", b =>
+                {
+                    b.HasOne("Kitty.Ledger.Data.Entities.Expense", null)
+                        .WithMany()
+                        .HasForeignKey("ExpenseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Kitty.Ledger.Data.Entities.Group", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Kitty.Ledger.Data.Entities.Member", null)
+                        .WithMany()
+                        .HasForeignKey("PayerMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.Settlement", b =>
@@ -465,6 +684,20 @@ namespace Kitty.Ledger.Data.Migrations
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.Group", b =>
                 {
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptItem", b =>
+                {
+                    b.Navigation("Claims");
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptSession", b =>
+                {
+                    b.Navigation("Charges");
+
+                    b.Navigation("Guests");
+
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

@@ -23,7 +23,9 @@ public sealed class IdempotencyMiddleware(RequestDelegate next)
 
     public async Task InvokeAsync(HttpContext context, ICurrentUser currentUser, IServiceScopeFactory scopes, TimeProvider clock)
     {
-        if (!IsMutating(context.Request.Method) || context.User.Identity?.IsAuthenticated != true)
+        // SignalR's negotiate/long-poll POSTs are transport, not business writes.
+        if (!IsMutating(context.Request.Method) || context.User.Identity?.IsAuthenticated != true
+            || context.Request.Path.StartsWithSegments("/hubs"))
         {
             await next(context);
             return;

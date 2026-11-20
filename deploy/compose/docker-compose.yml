@@ -65,6 +65,18 @@ services:
     deploy:
       resources: { limits: { memory: 1g } }
 
+  redis:
+    <<: *restart
+    image: redis:7.4-alpine
+    # Only carries live-update messages between ledger instances: nothing to persist.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "48mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 10
+    deploy:
+      resources: { limits: { memory: 64m } }
+
   ledger:
     <<: *restart
     image: ${KITTY_IMAGE_PREFIX:?set KITTY_IMAGE_PREFIX}kitty-ledger:${KITTY_TAG:-latest}
@@ -73,8 +85,11 @@ services:
       Auth__Authority: https://${KITTY_HOST}/auth/realms/kitty
       Auth__Audience: kitty-ledger
       Ledger__MigrateOnStartup: "true"
+      Ledger__TrustForwardedHeaders: "true" # only reachable through Caddy
+      ConnectionStrings__redis: redis:6379 # SignalR backplane for live table updates
     depends_on:
       postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
     deploy:
       resources: { limits: { memory: 512m } }
 
@@ -89,6 +104,9 @@ services:
       AUTH_KEYCLOAK_SECRET: ${KITTY_WEB_CLIENT_SECRET}
       AUTH_KEYCLOAK_ISSUER: https://${KITTY_HOST}/auth/realms/kitty
       LEDGER_URL: http://ledger:8080
+      TRUST_PROXY_HEADERS: "true" # only reachable through Caddy; passes guests' addresses on for the join limit
+      # Browsers open the live table connection through Caddy (same origin, so no CORS needed).
+      LEDGER_PUBLIC_URL: https://${KITTY_HOST}/api
     depends_on: [ledger, keycloak]
     deploy:
       resources: { limits: { memory: 512m } }

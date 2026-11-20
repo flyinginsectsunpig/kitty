@@ -20,6 +20,17 @@ public static class AuthSetup
                 o.RequireHttpsMetadata = !env.IsDevelopment() && authority.StartsWith("https", StringComparison.Ordinal);
                 o.TokenValidationParameters.ValidAudience = audience;
                 o.TokenValidationParameters.NameClaimType = "name";
+                // Browsers can't set headers on WebSocket/SSE requests, so SignalR sends the token in the query.
+                o.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = ctx =>
+                    {
+                        if (ctx.HttpContext.Request.Path.StartsWithSegments("/hubs")
+                            && ctx.Request.Query["access_token"].ToString() is { Length: > 0 } token)
+                            ctx.Token = token;
+                        return Task.CompletedTask;
+                    },
+                };
             });
 
         services.AddAuthorizationBuilder()

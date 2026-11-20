@@ -1,0 +1,62 @@
+[
+  { "name": "one item each", "chargesMinor": 0,
+    "participants": ["00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000", "00000003-0000-0000-0000-000000000000"],
+    "items": [
+      { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 1000, "claimerIds": ["00000001-0000-0000-0000-000000000000"] },
+      { "itemId": "10000000-0000-0000-0000-000000000002", "lineTotalMinor": 2000, "claimerIds": ["00000002-0000-0000-0000-000000000000"] },
+      { "itemId": "10000000-0000-0000-0000-000000000003", "lineTotalMinor": 3000, "claimerIds": ["00000003-0000-0000-0000-000000000000"] }
+    ],
+    "expected": [ { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 1000 }, { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 2000 }, { "memberId": "00000003-0000-0000-0000-000000000000", "minor": 3000 } ], "error": null },
+  { "name": "one item shared three ways gives the remainder in member order", "chargesMinor": 0,
+    "participants": ["00000003-0000-0000-0000-000000000000", "00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000"],
+    "items": [ { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 1000, "claimerIds": ["00000003-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000", "00000001-0000-0000-0000-000000000000"] } ],
+    "expected": [ { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 334 }, { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 333 }, { "memberId": "00000003-0000-0000-0000-000000000000", "minor": 333 } ], "error": null },
+  { "name": "unclaimed items are split among everyone", "chargesMinor": 0,
+    "participants": ["00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000", "00000003-0000-0000-0000-000000000000"],
+    "items": [ { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 900, "claimerIds": [] } ],
+    "expected": [ { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 300 }, { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 300 }, { "memberId": "00000003-0000-0000-0000-000000000000", "minor": 300 } ], "error": null },
+  { "name": "tip follows subtotals and someone who had nothing pays nothing", "chargesMinor": 1000,
+    "participants": ["00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000", "00000003-0000-0000-0000-000000000000"],
+    "items": [
+      { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 12000, "claimerIds": ["00000001-0000-0000-0000-000000000000"] },
+      { "itemId": "10000000-0000-0000-0000-000000000002", "lineTotalMinor": 8000, "claimerIds": ["00000002-0000-0000-0000-000000000000"] }
+    ],
+    "expected": [ { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 12600 }, { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 8400 } ], "error": null },
+  { "name": "tip remainder goes in member order", "chargesMinor": 100,
+    "participants": ["00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000", "00000003-0000-0000-0000-000000000000"],
+    "items": [
+      { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 100, "claimerIds": ["00000001-0000-0000-0000-000000000000"] },
+      { "itemId": "10000000-0000-0000-0000-000000000002", "lineTotalMinor": 100, "claimerIds": ["00000002-0000-0000-0000-000000000000"] },
+      { "itemId": "10000000-0000-0000-0000-000000000003", "lineTotalMinor": 100, "claimerIds": ["00000003-0000-0000-0000-000000000000"] }
+    ],
+    "expected": [ { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 134 }, { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 133 }, { "memberId": "00000003-0000-0000-0000-000000000000", "minor": 133 } ], "error": null },
+  { "name": "uneven subtotals with a tip remainder", "chargesMinor": 100,
+    "participants": ["00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000"],
+    "items": [
+      { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 1000, "claimerIds": ["00000001-0000-0000-0000-000000000000"] },
+      { "itemId": "10000000-0000-0000-0000-000000000002", "lineTotalMinor": 2000, "claimerIds": ["00000002-0000-0000-0000-000000000000"] }
+    ],
+    "expected": [ { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 1034 }, { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 2066 } ], "error": null },
+  { "name": "charges split equally when every item is free", "chargesMinor": 101,
+    "participants": ["00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000"],
+    "items": [ { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 0, "claimerIds": ["00000001-0000-0000-0000-000000000000"] } ],
+    "expected": [ { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 51 }, { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 50 } ], "error": null },
+  { "name": "a double tap counts once", "chargesMinor": 0,
+    "participants": ["00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000"],
+    "items": [ { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 1000, "claimerIds": ["00000001-0000-0000-0000-000000000000", "00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000"] } ],
+    "expected": [ { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 500 }, { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 500 } ], "error": null },
+  { "name": "no participants", "chargesMinor": 0, "participants": [],
+    "items": [ { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 1000, "claimerIds": [] } ], "expected": null, "error": "split_empty" },
+  { "name": "duplicate participant", "chargesMinor": 0,
+    "participants": ["00000001-0000-0000-0000-000000000000", "00000001-0000-0000-0000-000000000000"],
+    "items": [ { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 1000, "claimerIds": [] } ], "expected": null, "error": "split_duplicate_member" },
+  { "name": "claimer who is not a participant", "chargesMinor": 0,
+    "participants": ["00000001-0000-0000-0000-000000000000"],
+    "items": [ { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 1000, "claimerIds": ["00000009-0000-0000-0000-000000000000"] } ], "expected": null, "error": "split_invalid_value" },
+  { "name": "negative line total", "chargesMinor": 0,
+    "participants": ["00000001-0000-0000-0000-000000000000"],
+    "items": [ { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": -5, "claimerIds": [] } ], "expected": null, "error": "split_invalid_value" },
+  { "name": "nothing to pay", "chargesMinor": 0,
+    "participants": ["00000001-0000-0000-0000-000000000000"],
+    "items": [ { "itemId": "10000000-0000-0000-0000-000000000001", "lineTotalMinor": 0, "claimerIds": [] } ], "expected": null, "error": "split_invalid_value" }
+]

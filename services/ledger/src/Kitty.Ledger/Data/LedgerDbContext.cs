@@ -13,6 +13,10 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
     public DbSet<Settlement> Settlements => Set<Settlement>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+    public DbSet<ReceiptSession> ReceiptSessions => Set<ReceiptSession>();
+    public DbSet<ReceiptItem> ReceiptItems => Set<ReceiptItem>();
+    public DbSet<ItemClaim> ItemClaims => Set<ItemClaim>();
+    public DbSet<Guest> Guests => Set<Guest>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -93,6 +97,50 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
             e.Property(a => a.Before).HasColumnType("jsonb");
             e.Property(a => a.After).HasColumnType("jsonb");
             e.HasIndex(a => new { a.GroupId, a.At });
+        });
+
+        b.Entity<ReceiptSession>(e =>
+        {
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Title).HasMaxLength(80);
+            e.Property(x => x.Currency).HasMaxLength(3).IsFixedLength();
+            e.Property(x => x.Status).HasMaxLength(10);
+            // Version is a change counter for clients, bumped atomically in SQL; claims must never conflict on it.
+            e.HasIndex(x => new { x.GroupId, x.CreatedAt });
+            e.HasOne<Group>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Member>().WithMany().HasForeignKey(x => x.PayerMemberId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Expense>().WithMany().HasForeignKey(x => x.ExpenseId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Items).WithOne().HasForeignKey(i => i.SessionId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Charges).WithOne().HasForeignKey(c => c.SessionId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Guests).WithOne().HasForeignKey(gu => gu.SessionId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ReceiptItem>(e =>
+        {
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Description).HasMaxLength(80);
+            e.HasMany(x => x.Claims).WithOne().HasForeignKey(c => c.ItemId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ReceiptCharge>(e =>
+        {
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Kind).HasMaxLength(10);
+        });
+
+        b.Entity<ItemClaim>(e =>
+        {
+            e.HasKey(x => new { x.ItemId, x.ClaimantKind, x.ClaimantId });
+            e.Property(x => x.ClaimantKind).HasMaxLength(6);
+        });
+
+        b.Entity<Guest>(e =>
+        {
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.DisplayName).HasMaxLength(40);
+            e.Property(x => x.TokenHash).HasMaxLength(64);
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasOne<Member>().WithMany().HasForeignKey(x => x.MappedMemberId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<IdempotencyRecord>(e =>

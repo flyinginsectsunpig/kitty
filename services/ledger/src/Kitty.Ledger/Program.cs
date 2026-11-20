@@ -6,6 +6,7 @@ using Kitty.Ledger.Features.Activity;
 using Kitty.Ledger.Features.Balances;
 using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Settlements;
+using Kitty.Ledger.Features.Table;
 using Kitty.Ledger.Features.Groups;
 using Kitty.Ledger.Features.Invites;
 using Kitty.Ledger.Features.Me;
@@ -34,9 +35,30 @@ builder.Services.AddDbContext<LedgerDbContext>((sp, options) =>
         ?? throw new InvalidOperationException("Connection string 'ledger' is not configured.")));
 builder.Services.AddLedgerAuth(builder.Configuration, builder.Environment);
 builder.Services.AddWriteRateLimiting(builder.Configuration);
+if (builder.Configuration.GetValue<bool>("Ledger:TrustForwardedHeaders"))
+{
+    // Only enable where the ledger is reachable solely through the reverse proxy (deploy/compose: Caddy),
+    // so per-IP limits see the real client address.
+    builder.Services.Configure<ForwardedHeadersOptions>(o =>
+    {
+        o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+        o.KnownIPNetworks.Clear();
+        o.KnownProxies.Clear();
+    });
+}
 builder.Services.AddHostedService<IdempotencyCleanup>();
 builder.Services.AddScoped<AuditWriter>();
 builder.Services.AddScoped<GroupMemberFilter>();
+builder.Services.AddScoped<TableSessionService>();
+builder.Services.AddScoped<GuestFilter>();
+builder.Services.AddSingleton<ListenTokens>();
+// Browsers on another origin (local dev: web on :3000, ledger on :5080) open the hub cross-origin.
+var webOrigins = builder.Configuration["Ledger:WebOrigins"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+builder.Services.AddCors(o => o.AddPolicy("hub", p => p.WithOrigins(webOrigins).AllowAnyHeader().WithMethods("GET", "POST")));
+builder.Services.AddSingleton<ITableNotifier, SignalRTableNotifier>();
+var signalR = builder.Services.AddSignalR();
+if (builder.Configuration.GetConnectionString("redis") is { Length: > 0 } redis)
+    signalR.AddStackExchangeRedis(redis, o => o.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("kitty"));
 
 var app = builder.Build();
 
@@ -46,8 +68,10 @@ if (app.Configuration.GetValue<bool>("Ledger:MigrateOnStartup"))
     await scope.ServiceProvider.GetRequiredService<LedgerDbContext>().Database.MigrateAsync();
 }
 
+if (app.Configuration.GetValue<bool>("Ledger:TrustForwardedHeaders")) app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
@@ -62,6 +86,10 @@ group.MapExpenses();
 group.MapBalances();
 group.MapSettlements();
 group.MapActivity();
+group.MapTableSessions();
+var guestTable = app.MapGuestTable();
+ListenTokens.Map(group, guestTable);
+app.MapHub<TableHub>(TableHub.Path).AllowAnonymous().RequireCors("hub"); // JoinSession does the authorization
 app.MapInvites(group);
 
 app.Run();

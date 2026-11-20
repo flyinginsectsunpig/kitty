@@ -26,6 +26,8 @@ public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLif
         builder.UseSetting("Ledger:MigrateOnStartup", "true");
         builder.UseSetting("Auth:Authority", TestTokens.Issuer);
         builder.UseSetting("Auth:Audience", TestTokens.Audience);
+        // Every test-server request has the same (unknown) client IP; the join limit has its own dedicated test.
+        builder.UseSetting("Ledger:GuestJoinsPerMinute", "100000");
         builder.ConfigureTestServices(services =>
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, o =>
             {
