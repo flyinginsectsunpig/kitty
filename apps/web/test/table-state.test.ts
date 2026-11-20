@@ -119,6 +119,14 @@ describe("myShare", () => {
     expect(myShare(session)).toEqual({ minor: 3000, unclaimedMinor: 0, final: false });
   });
 
+  test("when every item is free, the extras are shared equally by whoever tapped (as the server splits them)", () => {
+    const session = bill(1, {
+      items: [item("water", 0, [me]), item("bread", 0, [sam])],
+      charges: [{ id: "delivery", kind: "delivery", amountMinor: 3000 }],
+    });
+    expect(myShare(session)).toEqual({ minor: 1500, unclaimedMinor: 0, final: false });
+  });
+
   test("nothing tapped yet is zero, with everything still unclaimed", () => {
     const session = bill(1, { items: [item("pizza", 12000, [])], charges: [{ id: "tip", kind: "tip", amountMinor: 1200 }] });
     expect(myShare(session)).toEqual({ minor: 0, unclaimedMinor: 13200, final: false });

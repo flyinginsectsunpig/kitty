@@ -100,11 +100,15 @@ export function myShare(session: TableSession): { minor: number; unclaimedMinor:
   const chargesTotal = sum(session.charges.map((c) => c.amountMinor));
   const claimed = session.items.filter((i) => i.claimants.length > 0);
   const claimedTotal = sum(claimed.map((i) => i.lineTotalMinor));
-  // Extras (tip, service) follow the claimed items pro rata.
-  const claimedCharges = itemsTotal === 0 ? 0 : Number((BigInt(chargesTotal) * BigInt(claimedTotal)) / BigInt(itemsTotal));
+  const participants = [...new Set(claimed.flatMap((i) => i.claimants.map((c) => c.id)))];
+  // Extras (tip, service) follow the claimed items pro rata. If every item is free, the server shares them
+  // equally between whoever tapped, so then they all belong to the people who tapped.
+  const claimedCharges =
+    itemsTotal === 0
+      ? participants.length > 0 ? chargesTotal : 0
+      : Number((BigInt(chargesTotal) * BigInt(claimedTotal)) / BigInt(itemsTotal));
   const unclaimedMinor = itemsTotal + chargesTotal - claimedTotal - claimedCharges;
 
-  const participants = [...new Set(claimed.flatMap((i) => i.claimants.map((c) => c.id)))];
   const shares =
     participants.length === 0
       ? []
