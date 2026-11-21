@@ -46,6 +46,17 @@ def test_names_after_labels_mid_line():
     assert redact("Tbl 5   Server: Thandi   Covers 4") == "Tbl 5   Server: [name]   Covers 4"
 
 
+def test_customer_names_are_redacted():
+    assert redact("Customer: Amina") == "Customer: [name]"
+    assert redact("Name: Amina Dlamini") == "Name: [name]"
+    assert redact("Order 42   Client: J Smith") == "Order 42   Client: [name]"
+    assert redact("Guest name - Thabo") == "Guest name - [name]"
+
+
+def test_name_words_without_a_label_separator_are_left_alone():
+    assert redact("Name brand coffee 30,00") == "Name brand coffee 30,00"
+
+
 def test_label_words_inside_item_names_are_left_alone():
     assert redact("Chef's special waiter tip jar 10,00") == "Chef's special waiter tip jar 10,00"
 

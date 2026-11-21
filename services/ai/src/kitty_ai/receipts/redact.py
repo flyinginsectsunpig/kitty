@@ -21,6 +21,10 @@ _LABELS = r"cashier|server|waiter|waitress|operator|served by|card ?holder|cardh
 # The name runs to the next wide gap (a printed column) or the end of the line.
 _NAME_AT_START = re.compile(rf"(?im)^(\s*(?:{_LABELS})\b\s*[:#-]?\s*)\S.*?(?=\s{{2,}}|$)")
 _NAME_MID_LINE = re.compile(rf"(?im)(\b(?:{_LABELS})\s*[:#]\s*)\S.*?(?=\s{{2,}}|$)")
+# The person paying or ordering. These words also start ordinary item names ("Name brand coffee"), so they
+# always need a separator after them.
+_CUSTOMER_LABELS = r"customer(?: name)?|client|guest(?: name)?|name|order for|cardholder name"
+_CUSTOMER = re.compile(rf"(?im)(\b(?:{_CUSTOMER_LABELS})\s*[:#-]\s*)\S.*?(?=\s{{2,}}|$)")
 
 
 def _luhn(digits: str) -> bool:
@@ -65,4 +69,5 @@ def redact(text: str) -> str:
     text = _MASKED_CARD.sub("[card]", text)
     text = _PHONE.sub("[phone]", text)
     text = _NAME_AT_START.sub(lambda m: m.group(1) + "[name]", text)
-    return _NAME_MID_LINE.sub(lambda m: m.group(1) + "[name]", text)
+    text = _NAME_MID_LINE.sub(lambda m: m.group(1) + "[name]", text)
+    return _CUSTOMER.sub(lambda m: m.group(1) + "[name]", text)
