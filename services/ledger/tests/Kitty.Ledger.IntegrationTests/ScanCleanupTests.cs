@@ -74,6 +74,28 @@ public class ScanCleanupTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Replaced_photo_is_deleted_even_if_the_first_delete_failed()
+    {
+        var (host, g, s) = await TableAsync();
+        var (first, _) = await host.ScanAsync(g.Id, s.Id);
+        await host.ScanAsync(g.Id, s.Id);
+        // As if deleting the replaced photo had failed: it is still stored and not marked deleted.
+        await new BlobServiceClient(factory.BlobConnectionString).GetBlobContainerClient("receipts")
+            .GetBlobClient($"{s.Id}/{first}").UploadAsync(new BinaryData(ScanData.Jpeg), overwrite: true, Ct);
+        using (var scope = factory.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<LedgerDbContext>().ReceiptScans.Where(x => x.Id == first)
+                .ExecuteUpdateAsync(u => u.SetProperty(x => x.BlobDeletedAt, (DateTimeOffset?)null), Ct);
+
+        await RunAtAsync(TimeSpan.Zero);
+
+        Assert.False(await BlobExistsAsync(s.Id, first));
+        using var check = factory.Services.CreateScope();
+        var scan = await check.ServiceProvider.GetRequiredService<LedgerDbContext>().ReceiptScans.SingleAsync(x => x.Id == first, Ct);
+        Assert.Equal("replaced", scan.Status);
+        Assert.NotNull(scan.BlobDeletedAt);
+    }
+
+    [Fact]
     public async Task Abandoned_upload_is_removed_after_a_day()
     {
         var (host, g, s) = await TableAsync();

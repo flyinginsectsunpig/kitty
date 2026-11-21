@@ -79,13 +79,10 @@ public static class ScanEndpoints
 
         var now = clock.NowMicros();
         var replaced = await db.ReceiptScans
-            .Where(s => s.SessionId == sessionId && s.Id != scanId && s.BlobDeletedAt == null && s.Status != ScanStatus.AwaitingUpload)
+            .Where(s => s.SessionId == sessionId && s.Id != scanId && s.Status != ScanStatus.AwaitingUpload && s.Status != ScanStatus.Replaced)
             .ToListAsync(ct);
-        foreach (var old in replaced)
-        {
-            if (old.Status == ScanStatus.Parsing) old.Status = ScanStatus.Replaced;
-            old.BlobDeletedAt = now;
-        }
+        // Replaced: never shown again, a late result is ignored, and its photo is deleted below (or by cleanup).
+        foreach (var old in replaced) old.Status = ScanStatus.Replaced;
         scan.Status = ScanStatus.Parsing;
         scan.UploadedAt = now;
         outbox.Add(Topics.ReceiptUploaded, sessionId.ToString(), new ReceiptUploaded
@@ -103,7 +100,7 @@ public static class ScanEndpoints
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
-        foreach (var old in replaced) await blobs.DeleteAsync(old.BlobName, ct);
+        foreach (var old in replaced) await DeleteReplacedPhotoAsync(db, blobs, old, clock, ct);
         await svc.NotifyAsync(sessionId, ct);
         return await CurrentAsync(svc, groupId, sessionId, http, ct);
     }
@@ -134,6 +131,26 @@ public static class ScanEndpoints
         await tx.CommitAsync(ct);
         await svc.NotifyAsync(sessionId, ct);
         return await CurrentAsync(svc, groupId, sessionId, http, ct);
+    }
+
+    /// <summary>
+    /// Deletes a replaced scan's photo and only then records it as deleted, so a failed delete leaves it for
+    /// <see cref="ScanCleanup"/> to retry instead of keeping the photo forever.
+    /// </summary>
+    internal static async Task<bool> DeleteReplacedPhotoAsync(LedgerDbContext db, ReceiptBlobs blobs, ReceiptScan scan,
+        TimeProvider clock, CancellationToken ct)
+    {
+        try
+        {
+            await blobs.DeleteAsync(scan.BlobName, ct);
+        }
+        catch (Azure.RequestFailedException)
+        {
+            return false;
+        }
+        var now = clock.NowMicros();
+        await db.ReceiptScans.Where(s => s.Id == scan.Id).ExecuteUpdateAsync(u => u.SetProperty(s => s.BlobDeletedAt, now), ct);
+        return true;
     }
 
     /// <summary>Null when the caller is this table's host; otherwise the response to send (404 for no such table).</summary>

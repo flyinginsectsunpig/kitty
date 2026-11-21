@@ -73,6 +73,12 @@ public sealed class ScanCleanup(IServiceScopeFactory scopes, ReceiptBlobs blobs,
         db.ReceiptScans.RemoveRange(abandoned);
         await db.SaveChangesAsync(ct);
 
+        // A replaced scan's photo is deleted when the new scan is confirmed; this retries any delete that failed.
+        var leftovers = await db.ReceiptScans.Where(s => s.Status == ScanStatus.Replaced && s.BlobDeletedAt == null).ToListAsync(ct);
+        var replacedDeleted = 0;
+        foreach (var scan in leftovers)
+            if (await ScanEndpoints.DeleteReplacedPhotoAsync(db, blobs, scan, clock, ct)) replacedDeleted++;
+
         var closedBefore = now - PhotoRetention;
         var expired = await db.ReceiptScans
             .Where(s => s.BlobDeletedAt == null && s.Status != ScanStatus.AwaitingUpload)
@@ -86,6 +92,6 @@ public sealed class ScanCleanup(IServiceScopeFactory scopes, ReceiptBlobs blobs,
         }
         await db.SaveChangesAsync(ct);
 
-        return new CleanupReport(stuck.Count, abandoned.Count, expired.Count);
+        return new CleanupReport(stuck.Count, abandoned.Count, expired.Count + replacedDeleted);
     }
 }
