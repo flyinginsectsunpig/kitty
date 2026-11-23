@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { isUuid } from "@/lib/ids";
+import { isUuid } from "@kitty/core";
 import { fetchListenToken, fetchTableState } from "@/lib/table-client";
 
 const SESSION = "4d5ec024-10ed-40a7-bf95-c99363763e4c";

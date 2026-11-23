@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { applyScan, confirmScan, startScan } from "@/app/groups/[id]/table/scan-actions";
-import { PHOTO_TYPES, SLOW_SCAN_MS, scanStatusMessage, uploadReceipt } from "@/lib/receipt-upload";
-import type { TableSession } from "@/lib/table-state";
+import { PHOTO_TYPES, SLOW_SCAN_MS, scanStatusMessage, uploadReceipt, type TableSession } from "@kitty/core";
 
 type Result = { session: TableSession | null; error: string | null };
 

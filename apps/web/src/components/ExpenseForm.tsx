@@ -2,7 +2,7 @@
 
 import { formatMoney, parseMoney, previewSplit, supportedCurrencies, type SplitMethod } from "@kitty/money";
 import { useMemo, useState } from "react";
-import { CATEGORIES, toExpenseWriteDto, type ExpenseFormState } from "@/lib/expense-form";
+import { CATEGORIES, toExpenseWriteDto, type ExpenseFormState } from "@kitty/core";
 
 type Member = { id: string; displayName: string };
 

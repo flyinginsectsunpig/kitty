@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { toExpenseWriteDto, type ExpenseFormState } from "@/lib/expense-form";
+import { toExpenseWriteDto, type ExpenseFormState } from "../src/expense-form";
 
 const A = "00000001-0000-0000-0000-000000000000";
 const B = "00000002-0000-0000-0000-000000000000";

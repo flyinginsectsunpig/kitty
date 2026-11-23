@@ -265,6 +265,9 @@ importers:
       '@kitty/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@kitty/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@kitty/money':
         specifier: workspace:*
         version: link:../../packages/money
@@ -327,6 +330,25 @@ importers:
       openapi-typescript:
         specifier: 7.13.0
         version: 7.13.0(typescript@5.9.3)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@26.6.6)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(@types/node@26.6.6)(jiti@2.7.0)(terser@5.51.4))
+
+  packages/core:
+    dependencies:
+      '@kitty/api-client':
+        specifier: workspace:*
+        version: link:../api-client
+      '@kitty/money':
+        specifier: workspace:*
+        version: link:../money
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
       typescript:
         specifier: 5.9.3
         version: 5.9.3

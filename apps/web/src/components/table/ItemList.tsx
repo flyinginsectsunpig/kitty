@@ -1,5 +1,5 @@
 import { formatMoney } from "@kitty/money";
-import type { TableSession } from "@/lib/table-state";
+import type { TableSession } from "@kitty/core";
 
 function initials(name: string): string {
   return name

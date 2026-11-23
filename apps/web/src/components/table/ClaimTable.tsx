@@ -4,8 +4,7 @@ import { formatMoney } from "@kitty/money";
 import { useState } from "react";
 import { toggleClaim } from "@/app/t/[sessionId]/actions";
 import { useTableSession } from "@/hooks/useTableSession";
-import { errorMessage } from "@/lib/errors";
-import { myShare, type TableSession } from "@/lib/table-state";
+import { errorMessage, myShare, type TableSession } from "@kitty/core";
 import { ItemList, PreviewTotals } from "./ItemList";
 
 type Phase = "open" | "locked" | "settled" | "cancelled" | "closed";

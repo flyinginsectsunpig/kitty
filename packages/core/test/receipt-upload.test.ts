@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { MAX_PHOTO_BYTES, rowsAction, scanStatusMessage, uploadReceipt, type ScanView } from "@/lib/receipt-upload";
-import { settle } from "@/lib/settle";
+import { MAX_PHOTO_BYTES, rowsAction, scanStatusMessage, uploadReceipt, type ScanView } from "../src/receipt-upload";
+import { settle } from "../src/settle";
 
 const photo = (type = "image/jpeg", size = 2048) => new File([new Uint8Array(size)], "receipt.jpg", { type });
 const started = { scanId: "scan-1", uploadUrl: "https://kitty.example/blob/kitty/receipts/s/scan-1?sig=abc" };

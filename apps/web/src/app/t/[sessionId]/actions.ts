@@ -2,7 +2,7 @@
 
 import type { TableSessionDto } from "@kitty/api-client";
 import { redirect } from "next/navigation";
-import { isUuid } from "@/lib/ids";
+import { isUuid } from "@kitty/core";
 import { joinAsGuest, loadTable, setClaim } from "@/lib/table";
 
 /**

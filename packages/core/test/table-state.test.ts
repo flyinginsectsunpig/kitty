@@ -9,7 +9,7 @@ import {
   type TableEvent,
   type TableSession,
   type TableState,
-} from "@/lib/table-state";
+} from "../src/table-state";
 
 const bill = (version: number, extra: object = {}) =>
   ({

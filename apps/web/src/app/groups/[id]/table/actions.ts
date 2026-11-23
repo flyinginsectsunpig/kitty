@@ -2,7 +2,7 @@
 
 import type { TableSessionDto } from "@kitty/api-client";
 import { redirect } from "next/navigation";
-import { isUuid } from "@/lib/ids";
+import { isUuid } from "@kitty/core";
 import { getLedger, problemCode } from "@/lib/ledger";
 
 // Every action here runs as the signed-in user (getLedger sends them to sign in otherwise), and the ledger

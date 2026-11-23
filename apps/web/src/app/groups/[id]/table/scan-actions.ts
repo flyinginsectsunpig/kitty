@@ -1,7 +1,7 @@
 "use server";
 
 import type { TableSessionDto } from "@kitty/api-client";
-import { isUuid } from "@/lib/ids";
+import { isUuid } from "@kitty/core";
 import { getLedger, problemCode } from "@/lib/ledger";
 
 // The host's receipt scans. The photo itself never passes through here: the browser uploads it straight to
