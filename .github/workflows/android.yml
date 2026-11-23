@@ -25,6 +25,7 @@ jobs:
       EXPO_PUBLIC_AUTH_ISSUER: ${{ vars.EXPO_PUBLIC_AUTH_ISSUER || 'https://kitty-split.duckdns.org/auth/realms/kitty' }}
     steps:
       - name: Signing secrets are set
+        id: signing
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -33,7 +34,14 @@ jobs:
         run: |
           missing=""
           for name in KEYSTORE STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do [ -n "${!name}" ] || missing="$missing $name"; done
-          if [ -n "$missing" ]; then echo "::error::Missing signing secrets:$missing (see apps/mobile/README.md)"; exit 1; fi
+          if [ -z "$missing" ]; then echo "signed=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "signed=false" >> "$GITHUB_OUTPUT"
+          # A release (a tag, or a run by hand) must carry the real signature. A branch run only proves the app still
+          # builds, so without the secrets it signs with the debug key and publishes nothing.
+          if [ "$GITHUB_EVENT_NAME" != "push" ] || [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "::error::Missing signing secrets:$missing (see apps/mobile/README.md)"; exit 1
+          fi
+          echo "::warning::No signing secrets:$missing. Building with the debug key to check the build; nothing is uploaded."
 
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -59,24 +67,30 @@ jobs:
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          SIGNED: ${{ steps.signing.outputs.signed }}
         run: |
+          if [ "$SIGNED" != "true" ]; then
+            ./gradlew assembleRelease --no-daemon # the generated project signs release builds with the debug key
+            exit 0
+          fi
           echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          trap 'rm -f "$RUNNER_TEMP/release.keystore"' EXIT
           ./gradlew assembleRelease --no-daemon \
             -Pandroid.injected.signing.store.file="$RUNNER_TEMP/release.keystore" \
             -Pandroid.injected.signing.store.password="$STORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
-          rm "$RUNNER_TEMP/release.keystore"
           mv app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/kitty-${GITHUB_REF_NAME//\//-}.apk"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.signing.outputs.signed == 'true'
         with:
           name: kitty-apk
           path: ${{ runner.temp }}/kitty-*.apk
           if-no-files-found: error
 
       - name: Attach to the release
-        if: startsWith(github.ref, 'refs/tags/mobile-v')
+        if: steps.signing.outputs.signed == 'true' && startsWith(github.ref, 'refs/tags/mobile-v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
