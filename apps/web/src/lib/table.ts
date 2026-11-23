@@ -9,7 +9,7 @@ import {
 import { cookies, headers } from "next/headers";
 import { getAccessToken } from "@/auth/token";
 import { forwardedFor } from "./client-ip";
-import { isUuid } from "./ids";
+import { isUuid } from "@kitty/core";
 import { getLedger, problemCode } from "./ledger";
 
 /** A way into one table: as a signed-in member of its group, or as a guest holding that table's cookie. */

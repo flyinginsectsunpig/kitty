@@ -1,4 +1,4 @@
-import type { TableSession } from "./table-state";
+import type { TableSession } from "@kitty/core";
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 

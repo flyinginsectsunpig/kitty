@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { HostTable } from "@/components/table/HostTable";
 import { loadGroup } from "@/lib/group-context";
-import { isUuid } from "@/lib/ids";
+import { isUuid } from "@kitty/core";
 import { unwrap } from "@/lib/ledger";
 import { hubUrl, tableLink } from "@/lib/table";
 

@@ -6,8 +6,17 @@ type Result = { session: TableSession | null; error: string | null };
 type Started = { scanId: string; uploadUrl: string } | { error: string };
 type Put = (url: string, init: RequestInit) => Promise<Response>;
 
+/** A photo to upload, from any platform: a browser `File`, or a `Blob` read from a phone's photo. */
+export type PhotoInput = { type: string; size: number; body: BodyInit };
+
 export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+/** What happens to a receipt photo, shown next to every scan button (web and app). */
+export const SCAN_PRIVACY_NOTE =
+  "Kitty reads the photo on its own server and removes card numbers, names and phone numbers. Only the remaining text " +
+  "goes to Google's Gemini (free tier) to pick out the items, and Google may use it to improve its products. The photo " +
+  "is deleted 90 days after the bill is closed.";
+
 /** After this long, "reading" also suggests typing the items meanwhile. */
 export const SLOW_SCAN_MS = 20_000;
 
@@ -17,23 +26,23 @@ export const SLOW_SCAN_MS = 20_000;
  * can't be scanned are turned away before anything is sent.
  */
 export async function uploadReceipt(
-  file: File,
+  photo: PhotoInput,
   start: (contentType: string) => Promise<Started>,
   confirm: (scanId: string) => Promise<Result>,
   put: Put = fetch,
 ): Promise<Result> {
-  if (!PHOTO_TYPES.includes(file.type)) return { session: null, error: "upload_not_image" };
-  if (file.size > MAX_PHOTO_BYTES) return { session: null, error: "upload_too_large" };
+  if (!PHOTO_TYPES.includes(photo.type)) return { session: null, error: "upload_not_image" };
+  if (photo.size > MAX_PHOTO_BYTES) return { session: null, error: "upload_too_large" };
 
   // Phones at a table drop signal: any step that throws is an upload that didn't happen, not a crash.
   try {
-    const started = await start(file.type);
+    const started = await start(photo.type);
     if ("error" in started) return { session: null, error: started.error };
 
     const uploaded = await put(started.uploadUrl, {
       method: "PUT",
-      headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": file.type },
-      body: file,
+      headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": photo.type },
+      body: photo.body,
     });
     if (!uploaded.ok) return { session: null, error: "upload_failed" };
     return await confirm(started.scanId);

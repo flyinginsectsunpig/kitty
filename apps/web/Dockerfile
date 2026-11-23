@@ -6,7 +6,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
 COPY packages/money/package.json packages/money/
 COPY packages/api-client/package.json packages/api-client/
-RUN pnpm install --frozen-lockfile
+COPY packages/core/package.json packages/core/
+RUN pnpm install --frozen-lockfile --filter web...
 COPY contracts/ contracts/
 COPY packages/ packages/
 COPY apps/web/ apps/web/

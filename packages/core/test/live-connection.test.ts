@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { keepLive, type LiveHub } from "@/lib/live-connection";
+import { keepLive, type LiveHub } from "../src/live-connection";
 
 /** A hub the test drives by hand: it records calls and lets the test fire the connection's events. */
 class FakeHub implements LiveHub {

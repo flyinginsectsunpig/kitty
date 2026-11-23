@@ -2,15 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { applyScan, confirmScan, startScan } from "@/app/groups/[id]/table/scan-actions";
-import { PHOTO_TYPES, SLOW_SCAN_MS, scanStatusMessage, uploadReceipt } from "@/lib/receipt-upload";
-import type { TableSession } from "@/lib/table-state";
+import { PHOTO_TYPES, SCAN_PRIVACY_NOTE, SLOW_SCAN_MS, scanStatusMessage, uploadReceipt, type TableSession } from "@kitty/core";
 
 type Result = { session: TableSession | null; error: string | null };
-
-export const PRIVACY_NOTE =
-  "Kitty reads the photo on its own server and removes card numbers, names and phone numbers. Only the remaining text " +
-  "goes to Google's Gemini (free tier) to pick out the items, and Google may use it to improve its products. The photo " +
-  "is deleted 90 days after the bill is closed.";
 
 /** The host photographs the receipt; the items fill in on every screen once it's read. */
 export function ReceiptScan({
@@ -42,7 +36,7 @@ export function ReceiptScan({
     if (!file) return;
     run(() =>
       uploadReceipt(
-        file,
+        { type: file.type, size: file.size, body: file },
         (contentType) => startScan(groupId, session.id, contentType),
         (scanId) => confirmScan(groupId, session.id, scanId),
       ),
@@ -82,7 +76,7 @@ export function ReceiptScan({
           Use the scanned items
         </button>
       )}
-      <p className="text-xs text-stone-500">{PRIVACY_NOTE}</p>
+      <p className="text-xs text-stone-500">{SCAN_PRIVACY_NOTE}</p>
     </div>
   );
 }

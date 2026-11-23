@@ -2,9 +2,8 @@
 
 import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import { useCallback, useEffect, useReducer } from "react";
-import { keepLive, type LiveHub } from "@/lib/live-connection";
+import { keepLive, type LiveHub, initialTableState, needsRefresh, retryDelayMs, tableReducer, type TableSession } from "@kitty/core";
 import { fetchListenToken, fetchTableState } from "@/lib/table-client";
-import { initialTableState, needsRefresh, retryDelayMs, tableReducer, type TableSession } from "@/lib/table-state";
 
 /**
  * Keeps a table screen live. It listens on the ledger's hub with a read-only token for this one bill and

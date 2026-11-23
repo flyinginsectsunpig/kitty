@@ -2,7 +2,7 @@
 
 import { formatMoney, parseMoney, previewSplit, supportedCurrencies, type SplitMethod } from "@kitty/money";
 import { useMemo, useState } from "react";
-import { CATEGORIES, toExpenseWriteDto, type ExpenseFormState } from "@/lib/expense-form";
+import { CATEGORIES, splitProblemMessage, toExpenseWriteDto, type ExpenseFormState } from "@kitty/core";
 
 type Member = { id: string; displayName: string };
 
@@ -44,7 +44,7 @@ export function ExpenseForm({
 
   const amountMinor = parseMoney(state.amount, state.currency);
   const touched = state.amount !== "" || state.description !== "";
-  const problem = "error" in dto ? dto.error : preview && "error" in preview ? splitMessage(preview.error) : null;
+  const problem = "error" in dto ? dto.error : preview && "error" in preview ? splitProblemMessage(preview.error) : null;
 
   return (
     <form action={action} className="card space-y-5">
@@ -139,13 +139,3 @@ export function ExpenseForm({
   );
 }
 
-function splitMessage(code: string): string {
-  switch (code) {
-    case "split_sum_mismatch":
-      return "The split must add up to the total.";
-    case "split_invalid_value":
-      return "Each person needs a positive number.";
-    default:
-      return "Check the split.";
-  }
-}

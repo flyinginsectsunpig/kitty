@@ -1,4 +1,4 @@
-import { errorMessage } from "@/lib/errors";
+import { errorMessage } from "@kitty/core";
 
 export function ErrorBanner({ code }: { code: string | undefined }) {
   const message = errorMessage(code);

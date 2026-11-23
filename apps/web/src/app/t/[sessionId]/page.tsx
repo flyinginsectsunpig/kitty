@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { ClaimTable } from "@/components/table/ClaimTable";
-import { isUuid } from "@/lib/ids";
+import { isUuid } from "@kitty/core";
 import { hubUrl, loadTable } from "@/lib/table";
 import { joinTable } from "./actions";
 

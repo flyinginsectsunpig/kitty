@@ -7,10 +7,7 @@ import { confirmTable, mapGuest, saveItems, saveTip, transition } from "@/app/gr
 import { toggleClaim } from "@/app/t/[sessionId]/actions";
 import { CopyButton } from "@/components/CopyButton";
 import { useTableSession } from "@/hooks/useTableSession";
-import { errorMessage } from "@/lib/errors";
-import { rowsAction } from "@/lib/receipt-upload";
-import { settle } from "@/lib/settle";
-import { tipToMinor, type TableSession } from "@/lib/table-state";
+import { errorMessage, rowsAction, settle, tipToMinor, type TableSession } from "@kitty/core";
 import { ItemList, PreviewTotals } from "./ItemList";
 import { ReceiptScan } from "./ReceiptScan";
 

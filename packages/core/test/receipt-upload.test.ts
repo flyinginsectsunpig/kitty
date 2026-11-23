@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
-import { MAX_PHOTO_BYTES, rowsAction, scanStatusMessage, uploadReceipt, type ScanView } from "@/lib/receipt-upload";
-import { settle } from "@/lib/settle";
+import { MAX_PHOTO_BYTES, rowsAction, scanStatusMessage, uploadReceipt, type PhotoInput, type ScanView } from "../src/receipt-upload";
+import { settle } from "../src/settle";
 
-const photo = (type = "image/jpeg", size = 2048) => new File([new Uint8Array(size)], "receipt.jpg", { type });
+const photo = (type = "image/jpeg", size = 2048): PhotoInput => ({ type, size, body: new Blob([new Uint8Array(size)], { type }) });
 const started = { scanId: "scan-1", uploadUrl: "https://kitty.example/blob/kitty/receipts/s/scan-1?sig=abc" };
 const confirmed = { session: null, error: null };
 
@@ -16,7 +16,7 @@ describe("uploadReceipt", () => {
     expect(put).not.toHaveBeenCalled();
   });
 
-  test("puts to the sas url with block blob header then confirms", async () => {
+  test("PUTs the photo body to the sas url with its content type, then confirms", async () => {
     const file = photo("image/webp");
     const start = vi.fn(async () => started);
     const confirm = vi.fn(async () => confirmed);
@@ -28,7 +28,7 @@ describe("uploadReceipt", () => {
     const [url, init] = put.mock.calls[0]!;
     expect(url).toBe(started.uploadUrl);
     expect(init.method).toBe("PUT");
-    expect(init.body).toBe(file);
+    expect(init.body).toBe(file.body);
     expect(init.headers).toEqual({ "x-ms-blob-type": "BlockBlob", "Content-Type": "image/webp" });
     expect(confirm).toHaveBeenCalledWith("scan-1");
   });

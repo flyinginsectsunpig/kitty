@@ -23,18 +23,20 @@ const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 /**
  * A typed ledger client. Every request carries the bearer token; every mutation carries an
  * Idempotency-Key — the caller's (e.g. one rendered into a form, so double-submits replay) or a fresh UUID.
+ * `newKey` makes those UUIDs; React Native has no global `crypto`, so the app passes expo-crypto's.
  */
 export function createLedgerClient(
   baseUrl: string,
   getToken: () => Promise<string>,
   fetchFn?: (request: Request) => Promise<Response>,
+  newKey: () => string = () => crypto.randomUUID(),
 ): LedgerClient {
   const client = createClient<paths>({ baseUrl, ...(fetchFn ? { fetch: fetchFn } : {}) });
   const auth: Middleware = {
     async onRequest({ request }) {
       request.headers.set("Authorization", `Bearer ${await getToken()}`);
       if (MUTATING.has(request.method) && !request.headers.has("Idempotency-Key"))
-        request.headers.set("Idempotency-Key", crypto.randomUUID());
+        request.headers.set("Idempotency-Key", newKey());
       return request;
     },
   };
