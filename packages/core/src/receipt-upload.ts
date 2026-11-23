@@ -11,6 +11,12 @@ export type PhotoInput = { type: string; size: number; body: BodyInit };
 
 export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+/** What happens to a receipt photo, shown next to every scan button (web and app). */
+export const SCAN_PRIVACY_NOTE =
+  "Kitty reads the photo on its own server and removes card numbers, names and phone numbers. Only the remaining text " +
+  "goes to Google's Gemini (free tier) to pick out the items, and Google may use it to improve its products. The photo " +
+  "is deleted 90 days after the bill is closed.";
+
 /** After this long, "reading" also suggests typing the items meanwhile. */
 export const SLOW_SCAN_MS = 20_000;
 
