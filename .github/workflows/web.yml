@@ -25,6 +25,8 @@ jobs:
       - run: pnpm -r typecheck
       - run: pnpm -r test
       - run: pnpm --filter web build
+      - name: Mobile bundle builds (no native toolchain needed)
+        run: pnpm --filter mobile export
 
   contract-drift:
     # The committed OpenAPI document and the generated TypeScript client must match the ledger.
