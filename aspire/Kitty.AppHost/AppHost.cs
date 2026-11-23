@@ -13,7 +13,14 @@ var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.33.1")
     .WithHttpEndpoint(targetPort: 8025, name: "ui")
     .WithEndpoint(targetPort: 1025, name: "smtp");
 
+// Plain HTTP locally (Aspire 17 turns on HTTPS by default): the issuer stays http://localhost:8180/realms/kitty,
+// which the ledger, web and the phone (through adb reverse) all reach without trusting a dev certificate.
+// WithoutHttpsCertificate is an evaluation API in Aspire 17; revisit when it's stable.
+#pragma warning disable ASPIRECERTIFICATES001
 var keycloak = builder.AddKeycloak("keycloak", port: 8180)
+    .WithImageTag("26.6") // the version deploy/compose runs; newer images change sign-up (no password on the form)
+    .WithoutHttpsCertificate()
+#pragma warning restore ASPIRECERTIFICATES001
     .WithRealmImport("../../infra/keycloak")
     .WaitFor(mailpit);
 
@@ -37,9 +44,10 @@ var storage = builder.AddAzureStorage("storage").RunAsEmulator(e => e.WithImageT
 var blobs = storage.AddBlobs("blobs");
 
 // Optional: without a key, scans fail fast with "type the items" (dotnet user-secrets set Parameters:gemini-api-key ...).
-var geminiKey = builder.AddParameter("gemini-api-key", "", secret: true);
+// Only wired in when set: Aspire 17 treats an empty parameter as missing and holds the ai service until one is entered.
+var hasGeminiKey = !string.IsNullOrWhiteSpace(builder.Configuration["Parameters:gemini-api-key"]);
 
-var ledger = builder.AddProject<Projects.Kitty_Ledger>("ledger")
+var ledger = builder.AddDotnetProject("ledger", "../../services/ledger/src/Kitty.Ledger/Kitty.Ledger.csproj")
     .WithReference(ledgerDb, connectionName: "ledger")
     .WaitFor(ledgerDb)
     .WaitFor(keycloak)
@@ -57,7 +65,7 @@ var ledger = builder.AddProject<Projects.Kitty_Ledger>("ledger")
     .WithEnvironment("Blob__ConfigureCors", "true"); // the browser (on :3000) uploads to Azurite cross-origin
 
 // Reads receipt photos (local OCR, redaction, Gemini). Uses the ai service's own uv environment.
-builder.AddUvicornApp("ai", "../../services/ai", "kitty_ai.main:create_app")
+var ai = builder.AddUvicornApp("ai", "../../services/ai", "kitty_ai.main:create_app")
     .WithUv()
     .WithArgs("--factory")
     .WithHttpHealthCheck("/health")
@@ -65,10 +73,10 @@ builder.AddUvicornApp("ai", "../../services/ai", "kitty_ai.main:create_app")
     .WithEnvironment("AI_SCHEMA_REGISTRY_URL", schemaRegistry)
     .WithEnvironment("AI_BLOB_CONNECTION_STRING", blobs.Resource.ConnectionStringExpression)
     .WithEnvironment("AI_POSTGRES_DSN", ledgerDb.Resource.ConnectionStringExpression)
-    .WithEnvironment("AI_GEMINI_API_KEY", geminiKey)
     .WaitFor(redpanda)
     .WaitFor(storage)
     .WaitFor(ledger); // the ledger creates the database
+if (hasGeminiKey) ai.WithEnvironment("AI_GEMINI_API_KEY", builder.AddParameter("gemini-api-key", secret: true));
 
 // Generated once and kept in user secrets; signs the web session cookie.
 var authSecret = builder.AddParameter("auth-secret",
