@@ -22,6 +22,9 @@ check "sign-in endpoints reach the web app" 1 "$("${CURL[@]}" "$BASE/api/auth/cs
 check "ledger health" 200 "$(status "$BASE/api/health")"
 check "ledger rejects anonymous calls" 401 "$(status "$BASE/api/me")"
 check "live table updates are reachable" 200 "$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/hubs/table/negotiate?negotiateVersion=1")"
+# An unsigned upload must reach blob storage and be refused by it (an XML error), not by the web app.
+check "receipt uploads reach blob storage" 1 "$("${CURL[@]}" -X PUT -H 'x-ms-blob-type: BlockBlob' --data-binary x "$BASE/blob/kitty/receipts/smoke" | grep -c '<Code>')"
+check "receipt photos can't be read back" 404 "$(status "$BASE/blob/kitty/receipts/smoke")"
 check "keycloak admin is not public" 404 "$(status "$BASE/auth/admin/")"
 check "keycloak master realm is not public" 404 "$(status "$BASE/auth/realms/master/account")"
 check "path-parameter bypass is blocked" 404 "$(status "$BASE/auth/realms/kitty/..;/master/account")"

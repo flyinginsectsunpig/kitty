@@ -17,6 +17,9 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
     public DbSet<ReceiptItem> ReceiptItems => Set<ReceiptItem>();
     public DbSet<ItemClaim> ItemClaims => Set<ItemClaim>();
     public DbSet<Guest> Guests => Set<Guest>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<ReceiptScan> ReceiptScans => Set<ReceiptScan>();
+    public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -150,6 +153,34 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
             e.Property(r => r.RequestHash).HasMaxLength(64);
             e.Property(r => r.Status).HasMaxLength(12);
             e.HasIndex(r => r.CreatedAt);
+        });
+
+        b.Entity<ReceiptScan>(e =>
+        {
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.BlobName).HasMaxLength(100);
+            e.Property(x => x.ContentType).HasMaxLength(20);
+            e.Property(x => x.Status).HasMaxLength(16);
+            e.Property(x => x.FailureReason).HasMaxLength(32);
+            e.Property(x => x.SuggestionJson).HasColumnType("jsonb");
+            e.HasIndex(x => new { x.SessionId, x.CreatedAt });
+            e.HasOne<ReceiptSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<InboxMessage>(e =>
+        {
+            e.HasKey(m => m.EventId);
+            e.Property(m => m.EventId).HasMaxLength(64);
+            e.Property(m => m.Topic).HasMaxLength(100);
+        });
+
+        b.Entity<OutboxMessage>(e =>
+        {
+            e.Property(m => m.Topic).HasMaxLength(100);
+            e.Property(m => m.Key).HasMaxLength(100);
+            e.Property(m => m.Type).HasMaxLength(200);
+            // The relay only ever looks at unsent rows, oldest first.
+            e.HasIndex(m => new { m.OccurredAt, m.Id }).HasFilter("\"SentAt\" IS NULL");
         });
     }
 }

@@ -1247,6 +1247,154 @@
         }
       }
     },
+    "/groups/{groupId}/table-sessions/{sessionId}/scans": {
+      "post": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "StartReceiptScan",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartScanDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartScanResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/table-sessions/{sessionId}/scans/{scanId}/uploaded": {
+      "post": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "ConfirmReceiptUpload",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/table-sessions/{sessionId}/scans/{scanId}/apply": {
+      "post": {
+        "tags": [
+          "Table"
+        ],
+        "operationId": "ApplyReceiptScan",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/guest/table-sessions/{sessionId}": {
       "get": {
         "tags": [
@@ -2298,6 +2446,49 @@
           "itemized"
         ]
       },
+      "StartScanDto": {
+        "required": [
+          "id",
+          "contentType"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contentType": {
+            "type": "string"
+          }
+        }
+      },
+      "StartScanResultDto": {
+        "required": [
+          "scanId",
+          "uploadUrl",
+          "expiresAt",
+          "maxBytes"
+        ],
+        "type": "object",
+        "properties": {
+          "scanId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "maxBytes": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "TableChargeDto": {
         "required": [
           "id",
@@ -2376,6 +2567,49 @@
           }
         }
       },
+      "TableScanDto": {
+        "required": [
+          "id",
+          "status",
+          "failureReason",
+          "suggestedItems",
+          "suggestedCharges"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "failureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "suggestedItems": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ItemWriteDto"
+            }
+          },
+          "suggestedCharges": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ChargeWriteDto"
+            }
+          }
+        }
+      },
       "TableSessionDto": {
         "required": [
           "id",
@@ -2390,7 +2624,8 @@
           "items",
           "charges",
           "guests",
-          "preview"
+          "preview",
+          "scan"
         ],
         "type": "object",
         "properties": {
@@ -2451,6 +2686,16 @@
             "items": {
               "$ref": "#/components/schemas/PreviewShareDto"
             }
+          },
+          "scan": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TableScanDto"
+              }
+            ]
           }
         }
       },

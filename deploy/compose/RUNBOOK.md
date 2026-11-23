@@ -1,4 +1,4 @@
-# Deploying Kitty on Oracle Always Free (phase 1)
+# Deploying Kitty on Oracle Always Free
 
 One small ARM server runs everything with Docker Compose: Postgres, Keycloak, the ledger, the web
 app and Caddy (automatic HTTPS). Cost: R0. Phase 5 replaces this with k3s, Helm and Argo CD.
@@ -34,8 +34,26 @@ reserved IP. The IP is static, so no updater is needed.
 ## 3. Email for verification links
 
 Keycloak requires email verification (it stops account takeover through Google sign-in).
-Create a free Resend account, verify a sending domain or use their test domain, create an API key,
-and put it in `SMTP_PASSWORD`.
+
+- **DuckDNS name (no domain of your own):** use Gmail. Turn on 2-Step Verification on the Google account,
+  create an app password at https://myaccount.google.com/apppasswords (name it "Kitty"), and set
+  `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USER` and `SMTP_FROM` to that Gmail address, and
+  `SMTP_PASSWORD` to the app password. Gmail allows about 500 emails a day.
+- **Your own domain:** Resend's free tier works too, once the domain is verified there (it needs DKIM/SPF
+  DNS records, which a DuckDNS name can't have): `SMTP_HOST=smtp.resend.com`, `SMTP_USER=resend`,
+  `SMTP_PASSWORD` = the API key, `SMTP_FROM` on the verified domain.
+
+## 3a. Receipt scanning
+
+Optional: create a free API key in Google AI Studio and put it in `GEMINI_API_KEY`. Photos never leave the server:
+the ai service reads the text itself, removes card numbers, phone numbers and staff names, and sends only
+that text to Gemini's free tier (Google may use it to improve its products; the app says so next to the
+scan button). Without a key the scan button still uploads, then tells the host to type the items.
+
+Receipt photos are stored in Azurite on the server (`BLOB_ACCOUNT_KEY` protects them) and deleted 90 days
+after the bill closes. To use a real Azure storage account instead, set `BLOB_CONNECTION_STRING` to its
+connection string, set `BLOB_PUBLIC_URL=` (empty, so browsers upload to Azure directly), and add a CORS
+rule on the account allowing `PUT` from `https://<your host>`.
 
 ## 4. Configure and start
 
@@ -63,6 +81,10 @@ deploy/compose/smoke.sh kitty-yourname.duckdns.org
 ```
 
 Pin `KITTY_TAG=sha-…` to roll back to a known build.
+
+**Upgrading to receipt scanning (phase 2b):** add `BLOB_ACCOUNT_KEY` (`openssl rand -base64 32`) and
+`AI_DB_PASSWORD` (`openssl rand -hex 24`) to `.env` before `up`; compose refuses to start without them.
+`GEMINI_API_KEY` stays optional.
 
 ## Keycloak admin console
 

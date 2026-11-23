@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package kitty.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "Kitty.Contracts.Events.V1";
+
+// An expense was created, edited or deleted. Topic ledger.events, keyed by group id (per-group order).
+message ExpenseChanged {
+  enum Change {
+    CHANGE_UNSPECIFIED = 0;
+    CREATED = 1;
+    UPDATED = 2;
+    DELETED = 3;
+  }
+  string event_id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  string group_id = 3;
+  string expense_id = 4;
+  Change change = 5;
+}

@@ -9,6 +9,8 @@ using Kitty.Ledger.Infrastructure;
 using Kitty.Ledger.Infrastructure.Audit;
 using Kitty.Ledger.Infrastructure.Errors;
 using Microsoft.EntityFrameworkCore;
+using Kitty.Contracts.Events.V1;
+using Kitty.Ledger.Infrastructure.Messaging;
 
 namespace Kitty.Ledger.Features.Expenses;
 
@@ -29,7 +31,7 @@ public static class ExpenseEndpoints
     }
 
     private static async Task<IResult> CreateAsync(Guid groupId, ExpenseWriteDto body, HttpContext http, LedgerDbContext db,
-        AuditWriter audit, TimeProvider clock, CancellationToken ct)
+        AuditWriter audit, Outbox outbox, TimeProvider clock, CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
         var validation = await ValidateAsync(groupId, body, db, ct);
@@ -48,6 +50,7 @@ public static class ExpenseEndpoints
 
         var dto = expense.ToDto();
         audit.Record(caller.User.Id, groupId, EntityType, expense.Id, AuditActions.Created, null, dto);
+        outbox.ExpenseChanged(groupId, expense.Id, ExpenseChanged.Types.Change.Created);
         await db.SaveChangesAsync(ct);
         return Results.Created($"/groups/{groupId}/expenses/{expense.Id}", dto);
     }
@@ -60,7 +63,7 @@ public static class ExpenseEndpoints
     }
 
     private static async Task<IResult> UpdateAsync(Guid groupId, Guid expenseId, ExpenseWriteDto body, HttpContext http,
-        LedgerDbContext db, AuditWriter audit, TimeProvider clock, CancellationToken ct)
+        LedgerDbContext db, AuditWriter audit, Outbox outbox, TimeProvider clock, CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
         var expense = await db.Expenses.SingleOrDefaultAsync(x => x.Id == expenseId && x.GroupId == groupId && x.DeletedAt == null, ct);
@@ -90,6 +93,7 @@ public static class ExpenseEndpoints
 
         var dto = expense.ToDto();
         audit.Record(caller.User.Id, groupId, EntityType, expense.Id, AuditActions.Updated, before, dto);
+        outbox.ExpenseChanged(groupId, expense.Id, ExpenseChanged.Types.Change.Updated);
         try
         {
             await db.SaveChangesAsync(ct);
@@ -102,7 +106,7 @@ public static class ExpenseEndpoints
     }
 
     private static async Task<IResult> DeleteAsync(Guid groupId, Guid expenseId, HttpContext http, LedgerDbContext db,
-        AuditWriter audit, TimeProvider clock, CancellationToken ct)
+        AuditWriter audit, Outbox outbox, TimeProvider clock, CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
         var expense = await db.Expenses.SingleOrDefaultAsync(x => x.Id == expenseId && x.GroupId == groupId && x.DeletedAt == null, ct);
@@ -111,6 +115,7 @@ public static class ExpenseEndpoints
         var before = expense.ToDto();
         expense.DeletedAt = clock.NowMicros();
         audit.Record(caller.User.Id, groupId, EntityType, expense.Id, AuditActions.Deleted, before, null);
+        outbox.ExpenseChanged(groupId, expense.Id, ExpenseChanged.Types.Change.Deleted);
         await db.SaveChangesAsync(ct);
         return Results.NoContent();
     }

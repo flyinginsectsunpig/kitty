@@ -19,6 +19,25 @@ var keycloak = builder.AddKeycloak("keycloak", port: 8180)
 
 var realmUrl = ReferenceExpression.Create($"{keycloak.GetEndpoint("http")}/realms/kitty");
 
+// Kafka API + schema registry: receipt scans to the ai service and results back, plus ledger events.
+// Fixed, unproxied host ports, so the address Redpanda advertises works for the ledger and ai on this machine.
+var redpanda = builder.AddContainer("redpanda", "docker.redpanda.com/redpandadata/redpanda", "v26.2.6")
+    .WithArgs("redpanda", "start", "--mode", "dev-container", "--smp", "1",
+        "--kafka-addr", "internal://0.0.0.0:9092,external://0.0.0.0:19092",
+        "--advertise-kafka-addr", "internal://redpanda:9092,external://localhost:19092",
+        "--schema-registry-addr", "internal://0.0.0.0:8081,external://0.0.0.0:18081")
+    .WithEndpoint(port: 19092, targetPort: 19092, name: "kafka", isProxied: false)
+    .WithHttpEndpoint(port: 18081, targetPort: 18081, name: "schema-registry", isProxied: false);
+const string kafkaBootstrap = "localhost:19092";
+const string schemaRegistry = "http://localhost:18081";
+
+// Receipt photos (Azurite locally).
+var storage = builder.AddAzureStorage("storage").RunAsEmulator(e => e.WithImageTag("3.37.0"));
+var blobs = storage.AddBlobs("blobs");
+
+// Optional: without a key, scans fail fast with "type the items" (dotnet user-secrets set Parameters:gemini-api-key ...).
+var geminiKey = builder.AddParameter("gemini-api-key", "", secret: true);
+
 var ledger = builder.AddProject<Projects.Kitty_Ledger>("ledger")
     .WithReference(ledgerDb, connectionName: "ledger")
     .WaitFor(ledgerDb)
@@ -28,7 +47,27 @@ var ledger = builder.AddProject<Projects.Kitty_Ledger>("ledger")
     .WithEnvironment("Ledger__MigrateOnStartup", "true")
     .WithReference(redis)
     .WaitFor(redis)
-    .WithEnvironment("Ledger__WebOrigins", "http://localhost:3000");
+    .WithEnvironment("Ledger__WebOrigins", "http://localhost:3000")
+    .WithEnvironment("ConnectionStrings__kafka", kafkaBootstrap)
+    .WithEnvironment("Kafka__SchemaRegistryUrl", schemaRegistry)
+    .WaitFor(redpanda)
+    .WithReference(blobs)
+    .WaitFor(storage)
+    .WithEnvironment("Blob__ConfigureCors", "true"); // the browser (on :3000) uploads to Azurite cross-origin
+
+// Reads receipt photos (local OCR, redaction, Gemini). Uses the ai service's own uv environment.
+builder.AddUvicornApp("ai", "../../services/ai", "kitty_ai.main:create_app")
+    .WithUv()
+    .WithArgs("--factory")
+    .WithHttpHealthCheck("/health")
+    .WithEnvironment("AI_KAFKA_BOOTSTRAP", kafkaBootstrap)
+    .WithEnvironment("AI_SCHEMA_REGISTRY_URL", schemaRegistry)
+    .WithEnvironment("AI_BLOB_CONNECTION_STRING", blobs.Resource.ConnectionStringExpression)
+    .WithEnvironment("AI_POSTGRES_DSN", ledgerDb.Resource.ConnectionStringExpression)
+    .WithEnvironment("AI_GEMINI_API_KEY", geminiKey)
+    .WaitFor(redpanda)
+    .WaitFor(storage)
+    .WaitFor(ledger); // the ledger creates the database
 
 // Generated once and kept in user secrets; signs the web session cookie.
 var authSecret = builder.AddParameter("auth-secret",

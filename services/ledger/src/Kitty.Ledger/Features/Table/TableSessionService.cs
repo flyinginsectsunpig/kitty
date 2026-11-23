@@ -1,3 +1,4 @@
+using Kitty.Ledger.Features.Scans;
 using Kitty.Ledger.Data;
 using Kitty.Ledger.Data.Entities;
 using Kitty.Ledger.Domain.Splits;
@@ -34,6 +35,14 @@ public sealed class TableSessionService(LedgerDbContext db, TimeProvider clock, 
         return groupId is null ? null : await LoadAsync(groupId.Value, sessionId, ct);
     }
 
+    private async Task<TableScanDto?> LatestScanAsync(Guid sessionId, CancellationToken ct)
+    {
+        var scan = await db.ReceiptScans.AsNoTracking()
+            .Where(x => x.SessionId == sessionId && x.Status != ScanStatus.AwaitingUpload && x.Status != ScanStatus.Replaced)
+            .OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(ct);
+        return scan is null ? null : ScanViews.ToDto(scan);
+    }
+
     public async Task<TableSessionDto> ToDtoAsync(ReceiptSession s, TableViewerDto viewer, CancellationToken ct)
     {
         var memberNames = await db.Members.Where(m => m.GroupId == s.GroupId).ToDictionaryAsync(m => m.Id, m => m.DisplayName, ct);
@@ -64,7 +73,7 @@ public sealed class TableSessionService(LedgerDbContext db, TimeProvider clock, 
             memberNames.GetValueOrDefault(s.PayerMemberId, "Someone"), s.ExpenseId, viewer, items,
             s.Charges.Select(c => new TableChargeDto(c.Id, c.Kind, c.AmountMinor)).ToList(),
             s.Guests.Select(g => new TableGuestDto(g.Id, g.DisplayName, g.MappedMemberId)).ToList(),
-            preview);
+            preview, await LatestScanAsync(s.Id, ct));
     }
 
     /// <summary>

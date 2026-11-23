@@ -77,6 +77,85 @@ services:
     deploy:
       resources: { limits: { memory: 64m } }
 
+  redpanda:
+    <<: *restart
+    # Kafka API + schema registry, one broker. Carries receipt scans to the ai service and results back.
+    image: docker.redpanda.com/redpandadata/redpanda:v26.2.6
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=1G
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
+      - --schema-registry-addr=0.0.0.0:8081
+      - --rpc-addr=0.0.0.0:33145
+      - --advertise-rpc-addr=redpanda:33145
+    volumes:
+      - redpanda:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true'"]
+      interval: 10s
+      retries: 20
+    deploy:
+      resources: { limits: { memory: 1500m } }
+
+  azurite:
+    <<: *restart
+    # Blob storage for receipt photos (Azure Blob's emulator; swap for a real Azure account via BLOB_CONNECTION_STRING).
+    # Its own secret account key: Azurite's default key is public knowledge.
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--location", "/data", "--skipApiVersionCheck", "--loose"]
+    environment:
+      AZURITE_ACCOUNTS: kitty:${BLOB_ACCOUNT_KEY:?set BLOB_ACCOUNT_KEY}
+    volumes:
+      - azurite:/data
+    deploy:
+      resources: { limits: { memory: 256m } }
+
+  ai-db-setup:
+    # One-shot, every start: gives the ai service its own role, limited to schema "ai" (ai-db-setup.sql).
+    image: pgvector/pgvector:pg17
+    restart: "no"
+    command: ["psql", "-v", "ai_password=${AI_DB_PASSWORD:?set AI_DB_PASSWORD}", "-f", "/setup/ai-db-setup.sql"]
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ledger
+    volumes:
+      - ./ai-db-setup.sql:/setup/ai-db-setup.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  ai:
+    <<: *restart
+    image: ${KITTY_IMAGE_PREFIX}kitty-ai:${KITTY_TAG:-latest}
+    environment:
+      AI_KAFKA_BOOTSTRAP: redpanda:9092
+      AI_SCHEMA_REGISTRY_URL: http://redpanda:8081
+      AI_BLOB_CONNECTION_STRING: ${BLOB_CONNECTION_STRING:-DefaultEndpointsProtocol=http;AccountName=kitty;AccountKey=${BLOB_ACCOUNT_KEY};BlobEndpoint=http://azurite:10000/kitty;}
+      AI_POSTGRES_DSN: host=postgres port=5432 dbname=ledger user=ai password=${AI_DB_PASSWORD}
+      # Empty: scans fail fast with "type the items" and everything else keeps working.
+      AI_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    healthcheck:
+      # 503 when a receipt reader has stopped.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      ai-db-setup: { condition: service_completed_successfully }
+      redpanda: { condition: service_healthy }
+      azurite: { condition: service_started }
+    deploy:
+      resources: { limits: { memory: 1500m } }
+
   ledger:
     <<: *restart
     image: ${KITTY_IMAGE_PREFIX:?set KITTY_IMAGE_PREFIX}kitty-ledger:${KITTY_TAG:-latest}
@@ -87,9 +166,16 @@ services:
       Ledger__MigrateOnStartup: "true"
       Ledger__TrustForwardedHeaders: "true" # only reachable through Caddy
       ConnectionStrings__redis: redis:6379 # SignalR backplane for live table updates
+      ConnectionStrings__kafka: redpanda:9092
+      Kafka__SchemaRegistryUrl: http://redpanda:8081
+      ConnectionStrings__blobs: ${BLOB_CONNECTION_STRING:-DefaultEndpointsProtocol=http;AccountName=kitty;AccountKey=${BLOB_ACCOUNT_KEY};BlobEndpoint=http://azurite:10000/kitty;}
+      # Browsers upload receipt photos through Caddy (same origin); unset when using real Azure Blob.
+      Blob__PublicUrl: ${BLOB_PUBLIC_URL-https://${KITTY_HOST}/blob}
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      redpanda: { condition: service_healthy }
+      azurite: { condition: service_started }
     deploy:
       resources: { limits: { memory: 512m } }
 
@@ -134,5 +220,7 @@ services:
 
 volumes:
   pgdata:
+  redpanda:
+  azurite:
   caddy-data:
   caddy-config:

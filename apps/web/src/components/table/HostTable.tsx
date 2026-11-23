@@ -8,8 +8,11 @@ import { toggleClaim } from "@/app/t/[sessionId]/actions";
 import { CopyButton } from "@/components/CopyButton";
 import { useTableSession } from "@/hooks/useTableSession";
 import { errorMessage } from "@/lib/errors";
+import { rowsAction } from "@/lib/receipt-upload";
+import { settle } from "@/lib/settle";
 import { tipToMinor, type TableSession } from "@/lib/table-state";
 import { ItemList, PreviewTotals } from "./ItemList";
+import { ReceiptScan } from "./ReceiptScan";
 
 type Member = { id: string; displayName: string };
 type Row = { id: string; description: string; quantity: string; amount: string };
@@ -34,9 +37,9 @@ export function HostTable({
   const { session, apply } = useTableSession(initial, hubUrl, groupId);
   const exp = exponent(session.currency);
   const money = (minor: number) => formatMoney(minor, session.currency);
-  const [rows, setRows] = useState<Row[]>(() =>
-    initial.items.map((i) => ({ id: i.id, description: i.description, quantity: String(i.quantity), amount: toDecimalString(i.lineTotalMinor, exp) })),
-  );
+  const toRows = (items: TableSession["items"]): Row[] =>
+    items.map((i) => ({ id: i.id, description: i.description, quantity: String(i.quantity), amount: toDecimalString(i.lineTotalMinor, exp) }));
+  const [rows, setRows] = useState<Row[]>(() => toRows(initial.items));
   const [members, setMembers] = useState(initialMembers);
   const [tipMode, setTipMode] = useState<"percent" | "amount">("percent");
   const [tipInput, setTipInput] = useState("");
@@ -57,6 +60,15 @@ export function HostTable({
   const typed = rows
     .filter((r) => r.description.trim() || r.amount.trim())
     .map((r) => ({ id: r.id, description: r.description.trim(), quantity: Number(r.quantity) || 1, lineTotalMinor: parseMoney(r.amount, session.currency) ?? -1 }));
+  // When the bill's items change elsewhere (a scan filled them), the rows follow, unless the host is editing.
+  const itemsKey = JSON.stringify(session.items.map((i) => [i.id, i.description, i.quantity, i.lineTotalMinor]));
+  const rowsKey = JSON.stringify(typed.map((i) => [i.id, i.description, i.quantity, i.lineTotalMinor]));
+  const [rowsBuiltFrom, setRowsBuiltFrom] = useState(itemsKey);
+  if (itemsKey !== rowsBuiltFrom) {
+    if (rowsAction(rowsKey, rowsBuiltFrom, itemsKey) === "reset") setRows(toRows(session.items));
+    setRowsBuiltFrom(itemsKey);
+  }
+
   const unsaved =
     typed.length !== session.items.length ||
     typed.some((t, i) => {
@@ -66,7 +78,7 @@ export function HostTable({
 
   async function run(action: () => Promise<Result>) {
     setBusy(true);
-    const result = await action();
+    const result = await settle(action); // never throws, so busy always clears
     apply(result.session);
     setError(result.error ? (errorMessage(result.error) ?? "Something went wrong.") : null);
     setBusy(false);
@@ -122,6 +134,8 @@ export function HostTable({
         </p>
       )}
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-owes dark:bg-red-950">{error}</p>}
+
+      {open && <ReceiptScan session={session} groupId={groupId} busy={busy} run={(action) => void run(action)} />}
 
       <div className="card space-y-3">
         <h2 className="font-semibold">1. The bill</h2>

@@ -1,0 +1,48 @@
+[project]
+name = "kitty-ai"
+version = "0.1.0"
+description = "Kitty's AI service: receipt scanning (OCR, redaction, structured extraction)."
+readme = "README.md"
+authors = [
+    { name = "Zakhir McKinnon", email = "127729274+flyinginsectsunpig@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "azure-storage-blob==12.31.1",
+    "confluent-kafka[protobuf,schemaregistry]==2.16.1",
+    "fastapi==0.162.0",
+    "google-genai==3.0.0",
+    "httpx==0.28.1",
+    "onnxruntime==1.31.1",
+    "pillow==13.0.0",
+    "protobuf==7.36.2",
+    "psycopg[binary]==3.3.8",
+    "pydantic==2.14.3",
+    "pydantic-settings==2.16.2",
+    "rapidocr==3.10.0",
+    "uvicorn==0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.24,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "grpcio-tools==1.85.1",
+    "pytest==9.2.0",
+    "ruff==0.17.4",
+    "testcontainers[azurite,kafka,postgres]==4.15.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = ["src/kitty_ai/contracts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: runs real OCR or containers"]

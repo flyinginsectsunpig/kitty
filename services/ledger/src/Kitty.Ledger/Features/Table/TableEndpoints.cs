@@ -4,9 +4,12 @@ using Kitty.Ledger.Domain;
 using Kitty.Ledger.Domain.Splits;
 using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Groups;
+using Kitty.Ledger.Features.Scans;
 using Kitty.Ledger.Infrastructure;
 using Kitty.Ledger.Infrastructure.Audit;
 using Kitty.Ledger.Infrastructure.Errors;
+using Kitty.Ledger.Infrastructure.Messaging;
+using Kitty.Contracts.Events.V1;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -39,6 +42,7 @@ public static class TableEndpoints
         sessions.MapPost("/{sessionId:guid}/cancel", CancelAsync).WithName("CancelTableSession").Produces<TableSessionDto>();
         sessions.MapPost("/{sessionId:guid}/guests/{guestId:guid}/map", MapGuestAsync).WithName("MapTableGuest").Produces<TableSessionDto>();
         sessions.MapPost("/{sessionId:guid}/confirm", ConfirmAsync).WithName("ConfirmTableSession").Produces<TableSessionDto>();
+        sessions.MapScans();
     }
 
     private static async Task<IResult> CreateAsync(Guid groupId, CreateTableSessionDto body, HttpContext http, LedgerDbContext db,
@@ -257,7 +261,7 @@ public static class TableEndpoints
     /// any validation failure after it leaves the transaction uncommitted, so the status rolls back.
     /// </summary>
     private static async Task<IResult> ConfirmAsync(Guid groupId, Guid sessionId, HttpContext http, LedgerDbContext db,
-        TableSessionService svc, AuditWriter audit, TimeProvider clock, CancellationToken ct)
+        TableSessionService svc, AuditWriter audit, Outbox outbox, TimeProvider clock, CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
         var existing = await db.ReceiptSessions.AsNoTracking().SingleOrDefaultAsync(s => s.Id == sessionId && s.GroupId == groupId, ct);
@@ -307,6 +311,7 @@ public static class TableEndpoints
         session.ExpenseId = expense.Id;
         audit.Record(caller.User.Id, groupId, ExpenseEndpoints.EntityType, expense.Id, AuditActions.Created, null, expense.ToDto());
         audit.Record(caller.User.Id, groupId, EntityType, session.Id, AuditActions.Updated, null, new { status = SessionStatus.Confirmed, expenseId = expense.Id });
+        outbox.ExpenseChanged(groupId, expense.Id, ExpenseChanged.Types.Change.Created);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
@@ -314,16 +319,16 @@ public static class TableEndpoints
         return Results.Ok(await svc.ToDtoAsync(session, Viewer(http), ct));
     }
 
-    private static TableViewerDto Viewer(HttpContext http) => TableSessionService.ViewerFor(GroupMemberFilter.CallerMember(http).Member);
+    internal static TableViewerDto Viewer(HttpContext http) => TableSessionService.ViewerFor(GroupMemberFilter.CallerMember(http).Member);
 
-    private static Task<Guid?> HostOfAsync(LedgerDbContext db, Guid groupId, Guid sessionId, CancellationToken ct) =>
+    internal static Task<Guid?> HostOfAsync(LedgerDbContext db, Guid groupId, Guid sessionId, CancellationToken ct) =>
         db.ReceiptSessions.Where(s => s.Id == sessionId && s.GroupId == groupId).Select(s => (Guid?)s.HostUserId).SingleOrDefaultAsync(ct);
 
-    private static Task<string> CurrentStatusAsync(LedgerDbContext db, Guid sessionId, CancellationToken ct) =>
+    internal static Task<string> CurrentStatusAsync(LedgerDbContext db, Guid sessionId, CancellationToken ct) =>
         db.ReceiptSessions.Where(s => s.Id == sessionId).Select(s => s.Status).SingleAsync(ct);
 
     /// <summary>Atomically bumps the version if the session is in one of the given states; takes the row lock.</summary>
-    private static async Task<bool> BumpAsync(LedgerDbContext db, Guid sessionId, TimeProvider clock, CancellationToken ct, params string[] states)
+    internal static async Task<bool> BumpAsync(LedgerDbContext db, Guid sessionId, TimeProvider clock, CancellationToken ct, params string[] states)
     {
         var now = clock.NowMicros();
         return await db.ReceiptSessions.Where(s => s.Id == sessionId && states.Contains(s.Status))
@@ -331,10 +336,10 @@ public static class TableEndpoints
     }
 
     /// <summary>The 409 for an action the session's current state doesn't allow.</summary>
-    private static IResult WrongState(string status) =>
+    internal static IResult WrongState(string status) =>
         status is SessionStatus.Confirmed or SessionStatus.Cancelled ? SessionClosed() : SessionLocked();
 
-    private static IResult HostOnly() => ApiError.Problem(StatusCodes.Status403Forbidden, ErrorCodes.HostOnly, "Only the person running this table can do that.");
+    internal static IResult HostOnly() => ApiError.Problem(StatusCodes.Status403Forbidden, ErrorCodes.HostOnly, "Only the person running this table can do that.");
     public static IResult SessionLocked() => ApiError.Conflict(ErrorCodes.SessionLocked, "The host has locked this bill.");
     public static IResult SessionClosed() => ApiError.Conflict(ErrorCodes.SessionClosed, "This bill is already settled or cancelled.");
 }
