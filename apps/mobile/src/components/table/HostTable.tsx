@@ -3,7 +3,7 @@ import { errorMessage, rowsAction, tipToMinor, type TableSession } from "@kitty/
 import { exponent, formatMoney, parseMoney, toDecimalString } from "@kitty/money";
 import { randomUUID } from "expo-crypto";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useGroup } from "../../group/GroupContext";
 import type { LedgerResult } from "../../hooks/useAction";
@@ -99,22 +99,38 @@ export function HostTable({ initial, groupId }: { initial: TableSession; groupId
     void run(() => ledger.PUT("/groups/{groupId}/table-sessions/{sessionId}/charges", { ...path, body: { charges } }));
   }
 
+  // One key per guest being added, kept until the ledger answers, so a retry or a double tap can't add them twice.
+  const addKeys = useRef(new Map<string, string>());
+  const mapping = useRef(false);
+
   async function onMapGuest(guestId: string, guestName: string, memberId: string | null) {
-    let target = memberId;
-    if (target === null) {
-      // "Add them to the group": a placeholder they can take over later, then match the guest to it.
-      try {
-        const added = await ledger.POST("/groups/{groupId}/members", { params: { path: { groupId } }, body: { displayName: guestName } });
+    if (mapping.current) return; // already matching someone: ignore the second tap
+    mapping.current = true;
+    setBusy(true);
+    try {
+      let target = memberId;
+      if (target === null) {
+        // "Add them to the group": a placeholder they can take over later, then match the guest to it.
+        const key = addKeys.current.get(guestId) ?? randomUUID();
+        addKeys.current.set(guestId, key);
+        let added;
+        try {
+          added = await ledger.POST("/groups/{groupId}/members", { params: { path: { groupId } }, body: { displayName: guestName }, headers: { "Idempotency-Key": key } });
+        } catch {
+          return setError(errorMessage("network"));
+        }
+        if (added.response.status < 500) addKeys.current.delete(guestId);
         if (!added.data) return setError(errorMessage((added.error as LedgerProblem | undefined)?.code ?? "unexpected"));
         target = added.data.id;
         void reloadGroup();
-      } catch {
-        return setError(errorMessage("network"));
       }
+      await run(() =>
+        ledger.POST("/groups/{groupId}/table-sessions/{sessionId}/guests/{guestId}/map", { params: { path: { groupId, sessionId: session.id, guestId } }, body: { memberId: target } }),
+      );
+    } finally {
+      mapping.current = false;
+      setBusy(false);
     }
-    await run(() =>
-      ledger.POST("/groups/{groupId}/table-sessions/{sessionId}/guests/{guestId}/map", { params: { path: { groupId, sessionId: session.id, guestId } }, body: { memberId: target } }),
-    );
   }
 
   async function onConfirm() {

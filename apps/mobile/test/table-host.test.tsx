@@ -179,3 +179,50 @@ test("adding a guest to the group creates a placeholder and matches the guest to
   await fireEvent.press(screen.getByRole("radio", { name: "Add Thabo to the group" }));
   await waitFor(() => expect(posted).toEqual([{ path: "members", body: { displayName: "Thabo" } }, { path: "map", body: { memberId: NEW } }]));
 });
+
+describe("adding a guest to the group never makes two placeholders", () => {
+  const GUEST = "88888888-8888-4888-8888-888888888888";
+  const NEW = "99999999-9999-4999-8999-999999999999";
+  const withGuest = () =>
+    hosted({
+      items: [{ ...bill(1).items[0]!, claimants: [{ kind: "guest", id: GUEST, displayName: "Thabo" }] }],
+      guests: [{ id: GUEST, displayName: "Thabo", mappedMemberId: null }],
+      preview: [{ kind: "guest", id: GUEST, displayName: "Thabo", amountMinor: 9000 }],
+    });
+  const member = { id: NEW, displayName: "Thabo", userId: null, isPlaceholder: true, paymentDetails: null };
+
+  test("a double tap sends one request", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const l = hostLedger(withGuest(), {
+      [`POST /groups/${G}/members`]: async () => (await gate, json(201, member)),
+      [`POST ${base}/guests/${GUEST}/map`]: () => json(200, withGuest()),
+    });
+    await openAsHost(l);
+    const add = screen.getByRole("radio", { name: "Add Thabo to the group" });
+    await fireEvent.press(add);
+    await fireEvent.press(add);
+    release();
+    await waitFor(() => expect(l.calls.filter((c) => c.path.endsWith("/map"))).toHaveLength(1));
+    expect(l.calls.filter((c) => c.method === "POST" && c.path === `/groups/${G}/members`)).toHaveLength(1);
+  });
+
+  test("a retry after a dropped connection replays the same request", async () => {
+    let attempts = 0;
+    const l = hostLedger(withGuest(), {
+      [`POST /groups/${G}/members`]: () => {
+        if (++attempts === 1) throw new TypeError("Network request failed");
+        return json(201, member);
+      },
+      [`POST ${base}/guests/${GUEST}/map`]: () => json(200, withGuest()),
+    });
+    await openAsHost(l);
+    await fireEvent.press(screen.getByRole("radio", { name: "Add Thabo to the group" }));
+    expect(await screen.findByText("Couldn't reach Kitty. Check your connection and try again.")).toBeTruthy();
+    await fireEvent.press(screen.getByRole("radio", { name: "Add Thabo to the group" }));
+    await waitFor(() => expect(l.calls.filter((c) => c.path.endsWith("/map"))).toHaveLength(1));
+    const posts = l.calls.filter((c) => c.method === "POST" && c.path === `/groups/${G}/members`);
+    expect(posts).toHaveLength(2);
+    expect(posts[0]!.headers.get("Idempotency-Key")).toBe(posts[1]!.headers.get("Idempotency-Key"));
+  });
+});
