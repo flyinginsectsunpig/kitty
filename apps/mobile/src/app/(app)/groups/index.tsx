@@ -6,6 +6,7 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { Button } from "../../../components/Button";
 import { Card, LoadState, Screen } from "../../../components/Screen";
 import { useLoad } from "../../../hooks/useLoad";
+import { useReloadOnReturn } from "../../../hooks/useReloadOnReturn";
 import { useLedger } from "../../../ledger";
 import { colors, font, space } from "../../../theme";
 
@@ -13,6 +14,7 @@ export default function GroupsScreen() {
   const ledger = useLedger();
   const { signOut } = useAuth();
   const groups = useLoad(() => ledger.GET("/groups"), [ledger]);
+  useReloadOnReturn(groups.reload); // back from creating or joining a group
 
   return (
     <Screen onRefresh={() => void groups.reload()} refreshing={groups.loading && groups.data !== null}>

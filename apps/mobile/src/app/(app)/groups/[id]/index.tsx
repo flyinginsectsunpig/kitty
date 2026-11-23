@@ -1,8 +1,8 @@
 import type { BalancesDto, ExpenseDto } from "@kitty/api-client";
 import { errorMessage } from "@kitty/core";
 import { formatMoney } from "@kitty/money";
-import { Link, useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { Link } from "expo-router";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../../components/Button";
 import { ErrorBanner } from "../../../../components/ErrorBanner";
@@ -11,6 +11,7 @@ import { Card, LoadState, Screen } from "../../../../components/Screen";
 import { useGroup } from "../../../../group/GroupContext";
 import { problemMessage } from "../../../../hooks/useAction";
 import { useLoad } from "../../../../hooks/useLoad";
+import { useReloadOnReturn } from "../../../../hooks/useReloadOnReturn";
 import { useLedger } from "../../../../ledger";
 import { colors, font, space } from "../../../../theme";
 
@@ -34,15 +35,7 @@ export default function GroupOverview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ledger, groupId]);
 
-  // Coming back from adding or editing an expense: show the change. The first focus is the load above.
-  const focusedBefore = useRef(false);
-  useFocusEffect(
-    useCallback(() => {
-      if (focusedBefore.current) void state.reload();
-      focusedBefore.current = true;
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []),
-  );
+  useReloadOnReturn(state.reload); // back from adding or editing an expense: show the change
 
   return (
     <Screen onRefresh={() => void state.reload()} refreshing={state.loading && state.data !== null}>

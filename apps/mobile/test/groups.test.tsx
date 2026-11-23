@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "expo-router/testing-library";
+import { act, fireEvent, screen, testRouter, waitFor } from "expo-router/testing-library";
 import { Text } from "react-native";
 import GroupsIndex from "../src/app/(app)/groups/index";
 import NewGroup from "../src/app/(app)/groups/new";
@@ -68,4 +68,24 @@ test("a group needs a name", async () => {
   await fireEvent.press(await screen.findByText("Create group"));
   expect(await screen.findByText("Give the group a name.")).toBeTruthy();
   expect(calls).toHaveLength(0);
+});
+
+test("coming back to the list after creating a group shows it", async () => {
+  const groups: unknown[] = [];
+  const { client } = fakeLedger({
+    "GET /groups": () => json(200, groups),
+    "POST /groups": async (req) => {
+      const body = await req.json();
+      groups.push({ id: body.id, name: body.name, baseCurrency: "ZAR", memberCount: 1, myNet: [] });
+      return json(201, {});
+    },
+  });
+  await renderApp(routes, client, "/groups");
+  expect(await screen.findByText(/^No groups yet/)).toBeTruthy();
+  await fireEvent.press(screen.getByText("New group"));
+  await fireEvent.changeText(await screen.findByLabelText("Name"), "Book club");
+  await fireEvent.press(screen.getByText("Create group"));
+  expect(await screen.findByText("Group home")).toBeTruthy();
+  await act(async () => testRouter.back());
+  expect(await screen.findByText("Book club")).toBeTruthy();
 });
