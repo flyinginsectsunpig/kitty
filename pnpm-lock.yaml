@@ -171,6 +171,9 @@ importers:
       '@kitty/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@kitty/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@kitty/money':
         specifier: workspace:*
         version: link:../../packages/money

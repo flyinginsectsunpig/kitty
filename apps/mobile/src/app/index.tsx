@@ -1,11 +1,5 @@
-import { formatMoney } from "@kitty/money";
-import { Text, View } from "react-native";
+import { Redirect } from "expo-router";
 
-export default function Home() {
-  return (
-    <View>
-      <Text>Kitty</Text>
-      <Text>{formatMoney(12345, "ZAR")}</Text>
-    </View>
-  );
+export default function Index() {
+  return <Redirect href="/groups" />;
 }
