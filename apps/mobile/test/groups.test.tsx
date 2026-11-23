@@ -89,3 +89,17 @@ test("coming back to the list after creating a group shows it", async () => {
   await act(async () => testRouter.back());
   expect(await screen.findByText("Book club")).toBeTruthy();
 });
+
+test("the currency list stays folded away until asked for", async () => {
+  const { client, calls } = fakeLedger({ "POST /groups": () => json(201, {}) });
+  const { app } = await renderApp(routes, client, "/groups/new");
+  expect(await screen.findByText("ZAR")).toBeTruthy();
+  expect(screen.queryByText("EUR")).toBeNull();
+  await fireEvent.press(screen.getByText("Change currency"));
+  await fireEvent.press(screen.getByText("EUR"));
+  expect(screen.queryByText("GBP")).toBeNull(); // folds away again once picked
+  await fireEvent.changeText(screen.getByLabelText("Name"), "Paris trip");
+  await fireEvent.press(screen.getByText("Create group"));
+  await waitFor(() => expect(app.getPathname()).toMatch(/^\/groups\/[0-9a-f-]{36}$/));
+  expect(calls.find((c) => c.method === "POST")!.body.baseCurrency).toBe("EUR");
+});

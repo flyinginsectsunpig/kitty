@@ -80,9 +80,11 @@ function InviteReady({ url }: { url: string }) {
       <Text style={styles.name}>Invite link ready</Text>
       <Text style={styles.small}>Send it to one person. It works once and expires in 7 days.</Text>
       <View style={styles.row}>
-        <Text style={styles.code} numberOfLines={1} selectable>
-          {url}
-        </Text>
+        <View style={styles.code}>
+          <Text style={styles.codeText} numberOfLines={1} ellipsizeMode="middle">
+            {url}
+          </Text>
+        </View>
         <CopyButton text={url} />
       </View>
       <Button title="Share link" variant="secondary" onPress={() => void Share.share({ message: `Join me on Kitty to split costs: ${url}` }).catch(() => {})} />
@@ -173,5 +175,7 @@ const styles = StyleSheet.create({
   muted: { fontSize: font.sm, color: colors.muted, fontWeight: "400" },
   small: { fontSize: 12, color: colors.muted },
   saved: { fontSize: font.sm, color: colors.owed },
-  code: { flex: 1, fontSize: 12, color: colors.text, backgroundColor: "#f5f5f4", borderRadius: radius.field, padding: space.sm },
+  // One line, cut in the middle (Copy has the full link). Not `selectable`: on Android that ignores numberOfLines.
+  code: { flex: 1, backgroundColor: "#f5f5f4", borderRadius: radius.field, padding: space.sm },
+  codeText: { fontSize: 12, color: colors.text },
 });

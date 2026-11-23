@@ -1,6 +1,6 @@
 import type { ExpenseWriteDto } from "@kitty/api-client";
 import { CATEGORIES, splitProblemMessage, toExpenseWriteDto, type ExpenseFormState } from "@kitty/core";
-import { formatMoney, parseMoney, previewSplit, supportedCurrencies, type SplitMethod } from "@kitty/money";
+import { formatMoney, parseMoney, previewSplit, type SplitMethod } from "@kitty/money";
 import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import { useAction, type LedgerResult } from "../hooks/useAction";
@@ -8,6 +8,7 @@ import { colors, font, radius, space } from "../theme";
 import { Button } from "./Button";
 import { Checkbox } from "./Checkbox";
 import { Chips } from "./Chips";
+import { CurrencyPicker } from "./CurrencyPicker";
 import { ErrorBanner } from "./ErrorBanner";
 import { Card } from "./Screen";
 import { TextField } from "./TextField";
@@ -74,7 +75,7 @@ export function ExpenseForm({ members, initial, submitLabel, save, onSaved }: {
       <ErrorBanner message={action.error} />
       <TextField label="What was it for?" value={state.description} onChangeText={(v) => set("description", v)} maxLength={120} placeholder="Groceries, Uber, electricity…" />
       <TextField label="Amount" value={state.amount} onChangeText={(v) => set("amount", v)} keyboardType="decimal-pad" placeholder="0.00" />
-      <Chips label="Currency" options={supportedCurrencies} value={state.currency} onChange={(v) => set("currency", v)} />
+      <CurrencyPicker label="Currency" value={state.currency} onChange={(v) => set("currency", v)} />
       <Chips label="Paid by" options={members.map((m) => m.id)} value={state.payerId} onChange={(v) => set("payerId", v)} render={nameOf} />
       <TextField label="Date" value={state.occurredOn} onChangeText={(v) => set("occurredOn", v)} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" />
       <Chips label="Category" options={CATEGORIES} value={state.category as (typeof CATEGORIES)[number]} onChange={(v) => set("category", v)} render={title} />

@@ -1,10 +1,10 @@
-import { supportedCurrencies } from "@kitty/money";
 import { randomUUID } from "expo-crypto";
 import { Stack, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { StyleSheet, Text } from "react-native";
 import { Button } from "../../../../../components/Button";
 import { Chips } from "../../../../../components/Chips";
+import { CurrencyPicker } from "../../../../../components/CurrencyPicker";
 import { ErrorBanner } from "../../../../../components/ErrorBanner";
 import { Card, Screen } from "../../../../../components/Screen";
 import { TextField } from "../../../../../components/TextField";
@@ -48,7 +48,7 @@ export default function NewTableScreen() {
       <Card>
         <TextField label="Where are you?" value={title} onChangeText={setTitle} maxLength={80} placeholder="Friday dinner at Mzansi" />
         <Chips label="Who's paying the bill?" options={group.members.map((m) => m.id)} value={payerMemberId} onChange={setPayer} render={(m) => (m === me.id ? "You" : nameOf(m))} />
-        <Chips label="Currency" options={supportedCurrencies} value={currency} onChange={setCurrency} />
+        <CurrencyPicker label="Currency" value={currency} onChange={setCurrency} />
         <Button title="Start" busy={start.busy} onPress={() => void onStart()} />
       </Card>
     </Screen>

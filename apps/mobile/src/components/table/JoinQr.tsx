@@ -19,9 +19,11 @@ export function JoinQr({ sessionId, groupId }: { sessionId: string; groupId: str
       </View>
       <Text style={styles.muted}>No account needed. Friends in the group are recognised when signed in.</Text>
       <View style={styles.row}>
-        <Text style={styles.code} numberOfLines={1} selectable>
-          {link}
-        </Text>
+        <View style={styles.code}>
+          <Text style={styles.codeText} numberOfLines={1} ellipsizeMode="middle">
+            {link}
+          </Text>
+        </View>
         <CopyButton text={link} />
       </View>
       <Button title="Share link" variant="secondary" onPress={() => void Share.share({ message: link }).catch(() => {})} />
@@ -34,5 +36,7 @@ const styles = StyleSheet.create({
   qr: { alignSelf: "center", padding: space.md, backgroundColor: "#fff", borderRadius: radius.field },
   muted: { fontSize: font.sm, color: colors.muted },
   row: { flexDirection: "row", alignItems: "center", gap: space.sm },
-  code: { flex: 1, fontSize: 12, color: colors.text, backgroundColor: "#f5f5f4", borderRadius: radius.field, padding: space.sm },
+  // One line, cut in the middle (Copy has the full link). Not `selectable`: on Android that ignores numberOfLines.
+  code: { flex: 1, backgroundColor: "#f5f5f4", borderRadius: radius.field, padding: space.sm },
+  codeText: { fontSize: 12, color: colors.text },
 });

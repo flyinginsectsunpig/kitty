@@ -18,7 +18,12 @@ export default function AppLayout() {
     const next = here(pathname, segments, params);
     return <Redirect href={{ pathname: "/sign-in", params: next === "/groups" ? {} : { next } }} />;
   }
-  return <Stack />;
+  // A group's screens have their own stack (and header, named after the group): no second header above it.
+  return (
+    <Stack>
+      <Stack.Screen name="groups/[id]" options={{ headerShown: false }} />
+    </Stack>
+  );
 }
 
 /** The current link, query included (a table QR link's ?g= says which group), without the route's own [params]. */

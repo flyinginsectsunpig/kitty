@@ -32,6 +32,17 @@ phone has to reach Keycloak as `localhost` too. Run it again after restarting th
 Sign-up verification emails land in Mailpit (its UI is in the Aspire dashboard). The first build downloads the
 Android NDK and CMake (about 1.5 GB) and takes a while; later builds are quick.
 
+**Windows:** pnpm's package paths run past 260 characters, and the default CMake 3.22's ninja can't read them (the
+build loops on "manifest 'build.ninja' still dirty after 100 tries"). Install a newer CMake and point the generated
+project at it, once per machine (`android/` isn't committed, so redo the second line after `expo prebuild --clean`):
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\cmdline-tools\latest\bin\sdkmanager.bat" --install "cmake/3.31.6"
+Add-Content apps\mobile\android\local.properties "cmake.dir=$($env:LOCALAPPDATA -replace '\\','\\' -replace ':','\:')\\Android\\Sdk\\cmake\\3.31.6"
+```
+
+Windows long paths must also be on (`LongPathsEnabled` = 1, the default on recent Windows 11 installs).
+
 Configuration (all optional for local dev):
 
 | Variable | Default |

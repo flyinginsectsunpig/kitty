@@ -1,9 +1,8 @@
-import { supportedCurrencies } from "@kitty/money";
 import { randomUUID } from "expo-crypto";
 import { Stack, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Button } from "../../../components/Button";
-import { Chips } from "../../../components/Chips";
+import { CurrencyPicker } from "../../../components/CurrencyPicker";
 import { ErrorBanner } from "../../../components/ErrorBanner";
 import { Card, Screen } from "../../../components/Screen";
 import { TextField } from "../../../components/TextField";
@@ -34,7 +33,7 @@ export default function NewGroupScreen() {
       <ErrorBanner message={create.error} />
       <Card>
         <TextField label="Name" value={name} onChangeText={setName} maxLength={60} placeholder="Flat 4B, Cape Town trip…" autoFocus />
-        <Chips label="Main currency" options={supportedCurrencies} value={currency} onChange={setCurrency} />
+        <CurrencyPicker label="Main currency" value={currency} onChange={setCurrency} />
         <Button title="Create group" busy={create.busy} onPress={() => void onCreate()} />
       </Card>
     </Screen>
