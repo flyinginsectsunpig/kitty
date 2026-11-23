@@ -34,8 +34,14 @@ reserved IP. The IP is static, so no updater is needed.
 ## 3. Email for verification links
 
 Keycloak requires email verification (it stops account takeover through Google sign-in).
-Create a free Resend account, verify a sending domain or use their test domain, create an API key,
-and put it in `SMTP_PASSWORD`.
+
+- **DuckDNS name (no domain of your own):** use Gmail. Turn on 2-Step Verification on the Google account,
+  create an app password at https://myaccount.google.com/apppasswords (name it "Kitty"), and set
+  `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USER` and `SMTP_FROM` to that Gmail address, and
+  `SMTP_PASSWORD` to the app password. Gmail allows about 500 emails a day.
+- **Your own domain:** Resend's free tier works too, once the domain is verified there (it needs DKIM/SPF
+  DNS records, which a DuckDNS name can't have): `SMTP_HOST=smtp.resend.com`, `SMTP_USER=resend`,
+  `SMTP_PASSWORD` = the API key, `SMTP_FROM` on the verified domain.
 
 ## 3a. Receipt scanning
 
