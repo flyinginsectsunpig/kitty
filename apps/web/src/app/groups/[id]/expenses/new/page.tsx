@@ -1,3 +1,4 @@
+import { newExpenseForm } from "@kitty/core";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { loadGroup } from "@/lib/group-context";
@@ -25,18 +26,13 @@ export default async function NewExpensePage({
         idempotencyKey={crypto.randomUUID()}
         action={saveExpense}
         submitLabel="Save expense"
-        initial={{
+        initial={newExpenseForm({
           id: crypto.randomUUID(),
-          version: null,
-          description: "",
-          category: "other",
+          today: new Date().toISOString().slice(0, 10),
           currency: group.baseCurrency,
-          amount: "",
-          occurredOn: new Date().toISOString().slice(0, 10),
-          payerId: me.id,
-          method: "equal",
-          participants: group.members.map((m) => ({ memberId: m.id, included: true, value: "" })),
-        }}
+          meId: me.id,
+          memberIds: group.members.map((m) => m.id),
+        })}
       />
     </section>
   );
