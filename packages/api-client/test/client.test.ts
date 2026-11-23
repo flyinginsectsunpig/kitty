@@ -28,6 +28,13 @@ describe("createLedgerClient", () => {
     expect(requests[0]!.headers.get("idempotency-key")).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  test("uses the given key factory for mutations (React Native has no global crypto)", async () => {
+    const { requests, fetchFn } = recordingFetch();
+    const client = createLedgerClient("http://ledger.test", async () => "t", fetchFn, () => "key-from-factory");
+    await client.PATCH("/me", { body: { displayName: "T" } });
+    expect(requests[0]!.headers.get("idempotency-key")).toBe("key-from-factory");
+  });
+
   test("keeps a caller-supplied Idempotency-Key", async () => {
     const { requests, fetchFn } = recordingFetch();
     const client = createLedgerClient("http://ledger.test", async () => "tok", fetchFn);

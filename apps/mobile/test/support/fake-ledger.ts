@@ -1,4 +1,4 @@
-import { createLedgerClient } from "@kitty/api-client";
+import { makeLedgerClient } from "../../src/ledger";
 
 export type Handler = (req: Request) => Response | Promise<Response>;
 
@@ -8,7 +8,7 @@ export const json = (status: number, body?: unknown) =>
 export type Call = { method: string; path: string; search: string; headers: Headers; body: any };
 
 /**
- * The real ledger client over a fake network. Routes are "METHOD /path" (exact path); anything else is a 404.
+ * The app's ledger client over a fake network. Routes are "METHOD /path" (exact path); anything else is a 404.
  * A handler may throw to act like a dropped connection. Every request is recorded, with its JSON body.
  */
 export function fakeLedger(routes: Record<string, Handler>) {
@@ -20,5 +20,6 @@ export function fakeLedger(routes: Record<string, Handler>) {
     const handler = routes[`${req.method} ${url.pathname}`];
     return handler ? handler(req) : json(404, { code: "not_found" });
   };
-  return { client: createLedgerClient("http://ledger.test", async () => "test-token", fetchFn), calls };
+  // The app's own client factory, so tests send what the app sends (keys from expo-crypto, not a global crypto).
+  return { client: makeLedgerClient("http://ledger.test", async () => "test-token", fetchFn), calls };
 }
