@@ -13,8 +13,8 @@ export function problemMessage(error: unknown): string {
 
 /**
  * Runs one screen action (a mutation). It never throws and never leaves `busy` stuck: a request that throws (no
- * signal, server restarting) becomes the "network" message. The Idempotency-Key stays the same until the action
- * succeeds, so a retry after a failure, or a double tap, replays the first request instead of repeating it.
+ * signal, server restarting) becomes the "network" message. The Idempotency-Key stays the same until the ledger has
+ * answered, so a retry after a dropped connection, or a double tap, replays the first request instead of repeating it.
  */
 export function useAction<T>(fn: (idempotencyKey: string) => Promise<LedgerResult<T>>) {
   const key = useRef(randomUUID());
@@ -30,6 +30,10 @@ export function useAction<T>(fn: (idempotencyKey: string) => Promise<LedgerResul
     try {
       const result = await fn(key.current);
       if (result.error !== undefined || !result.response.ok) {
+        // The ledger stores every answer below 500 under its key, so a retry with that key would replay this error
+        // even after the form is fixed: take a new key. Keep it only while the first request is still running.
+        const code = (result.error as LedgerProblem | undefined)?.code;
+        if (result.response.status < 500 && code !== "request_in_progress") key.current = randomUUID();
         setError(problemMessage(result.error));
         return { ok: false };
       }

@@ -65,3 +65,29 @@ test("a success without a body is still a success", async () => {
   });
   expect(value).toEqual({ ok: true, data: undefined });
 });
+
+test("after the ledger answers with a problem, the next try uses a new key (the ledger stored that answer)", async () => {
+  const keys: string[] = [];
+  const { result } = await renderHook(() =>
+    useAction(async (key) => {
+      keys.push(key);
+      return problem("version_conflict", 409);
+    }),
+  );
+  await act(async () => void (await result.current.run()));
+  await act(async () => void (await result.current.run()));
+  expect(keys[0]).not.toBe(keys[1]);
+});
+
+test("while the ledger is still working on the first request, a retry keeps its key", async () => {
+  const keys: string[] = [];
+  const { result } = await renderHook(() =>
+    useAction(async (key) => {
+      keys.push(key);
+      return problem("request_in_progress", 409);
+    }),
+  );
+  await act(async () => void (await result.current.run()));
+  await act(async () => void (await result.current.run()));
+  expect(keys[0]).toBe(keys[1]);
+});
