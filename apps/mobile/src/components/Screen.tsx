@@ -10,6 +10,7 @@ import { ErrorBanner } from "./ErrorBanner";
 export function Screen({ children, onRefresh, refreshing = false }: { children: ReactNode; onRefresh?: () => void; refreshing?: boolean }) {
   return (
     <ScrollView
+      testID="screen"
       style={styles.page}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
