@@ -1,3 +1,4 @@
+import type { GroupDto } from "@kitty/api-client";
 import { json, type Handler } from "./fake-ledger";
 
 /** A two-person group (Zee is the signed-in user) and the routes every group screen loads. */
@@ -5,7 +6,7 @@ export const G = "11111111-1111-4111-8111-111111111111";
 export const ME = "22222222-2222-4222-8222-222222222222";
 export const SAM = "33333333-3333-4333-8333-333333333333";
 
-export const group = {
+export const group: GroupDto = {
   id: G,
   name: "Flat 4B",
   baseCurrency: "ZAR",

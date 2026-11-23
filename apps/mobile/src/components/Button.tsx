@@ -1,13 +1,22 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 import { colors, font, radius, space } from "../theme";
 
-type Props = { title: string; onPress: () => void; variant?: "primary" | "secondary" | "danger"; disabled?: boolean; busy?: boolean };
+type Props = {
+  title: string;
+  onPress: () => void;
+  variant?: "primary" | "secondary" | "danger";
+  disabled?: boolean;
+  busy?: boolean;
+  /** When the visible title alone is ambiguous ("Invite" on every row). */
+  accessibilityLabel?: string;
+};
 
-export function Button({ title, onPress, variant = "primary", disabled = false, busy = false }: Props) {
+export function Button({ title, onPress, variant = "primary", disabled = false, busy = false, accessibilityLabel }: Props) {
   const off = disabled || busy;
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: off, busy }}
       disabled={off}
       onPress={onPress}
