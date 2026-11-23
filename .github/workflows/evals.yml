@@ -27,7 +27,7 @@ jobs:
         if: env.AI_GEMINI_API_KEY == ''
         working-directory: .
         run: echo "::notice::AI_GEMINI_API_KEY is not set; receipt evals skipped."
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.AI_GEMINI_API_KEY != ''
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         if: env.AI_GEMINI_API_KEY != ''
