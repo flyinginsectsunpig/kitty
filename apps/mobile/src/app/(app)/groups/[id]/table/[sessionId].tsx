@@ -3,6 +3,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { StyleSheet, Text } from "react-native";
 import { LoadState, Screen } from "../../../../../components/Screen";
 import { ClaimTable } from "../../../../../components/table/ClaimTable";
+import { HostTable } from "../../../../../components/table/HostTable";
 import { useGroup } from "../../../../../group/GroupContext";
 import { useLoad } from "../../../../../hooks/useLoad";
 import { useLedger } from "../../../../../ledger";
@@ -37,7 +38,7 @@ function Loaded({ sessionId }: { sessionId: string }) {
   return (
     <>
       <Stack.Screen options={{ title: "Split the bill" }} />
-      <LoadState state={state}>{({ bill }) => <ClaimTable initial={bill} groupId={group.id} />}</LoadState>
+      <LoadState state={state}>{({ bill, hosting }) => (hosting ? <HostTable initial={bill} groupId={group.id} /> : <ClaimTable initial={bill} groupId={group.id} />)}</LoadState>
     </>
   );
 }

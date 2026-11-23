@@ -8,14 +8,10 @@ import { config } from "../src/config";
 import { fakeLedger, json } from "./support/fake-ledger";
 import { connections } from "./support/fake-signalr";
 import { G, groupRoutes, ME, SAM } from "./support/group";
+import { base, bill, I1, S } from "./support/table";
 import { renderApp } from "./support/render-app";
 
 jest.mock("@microsoft/signalr", () => require("./support/fake-signalr"));
-
-const S = "66666666-6666-4666-8666-666666666666";
-const I1 = "77777777-7777-4777-8777-777777777771";
-const I2 = "77777777-7777-4777-8777-777777777772";
-const base = `/groups/${G}/table-sessions/${S}`;
 
 const routes = {
   "(app)/groups/[id]/_layout": GroupLayout,
@@ -24,29 +20,6 @@ const routes = {
   "(app)/t/[sessionId]": TableLink,
   "(app)/groups/index": () => <Text>Groups</Text>,
 };
-
-function bill(version: number, over: Record<string, unknown> = {}) {
-  return {
-    id: S,
-    title: "Friday dinner",
-    currency: "ZAR",
-    status: "open",
-    version,
-    payerMemberId: SAM,
-    payerDisplayName: "Sam",
-    expenseId: null,
-    viewer: { kind: "member", id: ME },
-    items: [
-      { id: I1, description: "Burger", quantity: 1, lineTotalMinor: 9000, claimants: [] },
-      { id: I2, description: "Chips", quantity: 2, lineTotalMinor: 6000, claimants: [] },
-    ],
-    charges: [],
-    guests: [],
-    preview: [],
-    scan: null,
-    ...over,
-  };
-}
 
 /** The ledger as one bill: `current` is what a GET returns; tests move it forward. */
 function tableLedger() {
@@ -57,7 +30,7 @@ function tableLedger() {
       [`GET ${base}`]: () => json(200, state.current),
       [`GET ${base}/listen-token`]: () => json(200, { token: "listen-1", expiresAt: "2026-11-23T23:00:00Z" }),
       [`PUT ${base}/items/${I1}/claim`]: () => {
-        state.current = bill(state.current.version + 1, { items: [{ ...bill(1).items[0]!, claimants: [{ kind: "member", id: ME, displayName: "Zee" }] }, bill(1).items[1]] });
+        state.current = bill(state.current.version + 1, { items: [{ ...bill(1).items[0]!, claimants: [{ kind: "member", id: ME, displayName: "Zee" }] }, bill(1).items[1]!] });
         return json(200);
       },
     }),
