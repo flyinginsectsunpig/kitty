@@ -45,7 +45,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-          cache: gradle
+          # No `cache: gradle`: the Gradle files only exist after `expo prebuild`, so there is nothing to key it on here.
       - run: pnpm install --frozen-lockfile
 
       - name: Generate the Android project
