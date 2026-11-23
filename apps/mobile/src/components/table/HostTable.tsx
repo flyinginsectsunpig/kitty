@@ -3,7 +3,7 @@ import { errorMessage, rowsAction, tipToMinor, type TableSession } from "@kitty/
 import { exponent, formatMoney, parseMoney, toDecimalString } from "@kitty/money";
 import { randomUUID } from "expo-crypto";
 import { useRouter } from "expo-router";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useGroup } from "../../group/GroupContext";
 import type { LedgerResult } from "../../hooks/useAction";
@@ -16,14 +16,12 @@ import { ErrorBanner } from "../ErrorBanner";
 import { Card, Screen } from "../Screen";
 import { ItemList, PreviewTotals } from "./ItemList";
 import { JoinQr } from "./JoinQr";
+import { ReceiptScan } from "./ReceiptScan";
 
 type Row = { id: string; description: string; quantity: string; amount: string };
 
-/**
- * The host's screen (web's HostTable, natively): enter the bill, show the QR code, watch claims arrive, match guests,
- * confirm. `scan` is the receipt-scan block, shown while the bill is open.
- */
-export function HostTable({ initial, groupId, scan }: { initial: TableSession; groupId: string; scan?: (run: Run) => ReactNode }) {
+/** The host's screen (web's HostTable, natively): scan or enter the bill, show the QR code, watch claims, match guests, confirm. */
+export function HostTable({ initial, groupId }: { initial: TableSession; groupId: string }) {
   const ledger = useLedger();
   const router = useRouter();
   const { group, reload: reloadGroup } = useGroup();
@@ -154,7 +152,7 @@ export function HostTable({ initial, groupId, scan }: { initial: TableSession; g
       {session.status === "cancelled" && <Text style={styles.status}>This bill was cancelled. Nothing was recorded.</Text>}
       <ErrorBanner message={error} />
 
-      {open && scan?.(run)}
+      {open && <ReceiptScan session={session} groupId={groupId} onSession={apply} />}
 
       <Card>
         <Text style={styles.h2}>1. The bill</Text>
@@ -244,8 +242,6 @@ export function HostTable({ initial, groupId, scan }: { initial: TableSession; g
     </Screen>
   );
 }
-
-export type Run = (action: () => Promise<LedgerResult<TableSession> | LedgerResult<unknown>>) => Promise<TableSession | null>;
 
 function Choice({ label, text, selected, disabled, onPress }: { label: string; text: string; selected: boolean; disabled: boolean; onPress: () => void }) {
   return (
