@@ -131,3 +131,10 @@ test("starting a table creates it and opens it", async () => {
   await waitFor(() => expect(app.getPathname()).toMatch(new RegExp(`^/groups/${G}/table/[0-9a-f-]{36}$`)));
   expect(created[0]).toMatchObject({ title: "Friday dinner", currency: "ZAR", payerMemberId: ME });
 });
+
+test("a malformed table QR link shows not found", async () => {
+  const l = tableLedger();
+  await renderApp(routes, l.client, `/t/not-a-uuid?g=${G}`);
+  expect(await screen.findByText("We couldn't find that.")).toBeTruthy();
+  expect(l.calls.filter((c) => c.path.includes("table-sessions"))).toHaveLength(0);
+});

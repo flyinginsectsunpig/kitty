@@ -3,6 +3,8 @@ import { renderRouter, screen, fireEvent, waitFor } from "expo-router/testing-li
 import { useEffect } from "react";
 import { Text } from "react-native";
 import AppLayout from "../../src/app/(app)/_layout";
+import AuthCallback from "../../src/app/auth/callback";
+import Index from "../../src/app/index";
 import SignIn from "../../src/app/sign-in";
 import { AuthProvider, useAuth } from "../../src/auth/AuthProvider";
 import type { AuthClient } from "../../src/auth/client";
@@ -36,8 +38,11 @@ async function renderApp(client: AuthClient, store: TokenStore, initialUrl = "/g
           <Slot />
         </AuthProvider>
       ),
+      index: Index,
       "sign-in": SignIn,
+      "auth/callback": AuthCallback,
       "(app)/_layout": AppLayout,
+      "(app)/t/[sessionId]": () => <Text>Table link</Text>,
       "(app)/groups/index": Groups,
     },
     { initialUrl },
@@ -89,4 +94,27 @@ test("no signal on start-up keeps the user signed in", async () => {
   expect(await screen.findByText("Groups screen")).toBeTruthy();
   expect(screen.queryByText("You've been signed out. Sign in again.")).toBeNull();
   expect(store.data.size).toBe(1);
+});
+
+test("the sign-in redirect (kitty://auth/callback) opening the app lands somewhere real", async () => {
+  const store = memoryStore();
+  await store.set("kitty.tokens", JSON.stringify(good));
+  const app = await renderApp(fakeClient(), store, "/auth/callback");
+  expect(await screen.findByText("Groups screen")).toBeTruthy();
+  expect(app.getPathname()).toBe("/groups");
+});
+
+test("after signing out, the redirect back to the app shows sign-in", async () => {
+  const app = await renderApp(fakeClient(), memoryStore(), "/auth/callback");
+  expect(await screen.findByText("Sign in")).toBeTruthy();
+  expect(app.getPathname()).toBe("/sign-in");
+});
+
+test("a signed-out QR scan keeps the whole link, group included, for after sign-in", async () => {
+  const app = await renderApp(fakeClient(), memoryStore(), "/t/s1?g=g1");
+  expect(await screen.findByText("Sign in")).toBeTruthy();
+  expect(app.getSearchParams().next).toBe("/t/s1?g=g1");
+  await fireEvent.press(screen.getByText("Sign in"));
+  expect(await screen.findByText("Table link")).toBeTruthy();
+  expect(app.getPathnameWithParams()).toBe("/t/s1?g=g1");
 });
