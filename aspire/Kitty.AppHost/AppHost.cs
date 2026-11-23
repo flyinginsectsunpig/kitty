@@ -32,7 +32,8 @@ const string kafkaBootstrap = "localhost:19092";
 const string schemaRegistry = "http://localhost:18081";
 
 // Receipt photos (Azurite locally).
-var storage = builder.AddAzureStorage("storage").RunAsEmulator(e => e.WithImageTag("3.37.0"));
+// Fixed blob port, so the phone app (through `adb reverse`) can upload to the same address the ledger signs.
+var storage = builder.AddAzureStorage("storage").RunAsEmulator(e => e.WithImageTag("3.37.0").WithBlobPort(10000));
 var blobs = storage.AddBlobs("blobs");
 
 // Optional: without a key, scans fail fast with "type the items" (dotnet user-secrets set Parameters:gemini-api-key ...).
