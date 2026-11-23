@@ -6,7 +6,7 @@ import AppLayout from "../../src/app/(app)/_layout";
 import SignIn from "../../src/app/sign-in";
 import { AuthProvider, useAuth } from "../../src/auth/AuthProvider";
 import type { AuthClient } from "../../src/auth/client";
-import type { TokenStore, Tokens } from "../../src/auth/tokens";
+import { SessionRejected, type TokenStore, type Tokens } from "../../src/auth/tokens";
 
 function memoryStore(): TokenStore & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -71,7 +71,7 @@ test("successful sign-in stores tokens and routes to /groups", async () => {
 test("the signed-out notice is shown after a forced sign-out", async () => {
   const store = memoryStore();
   await store.set("kitty.tokens", JSON.stringify({ ...good, expiresAt: now() - 10 }));
-  await renderApp(fakeClient({ refresh: jest.fn(async () => Promise.reject(new Error("invalid_grant"))) }), store);
+  await renderApp(fakeClient({ refresh: jest.fn(async () => Promise.reject(new SessionRejected("invalid_grant"))) }), store);
   expect(await screen.findByText("You've been signed out. Sign in again.")).toBeTruthy();
   expect(store.data.size).toBe(0);
 });
@@ -80,4 +80,13 @@ test("a sign-in failure says so", async () => {
   await renderApp(fakeClient({ signIn: jest.fn(async () => Promise.reject(new Error("offline"))) }), memoryStore());
   await fireEvent.press(await screen.findByText("Sign in"));
   expect(await screen.findByRole("alert")).toBeTruthy();
+});
+
+test("no signal on start-up keeps the user signed in", async () => {
+  const store = memoryStore();
+  await store.set("kitty.tokens", JSON.stringify({ ...good, expiresAt: now() - 10 }));
+  await renderApp(fakeClient({ refresh: jest.fn(async () => Promise.reject(new TypeError("Network request failed"))) }), store);
+  expect(await screen.findByText("Groups screen")).toBeTruthy();
+  expect(screen.queryByText("You've been signed out. Sign in again.")).toBeNull();
+  expect(store.data.size).toBe(1);
 });

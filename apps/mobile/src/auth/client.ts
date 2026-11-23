@@ -4,16 +4,18 @@ import {
   fetchDiscoveryAsync,
   makeRedirectUri,
   refreshAsync,
+  TokenError,
   type DiscoveryDocument,
   type TokenResponse,
 } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
-import type { Tokens } from "./tokens";
+import { SessionRejected, type Tokens } from "./tokens";
 
 /** What the app needs from Keycloak. Tests pass a fake. */
 export type AuthClient = {
   /** Opens Keycloak's login in the system browser. Null when the user cancels or backs out. */
   signIn(): Promise<Tokens | null>;
+  /** Throws SessionRejected when Keycloak refuses; anything else (no signal) is passed on unchanged. */
   refresh(refreshToken: string): Promise<Tokens>;
   /** Ends the Keycloak session too, so the next sign-in asks again. */
   signOut(idToken: string | undefined): Promise<void>;
@@ -55,7 +57,16 @@ export function createKeycloakClient(issuer: string): AuthClient {
     },
 
     async refresh(refreshToken) {
-      return toTokens(await refreshAsync({ clientId: CLIENT_ID, refreshToken }, await discover()));
+      let response: TokenResponse;
+      try {
+        response = await refreshAsync({ clientId: CLIENT_ID, refreshToken }, await discover());
+      } catch (e) {
+        // An OAuth error answer (invalid_grant: expired, revoked, signed out elsewhere) is final; no signal is not.
+        if (e instanceof TokenError) throw new SessionRejected(e.code);
+        throw e;
+      }
+      if (!response.refreshToken) throw new SessionRejected("no refresh token");
+      return toTokens(response);
     },
 
     async signOut(idToken) {

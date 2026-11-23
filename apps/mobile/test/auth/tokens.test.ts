@@ -1,4 +1,4 @@
-import { createTokenKeeper, SignedOut, type TokenDeps, type Tokens } from "../../src/auth/tokens";
+import { createTokenKeeper, SessionRejected, SignedOut, type TokenDeps, type Tokens } from "../../src/auth/tokens";
 
 function memoryStore() {
   const data = new Map<string, string>();
@@ -44,11 +44,26 @@ test("two concurrent calls refresh once", async () => {
   expect(refresh).toHaveBeenCalledTimes(1);
 });
 
-test("a failed refresh clears the store and throws SignedOut", async () => {
-  const { k, store } = keeper({ refresh: async () => Promise.reject(new Error("invalid_grant")) });
+test("a refresh Keycloak rejects clears the store and throws SignedOut", async () => {
+  const { k, store } = keeper({ refresh: async () => Promise.reject(new SessionRejected("invalid_grant")) });
   await k.save(tokens("old", NOW - 1));
   await expect(k.getAccessToken()).rejects.toBeInstanceOf(SignedOut);
   expect(store.data.size).toBe(0);
+});
+
+test("a refresh that fails for lack of signal keeps the session and can be retried", async () => {
+  let offline = true;
+  const refresh = jest.fn(async () => {
+    if (offline) throw new TypeError("Network request failed");
+    return tokens("fresh", NOW + 300);
+  });
+  const { k, store } = keeper({ refresh });
+  await k.save(tokens("old", NOW - 1));
+  await expect(k.getAccessToken()).rejects.toThrow("Network request failed");
+  await expect(k.getAccessToken()).rejects.not.toBeInstanceOf(SignedOut);
+  expect(store.data.size).toBe(1); // still signed in
+  offline = false;
+  expect(await k.getAccessToken()).toBe("fresh");
 });
 
 test("nothing stored throws SignedOut", async () => {
