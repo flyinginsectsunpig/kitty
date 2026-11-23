@@ -7,7 +7,8 @@ on:
   push:
     tags: ["mobile-v*"]
     branches-ignore: [main]
-    paths: [".github/workflows/android.yml"] # lets a branch that changes this file prove it still builds
+    # A branch that changes the app (or what it's built from) proves it still builds.
+    paths: [".github/workflows/android.yml", "apps/mobile/**", "packages/**", "pnpm-lock.yaml"]
 
 permissions:
   contents: read
