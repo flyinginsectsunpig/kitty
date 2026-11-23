@@ -86,6 +86,19 @@ Pin `KITTY_TAG=sha-…` to roll back to a known build.
 `AI_DB_PASSWORD` (`openssl rand -hex 24`) to `.env` before `up`; compose refuses to start without them.
 `GEMINI_API_KEY` stays optional.
 
+**Upgrading to the Android app (phase 2c):** Keycloak imports `infra/keycloak/kitty-realm.json` only when the
+realm doesn't exist yet (`--import-realm`), so a server set up before 2c lacks the app's `kitty-mobile` client. Add
+it once in the admin console (see below): Clients → Import client → pick the `kitty-mobile` entry from the realm file
+(public client, standard flow, PKCE S256, redirect `kitty://auth/callback`, the `kitty-ledger` audience mapper).
+A fresh server gets it automatically.
+
+## 5a. The Android app
+
+Download the APK from the repository's GitHub Releases (`mobile-v*` tags) or from the latest `android` workflow run,
+and open it on the phone (allow installs from that source when asked). Building it is described in
+[apps/mobile/README.md](../../apps/mobile/README.md). Once you have the signing certificate's SHA-256, set
+`ANDROID_CERT_SHA256` in `.env` and `up -d` again: invite and table links then open in the installed app.
+
 ## Keycloak admin console
 
 It is not reachable from the internet. From your own machine:

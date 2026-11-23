@@ -15,6 +15,8 @@ See [the design](docs/superpowers/specs/2026-11-15-kitty-design.md).
   confirming turns it into one expense. VAT is never added on top (South African prices include it).
 - **Scan the receipt:** photograph the bill and its items and tip fill in by themselves. The photo stays on
   Kitty's server; only the text, with card numbers, phone numbers and names removed, goes to an AI model.
+- **Android app:** everything above on the phone, with the camera for receipts and invite and table links that
+  open in the app ([apps/mobile](apps/mobile/README.md)). The web app works on any phone too.
 
 ## Local dev
 
@@ -30,3 +32,5 @@ Receipt scanning uses Gemini when you give it a key (otherwise scans fail fast a
 ```bash
 dotnet user-secrets set Parameters:gemini-api-key <key> --project aspire/Kitty.AppHost
 ```
+
+The Android app runs on an emulator or a USB phone against the same stack: see [apps/mobile](apps/mobile/README.md).
