@@ -41,7 +41,7 @@ export function ReceiptScan({
     if (!file) return;
     run(() =>
       uploadReceipt(
-        file,
+        { type: file.type, size: file.size, body: file },
         (contentType) => startScan(groupId, session.id, contentType),
         (scanId) => confirmScan(groupId, session.id, scanId),
       ),
