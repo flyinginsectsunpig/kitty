@@ -157,8 +157,10 @@ between web and mobile.
 
 ### 5.7 Distribution
 
-The overall design names EAS Build for the Android APK. See open question Q1: EAS needs an Expo account; the
-alternative is a GitHub Actions Gradle build with a signing keystore kept as a repo secret.
+**Decided (owner): a GitHub Actions Gradle build, not EAS Build**, so no Expo account is needed.
+- The workflow runs `expo prebuild` and then `gradlew assembleRelease`.
+- It signs the APK with a keystore kept as a repo secret, and publishes the APK as a workflow artifact and on
+  GitHub Releases for `mobile-v*` tags.
 
 ## 6. Ledger, Keycloak and web changes (all that 2c touches outside `apps/mobile`)
 
@@ -191,5 +193,5 @@ alternative is a GitHub Actions Gradle build with a signing keystore kept as a r
 
 - Every goal in §2 works on the Android emulator against Aspire, shown by the manual end-to-end steps in §5.6.
 - All test suites are green in CI (.NET, ai, web, core, money, api-client, mobile), and the bundle exports.
-- `RUNBOOK`/README describe running the app locally. The APK route is decided (Q1); building it can trail into the
-  next phase if it needs an account the owner hasn't made yet.
+- `RUNBOOK`/README describe running the app locally.
+- A signed APK builds in GitHub Actions and installs on the emulator.
