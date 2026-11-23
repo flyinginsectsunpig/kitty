@@ -1,3 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+allowBuilds:
+  # Optional file watcher for jest; it ships prebuilt binaries, so its install script is not needed.
+  "@parcel/watcher": false
