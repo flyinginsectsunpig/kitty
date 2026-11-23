@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth/config";
-import { safeNext } from "@/lib/redirects";
+import { safeNext } from "@kitty/core";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const target = safeNext((await searchParams).next);

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { safeNext } from "@/lib/redirects";
+import { safeNext } from "../src/redirects";
 
 describe("safeNext", () => {
   test("keeps same-site paths", () => expect(safeNext("/invite/abc")).toBe("/invite/abc"));
