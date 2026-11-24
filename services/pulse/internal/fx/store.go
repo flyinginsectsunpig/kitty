@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/pgschema"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
@@ -35,18 +36,9 @@ func OpenStore(ctx context.Context, url string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: %w", err)
 	}
-	// In production the schema already exists, owned by role "pulse", which may not create schemas — and
-	// CREATE SCHEMA IF NOT EXISTS checks that right even when the schema is there. So look first.
-	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'pulse')`).Scan(&exists); err != nil {
+	if err := pgschema.Ensure(ctx, pool); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("store: %w", err)
-	}
-	if !exists {
-		if _, err := pool.Exec(ctx, `CREATE SCHEMA pulse`); err != nil {
-			pool.Close()
-			return nil, fmt.Errorf("store: create schema: %w", err)
-		}
 	}
 	if _, err := pool.Exec(ctx, tables); err != nil {
 		pool.Close()
