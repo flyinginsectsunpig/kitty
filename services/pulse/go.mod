@@ -9,6 +9,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.45.0
 	github.com/testcontainers/testcontainers-go/modules/redpanda v0.45.0
 	github.com/twmb/franz-go v1.22.3
+	golang.org/x/oauth2 v0.38.0
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
 )

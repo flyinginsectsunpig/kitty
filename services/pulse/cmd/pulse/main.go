@@ -10,11 +10,13 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	fxv1 "github.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/fx/v1"
 	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/fx"
+	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/recurring"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health"
@@ -36,10 +38,11 @@ func main() {
 }
 
 func run(port string) error {
-	dbURL := os.Getenv("PULSE_DATABASE_URL")
-	if dbURL == "" {
-		return fmt.Errorf("PULSE_DATABASE_URL is required")
+	cfg, err := requiredEnv("PULSE_DATABASE_URL", "PULSE_KAFKA_BOOTSTRAP", "PULSE_LEDGER_GRPC", "PULSE_TOKEN_URL", "PULSE_CLIENT_SECRET")
+	if err != nil {
+		return err
 	}
+	dbURL := cfg["PULSE_DATABASE_URL"]
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -56,6 +59,29 @@ func run(port string) error {
 	}
 	// Hourly, so today's rate appears soon after the ECB publishes (around 16:00 CET).
 	go fx.RefreshDaily(ctx, svc, time.Hour)
+
+	// Recurring expenses: follow the ledger's schedules, and add each period when it falls due.
+	schedules, err := recurring.OpenStore(ctx, dbURL)
+	if err != nil {
+		return err
+	}
+	defer schedules.Close()
+	consumer, err := recurring.NewConsumerClient(cfg["PULSE_KAFKA_BOOTSTRAP"], recurring.Topic, "pulse-recurring")
+	if err != nil {
+		return err
+	}
+	defer consumer.Close()
+	go func() {
+		if err := recurring.Consume(ctx, consumer, schedules); err != nil && ctx.Err() == nil {
+			slog.Error("schedule consumer stopped", "err", err)
+		}
+	}()
+	ledger, err := recurring.NewLedgerClient(cfg["PULSE_LEDGER_GRPC"], cfg["PULSE_TOKEN_URL"], cfg["PULSE_CLIENT_SECRET"])
+	if err != nil {
+		return err
+	}
+	scheduler := &recurring.Scheduler{Store: schedules, Ledger: ledger, Now: time.Now}
+	go scheduler.Run(ctx, time.Minute)
 
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
@@ -88,6 +114,23 @@ func checkHealth(port string) int {
 		return 1
 	}
 	return 0
+}
+
+// requiredEnv reads every named variable, failing fast with the full list of missing ones.
+func requiredEnv(names ...string) (map[string]string, error) {
+	values := map[string]string{}
+	var missing []string
+	for _, n := range names {
+		if v := os.Getenv(n); v != "" {
+			values[n] = v
+		} else {
+			missing = append(missing, n)
+		}
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("required environment variables are missing: %s", strings.Join(missing, ", "))
+	}
+	return values, nil
 }
 
 func env(name, fallback string) string {
