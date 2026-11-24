@@ -10,7 +10,10 @@ export default async function GroupsPage() {
     <section className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Your groups</h1>
-        <Link href="/groups/new" className="btn-primary">New group</Link>
+        <div className="flex items-center gap-4">
+          <Link href="/settings/notifications" className="text-sm text-brand-600 hover:underline">Notifications</Link>
+          <Link href="/groups/new" className="btn-primary">New group</Link>
+        </div>
       </div>
 
       {groups.length === 0 ? (
