@@ -45,4 +45,6 @@ public static class ErrorCodes
     public const string FxRateUnavailable = "fx_rate_unavailable";
     public const string FxRateRequired = "fx_rate_required";
     public const string FxRateInvalid = "fx_rate_invalid";
+    public const string ScheduleStarted = "schedule_started";
+    public const string ServiceTokenNotAllowed = "service_token_not_allowed";
 }

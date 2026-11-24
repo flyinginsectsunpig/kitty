@@ -5,6 +5,11 @@ namespace Kitty.Ledger.Data;
 
 public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) : DbContext(options)
 {
+    private static readonly System.Text.Json.JsonSerializerOptions TemplateJson = new(System.Text.Json.JsonSerializerDefaults.Web)
+    {
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.CamelCase) },
+    };
+
     public DbSet<User> Users => Set<User>();
     public DbSet<Group> Groups => Set<Group>();
     public DbSet<Member> Members => Set<Member>();
@@ -20,6 +25,7 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<ReceiptScan> ReceiptScans => Set<ReceiptScan>();
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
+    public DbSet<RecurringSchedule> RecurringSchedules => Set<RecurringSchedule>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -84,6 +90,19 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
                 s.HasKey("ExpenseId", nameof(ExpenseShare.MemberId));
                 s.HasOne<Member>().WithMany().HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Restrict);
             });
+        });
+
+        b.Entity<RecurringSchedule>(e =>
+        {
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Template).HasColumnType("jsonb").HasConversion(
+                t => System.Text.Json.JsonSerializer.Serialize(t, TemplateJson),
+                s => System.Text.Json.JsonSerializer.Deserialize<ExpenseTemplate>(s, TemplateJson)!);
+            e.Property(x => x.Frequency).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.Version).IsConcurrencyToken();
+            e.Ignore(x => x.Rule);
+            e.HasIndex(x => x.GroupId);
+            e.HasOne<Group>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<Settlement>(e =>

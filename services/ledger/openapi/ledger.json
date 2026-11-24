@@ -795,6 +795,278 @@
         }
       }
     },
+    "/groups/{groupId}/recurring": {
+      "get": {
+        "tags": [
+          "Recurring"
+        ],
+        "operationId": "ListRecurring",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RecurringDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Recurring"
+        ],
+        "operationId": "CreateRecurring",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurringWriteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/recurring/{scheduleId}": {
+      "get": {
+        "tags": [
+          "Recurring"
+        ],
+        "operationId": "GetRecurring",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "scheduleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Recurring"
+        ],
+        "operationId": "UpdateRecurring",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "scheduleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurringWriteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Recurring"
+        ],
+        "operationId": "DeleteRecurring",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "scheduleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/recurring/{scheduleId}/pause": {
+      "post": {
+        "tags": [
+          "Recurring"
+        ],
+        "operationId": "PauseRecurring",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "scheduleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/recurring/{scheduleId}/resume": {
+      "post": {
+        "tags": [
+          "Recurring"
+        ],
+        "operationId": "ResumeRecurring",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "scheduleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/groups/{groupId}/table-sessions": {
       "get": {
         "tags": [
@@ -2086,6 +2358,12 @@
           }
         }
       },
+      "Frequency": {
+        "enum": [
+          "weekly",
+          "monthly"
+        ]
+      },
       "FxRateDto": {
         "required": [
           "rate",
@@ -2444,6 +2722,158 @@
           "amountMinor": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "RecurringDto": {
+        "required": [
+          "id",
+          "description",
+          "category",
+          "currency",
+          "amountMinor",
+          "payers",
+          "split",
+          "frequency",
+          "startsOn",
+          "endsOn",
+          "paused",
+          "nextDueOn",
+          "lastAddedOn",
+          "version",
+          "createdBy"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "payers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayerDto"
+            }
+          },
+          "split": {
+            "$ref": "#/components/schemas/SplitDto"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/Frequency"
+          },
+          "startsOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "endsOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "nextDueOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "lastAddedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "RecurringWriteDto": {
+        "required": [
+          "id",
+          "description",
+          "category",
+          "currency",
+          "amountMinor",
+          "payers",
+          "split",
+          "frequency",
+          "startsOn",
+          "endsOn",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "payers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayerDto"
+            }
+          },
+          "split": {
+            "$ref": "#/components/schemas/SplitDto"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/Frequency"
+          },
+          "startsOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "endsOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "version": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -3004,6 +3434,9 @@
     },
     {
       "name": "Settlements"
+    },
+    {
+      "name": "Recurring"
     }
   ]
 }
