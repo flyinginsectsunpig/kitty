@@ -19,9 +19,9 @@ type ledgerClient struct {
 	rpc ledgerv1.RecurringServiceClient
 }
 
-// NewLedgerClient calls the ledger's RecurringService at addr (plain HTTP/2 on the internal network) with a
-// client-credentials token from tokenURL, cached until shortly before it expires.
-func NewLedgerClient(addr, tokenURL, secret string, opts ...grpc.DialOption) (Adder, error) {
+// NewLedgerConn connects to the ledger's gRPC port at addr (plain HTTP/2 on the internal network), sending a
+// client-credentials token from tokenURL with every call, cached until shortly before it expires.
+func NewLedgerConn(addr, tokenURL, secret string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	tokens := (&clientcredentials.Config{ClientID: ClientID, ClientSecret: secret, TokenURL: tokenURL}).TokenSource(context.Background())
 	conn, err := grpc.NewClient(addr, append([]grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -30,7 +30,12 @@ func NewLedgerClient(addr, tokenURL, secret string, opts ...grpc.DialOption) (Ad
 	if err != nil {
 		return nil, fmt.Errorf("ledger client: %w", err)
 	}
-	return ledgerClient{rpc: ledgerv1.NewRecurringServiceClient(conn)}, nil
+	return conn, nil
+}
+
+// NewLedgerClient calls the ledger's RecurringService over conn.
+func NewLedgerClient(conn grpc.ClientConnInterface) Adder {
+	return ledgerClient{rpc: ledgerv1.NewRecurringServiceClient(conn)}
 }
 
 func (c ledgerClient) AddOccurrence(ctx context.Context, scheduleID string, period time.Time) error {

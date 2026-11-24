@@ -10,8 +10,10 @@ import (
 	notifyv1 "github.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/notify/v1"
 	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/kafkaconsume"
 	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/pgschema"
+	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/recurring"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -149,4 +151,16 @@ func DecodeSettings(value []byte) (Settings, error) {
 		WeeklyPush: m.GetWeeklyPush(), WeeklyEmail: m.GetWeeklyEmail(),
 		Tokens: m.GetPushTokens(), Version: m.GetVersion(),
 	}, nil
+}
+
+// ConsumeSettings keeps the store in step with the ledger's settings topic until ctx ends. Upserts are idempotent
+// (newer versions win); an unreadable record, or one the database rejects outright, is skipped.
+func ConsumeSettings(ctx context.Context, client *kgo.Client, store *Store) error {
+	return kafkaconsume.Run(ctx, client, "notify settings", func(ctx context.Context, value []byte) error {
+		s, err := DecodeSettings(value)
+		if err != nil {
+			return kafkaconsume.Skip{Err: err}
+		}
+		return recurring.RejectedAsSkip(store.Upsert(ctx, s))
+	})
 }

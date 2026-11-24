@@ -53,11 +53,13 @@ func TestLedgerClient_SendsBearerTokenAndPeriod(t *testing.T) {
 	go func() { _ = srv.Serve(lis) }()
 	defer srv.Stop()
 
-	client, err := NewLedgerClient("passthrough:///bufnet", tokens.URL, "secret",
+	conn, err := NewLedgerConn("passthrough:///bufnet", tokens.URL, "secret",
 		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) { return lis.DialContext(ctx) }))
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer conn.Close()
+	client := NewLedgerClient(conn)
 
 	if err := client.AddOccurrence(context.Background(), "s1", date(2026, 11, 24)); err != nil {
 		t.Fatalf("already_added must count as success: %v", err)
