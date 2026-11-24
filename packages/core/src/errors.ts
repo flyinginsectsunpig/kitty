@@ -26,6 +26,9 @@ const messages: Record<string, string> = {
   upload_failed: "The photo couldn't be uploaded. Check your connection and try again.",
   no_suggestion: "There's nothing from the scan to use.",
   network: "Couldn't reach Kitty. Check your connection and try again.",
+  fx_rate_unavailable: "Couldn't get today's exchange rate. Type the rate instead.",
+  fx_rate_required: "We couldn't look up the exchange rate. Enter it to record this payment.",
+  fx_rate_invalid: "That exchange rate doesn't look right.",
 };
 
 export function errorMessage(code: string | undefined): string | null {

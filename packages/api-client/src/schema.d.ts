@@ -116,6 +116,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/groups/{groupId}/fx-rate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetFxRate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/groups/{groupId}/activity": {
         parameters: {
             query?: never;
@@ -545,6 +561,7 @@ export interface components {
         };
         BalancesDto: {
             currencies: components["schemas"]["CurrencyBalanceDto"][];
+            converted: null | components["schemas"]["ConvertedBalanceDto"];
         };
         ChargeWriteDto: {
             /** Format: uuid */
@@ -558,6 +575,13 @@ export interface components {
             /** Format: uuid */
             id: string;
             displayName: string;
+        };
+        ConvertedBalanceDto: {
+            currency: string;
+            members: components["schemas"]["MemberNetDto"][];
+            transfers: components["schemas"]["TransferDto"][];
+            /** Format: int32 */
+            excludedCount: number;
         };
         CreateGroupDto: {
             /** Format: uuid */
@@ -603,6 +627,12 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            fxRate: null | string;
+            /** Format: date */
+            fxRateDate: null | string;
+            fxRateSource: null | string;
+            /** Format: int64 */
+            convertedAmountMinor: null | number;
         };
         ExpensePageDto: {
             items: components["schemas"]["ExpenseDto"][];
@@ -622,6 +652,13 @@ export interface components {
             split: components["schemas"]["SplitDto"];
             /** Format: int32 */
             version: null | number;
+            fxRate?: null | string;
+        };
+        FxRateDto: {
+            rate: string;
+            /** Format: date */
+            rateDate: string;
+            source: string;
         };
         GroupDto: {
             /** Format: uuid */
@@ -745,6 +782,13 @@ export interface components {
             createdBy: string;
             /** Format: date-time */
             createdAt: string;
+            fxRate: null | string;
+            /** Format: date */
+            fxRateDate: null | string;
+            fxRateSource: null | string;
+            /** Format: int64 */
+            convertedAmountMinor: null | number;
+            paidInGroupCurrency: boolean;
         };
         SettlementWriteDto: {
             /** Format: uuid */
@@ -756,6 +800,9 @@ export interface components {
             currency: string;
             /** Format: int64 */
             amountMinor: number;
+            fxRate?: null | string;
+            /** @default false */
+            paidInGroupCurrency: boolean;
         };
         ShareDto: {
             /** Format: uuid */
@@ -1101,6 +1148,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BalancesDto"];
+                };
+            };
+        };
+    };
+    GetFxRate: {
+        parameters: {
+            query: {
+                currency: string;
+                date: string;
+            };
+            header?: never;
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FxRateDto"];
                 };
             };
         };

@@ -3,7 +3,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { loadGroup } from "@/lib/group-context";
 import { unwrap } from "@/lib/ledger";
-import { deleteExpense, saveExpense } from "../../../actions";
+import { deleteExpense, fetchRate, saveExpense } from "../../../actions";
 
 export default async function EditExpensePage({
   params,
@@ -52,6 +52,9 @@ export default async function EditExpensePage({
         idempotencyKey={crypto.randomUUID()}
         action={saveExpense}
         submitLabel="Save changes"
+        groupCurrency={group.baseCurrency}
+        fetchRate={fetchRate}
+        saved={expense}
         initial={editExpenseForm(expense, group.members.map((m) => m.id), me.id)}
       />
       {deleteForm}

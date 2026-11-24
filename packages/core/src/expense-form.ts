@@ -1,5 +1,5 @@
 import type { ExpenseDto, ExpenseWriteDto } from "@kitty/api-client";
-import { exponent, parseMoney, toDecimalString, type SplitMethod } from "@kitty/money";
+import { exponent, parseMoney, parseRate, toDecimalString, type SplitMethod } from "@kitty/money";
 
 export const CATEGORIES = [
   "food",
@@ -27,6 +27,8 @@ export type ExpenseFormState = {
   payerId: string;
   method: SplitMethod;
   participants: ParticipantInput[];
+  /** A rate the person typed, or "" to let the ledger use the ECB rate (or keep the saved one). Clear it when the currency or date changes. */
+  fxRate: string;
 };
 
 /** "33.33" → 3333 basis points; at most two decimals, 0 < p ≤ 100. */
@@ -72,6 +74,13 @@ export function toExpenseWriteDto(form: ExpenseFormState): ExpenseWriteDto | { e
     participants.push({ memberId: p.memberId, value });
   }
 
+  let fxRate: string | undefined;
+  if (form.fxRate.trim() !== "") {
+    const rate = parseRate(form.fxRate.trim());
+    if (rate === null) return { error: "That exchange rate doesn't look right." };
+    fxRate = rate;
+  }
+
   return {
     id: form.id,
     description: form.description.trim(),
@@ -82,6 +91,7 @@ export function toExpenseWriteDto(form: ExpenseFormState): ExpenseWriteDto | { e
     payers: [{ memberId: form.payerId, amountMinor }],
     split: { method: form.method, participants },
     version: form.version,
+    ...(fxRate === undefined ? {} : { fxRate }),
   };
 }
 
@@ -98,6 +108,7 @@ export function newExpenseForm(o: { id: string; today: string; currency: string;
     payerId: o.meId,
     method: "equal",
     participants: o.memberIds.map((memberId) => ({ memberId, included: true, value: "" })),
+    fxRate: "",
   };
 }
 
@@ -135,6 +146,7 @@ export function editExpenseForm(expense: EditableExpense, memberIds: readonly st
       included: expense.split.participants.some((p) => p.memberId === memberId),
       value: valueText(memberId),
     })),
+    fxRate: "",
   };
 }
 

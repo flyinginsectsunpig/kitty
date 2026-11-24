@@ -1,3 +1,4 @@
+import { expenseAmounts } from "@kitty/core";
 import { formatMoney } from "@kitty/money";
 import Link from "next/link";
 import { GroupNav } from "@/components/GroupNav";
@@ -55,6 +56,26 @@ export default async function GroupPage({
 
       <div className="card space-y-3">
         <h2 className="font-semibold">Balances</h2>
+        {balances.converted && (
+          <div className="space-y-2 rounded-xl bg-stone-50 p-3 dark:bg-stone-900">
+            <p className="text-xs font-semibold uppercase text-stone-500">About {balances.converted.currency} in total</p>
+            <ul className="divide-y divide-stone-100 dark:divide-stone-800">
+              {balances.converted.members.filter((m) => m.netMinor !== 0).map((m) => (
+                <li key={m.memberId} className="flex justify-between py-1.5 text-sm">
+                  <span>{m.memberId === me.id ? "You" : nameOf(m.memberId)}</span>
+                  <span className={m.netMinor > 0 ? "text-owed" : "text-owes"}>
+                    {`${m.netMinor > 0 ? "gets back about" : "owes about"} ${formatMoney(Math.abs(m.netMinor), balances.converted!.currency)}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-stone-500">
+              Uses each expense&apos;s saved exchange rate. Settle up in each currency below.
+              {balances.converted.excludedCount > 0 &&
+                ` ${balances.converted.excludedCount} older ${balances.converted.excludedCount === 1 ? "expense has" : "expenses have"} no rate yet.`}
+            </p>
+          </div>
+        )}
         {balances.currencies.length === 0 ? (
           <p className="text-sm text-stone-500">Nothing to settle yet.</p>
         ) : (
@@ -98,7 +119,7 @@ export default async function GroupPage({
                     <div className="min-w-0">
                       <p className="truncate font-medium">{e.description}</p>
                       <p className="text-xs text-stone-500">
-                        {e.occurredOn} · {payer} paid {formatMoney(e.amountMinor, e.currency)}
+                        {e.occurredOn} · {payer} paid {expenseAmounts(e, group.baseCurrency)}
                       </p>
                     </div>
                     <p className="shrink-0 text-right text-sm text-stone-600 dark:text-stone-400">
