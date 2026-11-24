@@ -57,6 +57,18 @@ jobs:
           # No `cache: gradle`: the Gradle files only exist after `expo prebuild`, so there is nothing to key it on here.
       - run: pnpm install --frozen-lockfile
 
+      - name: Firebase config for push
+        env:
+          GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        working-directory: apps/mobile
+        run: |
+          if [ -z "$GOOGLE_SERVICES" ]; then
+            echo "::warning::No GOOGLE_SERVICES_JSON_BASE64 secret: this APK has push notifications off (see apps/mobile/README.md)."
+            exit 0
+          fi
+          echo "$GOOGLE_SERVICES" | base64 -d > google-services.json
+          echo "GOOGLE_SERVICES_JSON=./google-services.json" >> "$GITHUB_ENV"
+
       - name: Generate the Android project
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install --clean

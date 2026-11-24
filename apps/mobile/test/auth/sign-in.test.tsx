@@ -9,6 +9,8 @@ import SignIn from "../../src/app/sign-in";
 import { AuthProvider, useAuth } from "../../src/auth/AuthProvider";
 import type { AuthClient } from "../../src/auth/client";
 import { SessionRejected, type TokenStore, type Tokens } from "../../src/auth/tokens";
+import { LedgerProvider } from "../../src/ledger";
+import { fakeLedger } from "../support/fake-ledger";
 
 function memoryStore(): TokenStore & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -31,11 +33,14 @@ function Groups() {
 }
 
 async function renderApp(client: AuthClient, store: TokenStore, initialUrl = "/groups") {
+  const ledger = fakeLedger({}).client; // the app's tree always has one; signed-in screens register for push
   return renderRouter(
     {
       _layout: () => (
         <AuthProvider client={client} store={store}>
-          <Slot />
+          <LedgerProvider client={ledger}>
+            <Slot />
+          </LedgerProvider>
         </AuthProvider>
       ),
       index: Index,

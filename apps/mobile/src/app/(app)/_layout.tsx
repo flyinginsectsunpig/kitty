@@ -1,6 +1,10 @@
 import { Redirect, Stack, useGlobalSearchParams, usePathname, useSegments } from "expo-router";
+import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useAuth } from "../../auth/AuthProvider";
+import { useLedger } from "../../ledger";
+import { forgetDevice, registerDevice } from "../../notifications/registerDevice";
+import { useNotificationLinks } from "../../notifications/useNotificationLinks";
 
 /** Everything except sign-in needs a session; a signed-out visitor is sent to sign in and brought back after. */
 export default function AppLayout() {
@@ -18,6 +22,18 @@ export default function AppLayout() {
     const next = here(pathname, segments, params);
     return <Redirect href={{ pathname: "/sign-in", params: next === "/groups" ? {} : { next } }} />;
   }
+  return <SignedIn />;
+}
+
+/** Push: this phone gets the person's notifications while they're signed in, and a tapped one opens its page. */
+function SignedIn() {
+  const ledger = useLedger();
+  const { beforeSignOut } = useAuth();
+  useNotificationLinks();
+  useEffect(() => {
+    registerDevice(ledger).catch(() => {}); // tried again at the next start; the app works without push
+    return beforeSignOut(() => forgetDevice(ledger));
+  }, [ledger, beforeSignOut]);
   // A group's screens have their own stack (and header, named after the group): no second header above it.
   return (
     <Stack>

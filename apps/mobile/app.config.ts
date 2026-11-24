@@ -15,6 +15,10 @@ const appLinks =
       ]
     : [];
 
+// Push needs the Firebase app's google-services.json; GOOGLE_SERVICES_JSON is its path (./google-services.json, which
+// git ignores). Without it the app builds and runs with push off.
+const googleServicesFile = process.env.GOOGLE_SERVICES_JSON || undefined;
+
 const config: ExpoConfig = {
   name: "Kitty",
   slug: "kitty",
@@ -22,13 +26,15 @@ const config: ExpoConfig = {
   version: "0.1.0",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
-  android: { package: "za.kitty.app", intentFilters: appLinks },
+  android: { package: "za.kitty.app", intentFilters: appLinks, ...(googleServicesFile ? { googleServicesFile } : {}) },
   ios: { bundleIdentifier: "za.kitty.app" },
   plugins: [
     "expo-router",
     "expo-secure-store",
     // Photos only: no microphone (the picker asks for it by default, for video).
     ["expo-image-picker", { cameraPermission: "Kitty uses the camera to read receipts.", microphonePermission: false }],
+    // The channel src/notifications/registerDevice.ts creates.
+    ["expo-notifications", { defaultChannel: "default" }],
   ],
 };
 
