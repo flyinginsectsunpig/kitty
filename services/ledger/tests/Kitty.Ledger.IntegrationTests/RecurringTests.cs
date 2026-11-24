@@ -201,6 +201,24 @@ public class RecurringTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task A_schedule_change_reaches_kafka_keyed_by_schedule()
+    {
+        // Through the outbox relay and the schema registry, as pulse reads it (not just the outbox row).
+        var owner = factory.NewUser("Owner");
+        var g = await owner.CreateGroupAsync();
+        var me = g.Members[0].Id;
+        var id = Guid.NewGuid();
+        var start = DateOnly.FromDateTime(DateTime.UtcNow);
+        (await owner.PostJsonAsync($"/groups/{g.Id}/recurring", RecurringData.Monthly(id, me, [me], start))).EnsureSuccessStatusCode();
+
+        var events = await KafkaProbe.WaitForAsync<RecurringScheduleChanged>(factory, "ledger.recurring", e => e.ScheduleId == id.ToString());
+
+        var (key, e) = Assert.Single(events);
+        Assert.Equal(id.ToString(), key);
+        Assert.Equal((g.Id.ToString(), RecurringScheduleChanged.Types.Frequency.Monthly), (e.GroupId, e.Frequency));
+    }
+
+    [Fact]
     public async Task Non_member_gets_404()
     {
         using var env = await GroupAsync();
