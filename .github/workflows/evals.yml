@@ -8,6 +8,9 @@ on:
       limit:
         description: Receipts to score
         default: "50"
+      model:
+        description: Gemini model to try instead of the service's default (e.g. gemini-3.5-flash-lite)
+        default: ""
   schedule:
     - cron: "17 2 * * *"
 
@@ -35,9 +38,20 @@ jobs:
           version: "0.12.24"
       - if: env.AI_GEMINI_API_KEY != ''
         run: uv sync --frozen --no-dev
+      - name: Models this key can use
+        # Names only (never the key): shows at a glance when the configured model has been renamed or retired.
+        if: env.AI_GEMINI_API_KEY != ''
+        run: >-
+          uv run python -c "import os; from google import genai;
+          c = genai.Client(api_key=os.environ['AI_GEMINI_API_KEY']);
+          print('\n'.join(sorted(m.name for m in c.models.list() if 'generateContent' in (m.supported_actions or []))))"
       - name: Fetch the bootstrap set (CORD-v2)
         if: env.AI_GEMINI_API_KEY != ''
         run: uv run python evals/fetch_cord.py --out "$RUNNER_TEMP/cord" --limit "${{ inputs.limit || '50' }}"
       - name: Score
         if: env.AI_GEMINI_API_KEY != ''
-        run: uv run python evals/run_receipts.py --data "$RUNNER_TEMP/cord" --min-total-accuracy 0.9
+        env:
+          MODEL: ${{ inputs.model }}
+        run: |
+          if [ -n "$MODEL" ]; then export AI_GEMINI_MODEL="$MODEL"; fi
+          uv run python evals/run_receipts.py --data "$RUNNER_TEMP/cord" --min-total-accuracy 0.9

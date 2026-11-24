@@ -59,3 +59,10 @@ def score(pairs: list[tuple[ReceiptLabel, pb.ParsedReceipt | int]]) -> Scores:
     recall = true_pos / labelled if labelled else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
     return Scores(receipts=len(pairs), total_accuracy=totals_right / len(pairs) if pairs else 0.0, item_f1=f1)
+
+
+def describe_outcome(outcome: pb.ParsedReceipt | int) -> str:
+    """One word for a scan's result, with the failure reason when it failed: "read" or "failed (model_unavailable)"."""
+    if isinstance(outcome, pb.ParsedReceipt):
+        return "read"
+    return f"failed ({pb.ScanFailure.Reason.Name(outcome).lower()})"

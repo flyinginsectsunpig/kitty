@@ -54,3 +54,10 @@ def test_no_model_is_model_unavailable():
 
 def test_nonsense_answer_is_unreadable():
     assert process(b"x", FakeOcr("Burger"), FakeExtractor(error=UnusableOutput()), "ZAR") == Reason.UNREADABLE
+
+
+def test_why_the_model_was_unavailable_is_logged(caplog):
+    error = ModelUnavailable("400 INVALID_ARGUMENT. API key not valid.")
+    with caplog.at_level("WARNING"):
+        assert process(b"x", FakeOcr("Burger"), FakeExtractor(error=error), "ZAR") == Reason.MODEL_UNAVAILABLE
+    assert "API key not valid" in caplog.text

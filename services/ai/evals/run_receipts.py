@@ -15,10 +15,11 @@ import pathlib
 import sys
 import time
 
+from kitty_ai.contracts.kitty.events.v1 import receipts_pb2 as pb
 from kitty_ai.receipts.extract import RateLimited, extractor_from
 from kitty_ai.receipts.ocr import RapidOcr
 from kitty_ai.receipts.pipeline import process
-from kitty_ai.receipts.scoring import ReceiptLabel, score
+from kitty_ai.receipts.scoring import ReceiptLabel, describe_outcome, score
 from kitty_ai.settings import Settings
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp")
@@ -48,16 +49,21 @@ def main() -> int:
         label = ReceiptLabel(
             items=[(i["description"], i["line_total_minor"]) for i in raw["items"]], total_minor=raw["total_minor"]
         )
+        started = time.monotonic()
         for attempt in range(4):
             try:
                 outcome = process(image.read_bytes(), ocr, extractor, raw.get("currency", "ZAR"))
                 break
-            except RateLimited:
-                time.sleep(30 * (attempt + 1))
+            except RateLimited as e:
+                wait = 30 * (attempt + 1)
+                # Timeouts land here too: say which, so a slow model isn't mistaken for a throttled one.
+                print(f"{path.stem}: busy or slow ({str(e)[:120]}); retrying in {wait}s", file=sys.stderr, flush=True)
+                time.sleep(wait)
         else:
-            outcome = 0  # still rate limited: counts as a failed read
+            outcome = pb.ScanFailure.Reason.RATE_LIMITED  # still rate limited: counts as a failed read
         pairs.append((label, outcome))
-        print(f"{path.stem}: {'read' if hasattr(outcome, 'items') else 'failed'}")
+        # flush: CI pipes stdout, which Python would otherwise hold back until the run ends.
+        print(f"{path.stem}: {describe_outcome(outcome)} in {time.monotonic() - started:.1f}s", flush=True)
         time.sleep(args.delay)
 
     scores = score(pairs)

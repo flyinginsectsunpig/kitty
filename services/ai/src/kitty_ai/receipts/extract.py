@@ -9,7 +9,7 @@ from google.genai import errors, types
 from pydantic import ValidationError
 
 from kitty_ai.receipts.schema import ExtractedReceipt
-from kitty_ai.settings import Settings
+from kitty_ai.settings import DEFAULT_GEMINI_MODEL, Settings
 
 SYSTEM = (
     "You read shop and restaurant receipts. The user message is the OCR text of one receipt. "
@@ -48,7 +48,7 @@ class GeminiExtractor:
     # A stalled request must not hold the reader forever (the client's own default is no timeout).
     TIMEOUT_MS = 30_000
 
-    def __init__(self, api_key: str = "", model: str = "gemini-flash-latest", client=None):
+    def __init__(self, api_key: str = "", model: str = DEFAULT_GEMINI_MODEL, client=None):
         self._client = client or genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=self.TIMEOUT_MS))
         self._model = model
 
