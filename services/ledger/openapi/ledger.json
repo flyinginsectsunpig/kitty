@@ -2442,7 +2442,12 @@
           "currency",
           "amountMinor",
           "createdBy",
-          "createdAt"
+          "createdAt",
+          "fxRate",
+          "fxRateDate",
+          "fxRateSource",
+          "convertedAmountMinor",
+          "paidInGroupCurrency"
         ],
         "type": "object",
         "properties": {
@@ -2472,6 +2477,35 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "fxRate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fxRateDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "fxRateSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "convertedAmountMinor": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "paidInGroupCurrency": {
+            "type": "boolean"
           }
         }
       },
@@ -2503,6 +2537,16 @@
           "amountMinor": {
             "type": "integer",
             "format": "int64"
+          },
+          "fxRate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "paidInGroupCurrency": {
+            "type": "boolean",
+            "default": false
           }
         }
       },

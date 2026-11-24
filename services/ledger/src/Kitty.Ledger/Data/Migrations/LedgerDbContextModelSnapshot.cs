@@ -556,6 +556,9 @@ namespace Kitty.Ledger.Data.Migrations
                     b.Property<long>("AmountMinor")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("ConvertedAmountMinor")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -574,8 +577,22 @@ namespace Kitty.Ledger.Data.Migrations
                     b.Property<Guid>("FromMemberId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("FxRate")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)");
+
+                    b.Property<DateOnly?>("FxRateDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("FxRateSource")
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("PaidInGroupCurrency")
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("ToMemberId")
                         .HasColumnType("uuid");
