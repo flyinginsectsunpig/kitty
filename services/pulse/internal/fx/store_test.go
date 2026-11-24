@@ -73,6 +73,9 @@ func TestStore_SaveThenLookup(t *testing.T) {
 	if !got.Date.Equal(date(2026, 11, 20)) || !got.PerEUR["ZAR"].Equal(d("19.1987")) || !got.PerEUR["USD"].Equal(d("1.099")) {
 		t.Fatalf("got %+v", got)
 	}
+	if time.Since(got.FetchedAt) > time.Minute {
+		t.Fatalf("fetched_at = %s, want about now", got.FetchedAt)
+	}
 }
 
 func TestStore_AskedDateMapsToEarlierEcbDate(t *testing.T) {

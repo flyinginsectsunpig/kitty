@@ -77,35 +77,42 @@ func (s *Store) Save(ctx context.Context, asked time.Time, day Day) error {
 	})
 }
 
+// Stored is what a date resolved to, and when that was fetched.
+type Stored struct {
+	Day
+	FetchedAt time.Time
+}
+
 // Lookup returns the rates asked resolved to, if anyone asked for that date before.
-func (s *Store) Lookup(ctx context.Context, asked time.Time) (Day, bool, error) {
-	var ecbDate time.Time
-	err := s.pool.QueryRow(ctx, `SELECT ecb_date FROM pulse.date_map WHERE asked_date = $1`, asked).Scan(&ecbDate)
+func (s *Store) Lookup(ctx context.Context, asked time.Time) (Stored, bool, error) {
+	var ecbDate, fetchedAt time.Time
+	err := s.pool.QueryRow(ctx, `SELECT ecb_date, fetched_at FROM pulse.date_map WHERE asked_date = $1`, asked).
+		Scan(&ecbDate, &fetchedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Day{}, false, nil
+		return Stored{}, false, nil
 	}
 	if err != nil {
-		return Day{}, false, fmt.Errorf("store: lookup %s: %w", asked.Format(dateLayout), err)
+		return Stored{}, false, fmt.Errorf("store: lookup %s: %w", asked.Format(dateLayout), err)
 	}
 
 	rows, err := s.pool.Query(ctx, `SELECT currency, per_eur::text FROM pulse.ecb_rates WHERE ecb_date = $1`, ecbDate)
 	if err != nil {
-		return Day{}, false, fmt.Errorf("store: rates for %s: %w", ecbDate.Format(dateLayout), err)
+		return Stored{}, false, fmt.Errorf("store: rates for %s: %w", ecbDate.Format(dateLayout), err)
 	}
 	per := map[string]decimal.Decimal{}
 	for rows.Next() {
 		var currency, text string
 		if err := rows.Scan(&currency, &text); err != nil {
-			return Day{}, false, err
+			return Stored{}, false, err
 		}
 		r, err := decimal.NewFromString(text)
 		if err != nil {
-			return Day{}, false, fmt.Errorf("store: rate for %s: %w", currency, err)
+			return Stored{}, false, fmt.Errorf("store: rate for %s: %w", currency, err)
 		}
 		per[currency] = r
 	}
 	if err := rows.Err(); err != nil {
-		return Day{}, false, err
+		return Stored{}, false, err
 	}
-	return Day{Date: ecbDate.UTC(), PerEUR: per}, true, nil
+	return Stored{Day: Day{Date: ecbDate.UTC(), PerEUR: per}, FetchedAt: fetchedAt.UTC()}, true, nil
 }

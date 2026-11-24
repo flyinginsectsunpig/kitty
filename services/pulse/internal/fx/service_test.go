@@ -37,22 +37,28 @@ func (f *fakeSource) Day(_ context.Context, date *time.Time) (Day, error) {
 	return day, nil
 }
 
-type fakeStore struct{ saved map[string]Day }
+type fakeStore struct {
+	saved   map[string]Day
+	fetched map[string]time.Time // when each mapping was saved; zero for ones a test put in directly
+}
 
-func (f *fakeStore) Lookup(_ context.Context, asked time.Time) (Day, bool, error) {
-	day, ok := f.saved[asked.Format(dateLayout)]
-	return day, ok, nil
+func (f *fakeStore) Lookup(_ context.Context, asked time.Time) (Stored, bool, error) {
+	key := asked.Format(dateLayout)
+	day, ok := f.saved[key]
+	return Stored{Day: day, FetchedAt: f.fetched[key]}, ok, nil
 }
 
 func (f *fakeStore) Save(_ context.Context, asked time.Time, day Day) error {
-	f.saved[asked.Format(dateLayout)] = day
+	key := asked.Format(dateLayout)
+	f.saved[key] = day
+	f.fetched[key] = today.Add(10 * time.Hour)
 	return nil
 }
 
 var today = date(2026, 11, 24)
 
 func newService(src *fakeSource) (*Service, *fakeStore) {
-	store := &fakeStore{saved: map[string]Day{}}
+	store := &fakeStore{saved: map[string]Day{}, fetched: map[string]time.Time{}}
 	return &Service{Source: src, Store: store, Now: func() time.Time { return today.Add(10 * time.Hour) }}, store
 }
 
@@ -124,6 +130,63 @@ func TestGetRate_UnseenDateFetchesEvenWhenOlderDatesStored(t *testing.T) {
 	}
 	if res.Rate != "20.4" || len(src.calls) != 1 {
 		t.Fatalf("res = %+v calls = %v", res, src.calls)
+	}
+}
+
+// Asked on the morning of 20 Nov, before the ECB published, 20 Nov resolved to the 19th. Nothing refreshed it that day
+// (pulse was stopped, or Frankfurter was down), so days later that answer is still provisional: fetch the real one.
+func TestGetRate_ProvisionalAnswerForAPastDayIsRefetched(t *testing.T) {
+	src := &fakeSource{days: map[string]Day{"2026-11-20": ecbDay(date(2026, 11, 20), "19.1987")}}
+	s, store := newService(src)
+	store.saved["2026-11-20"] = ecbDay(date(2026, 11, 19), "19.0")
+	store.fetched["2026-11-20"] = date(2026, 11, 20).Add(9 * time.Hour)
+
+	res, err := get(t, s, "EUR", "ZAR", "2026-11-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Rate != "19.1987" || res.RateDate != "2026-11-20" || len(src.calls) != 1 {
+		t.Fatalf("res = %+v calls = %v", res, src.calls)
+	}
+}
+
+// Frankfurter is down when that provisional answer is re-checked: the provisional one beats no rate at all.
+func TestGetRate_ProvisionalAnswerIsUsedWhenTheRefetchFails(t *testing.T) {
+	s, store := newService(&fakeSource{down: true})
+	store.saved["2026-11-20"] = ecbDay(date(2026, 11, 19), "19.0")
+	store.fetched["2026-11-20"] = date(2026, 11, 20).Add(9 * time.Hour)
+
+	res, err := get(t, s, "EUR", "ZAR", "2026-11-20")
+	if err != nil || res.RateDate != "2026-11-19" {
+		t.Fatalf("res = %+v err = %v", res, err)
+	}
+}
+
+// Fetched after 20 Nov had ended, an answer of the 19th is final (a holiday, say): no fetch.
+func TestGetRate_AnswerFetchedAfterTheDayEndedIsFinal(t *testing.T) {
+	src := &fakeSource{}
+	s, store := newService(src)
+	store.saved["2026-11-20"] = ecbDay(date(2026, 11, 19), "19.0")
+	store.fetched["2026-11-20"] = date(2026, 11, 21).Add(time.Hour)
+
+	res, err := get(t, s, "EUR", "ZAR", "2026-11-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.RateDate != "2026-11-19" || len(src.calls) != 0 {
+		t.Fatalf("res = %+v calls = %v", res, src.calls)
+	}
+}
+
+// Today's provisional answer is kept until the daily refresh replaces it (no fetch on every request).
+func TestGetRate_TodaysProvisionalAnswerIsUsed(t *testing.T) {
+	src := &fakeSource{}
+	s, store := newService(src)
+	store.saved["2026-11-24"] = ecbDay(date(2026, 11, 23), "19.15")
+	store.fetched["2026-11-24"] = today.Add(8 * time.Hour)
+
+	if _, err := get(t, s, "EUR", "ZAR", "2026-11-24"); err != nil || len(src.calls) != 0 {
+		t.Fatalf("err = %v calls = %v", err, src.calls)
 	}
 }
 

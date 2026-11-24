@@ -20,7 +20,7 @@ type Source interface {
 
 // Rates is where they're kept (the Postgres Store in production).
 type Rates interface {
-	Lookup(ctx context.Context, asked time.Time) (Day, bool, error)
+	Lookup(ctx context.Context, asked time.Time) (Stored, bool, error)
 	Save(ctx context.Context, asked time.Time, day Day) error
 }
 
@@ -54,17 +54,24 @@ func (s *Service) GetRate(ctx context.Context, req *fxv1.GetRateRequest) (*fxv1.
 		asked = today
 	}
 
-	day, ok, err := s.Store.Lookup(ctx, asked)
+	stored, ok, err := s.Store.Lookup(ctx, asked)
 	if err != nil {
 		slog.ErrorContext(ctx, "rate lookup failed", "date", asked.Format(dateLayout), "err", err)
 		return nil, status.Error(codes.Unavailable, "rates are unavailable")
 	}
-	if !ok {
+	day := stored.Day
+	if !ok || (asked.Before(today) && provisional(stored, asked)) {
 		var on *time.Time
 		if asked.Before(today) {
 			on = &asked
 		}
-		if day, err = s.fetch(ctx, asked, on); err != nil {
+		fetched, err := s.fetch(ctx, asked, on)
+		switch {
+		case err == nil:
+			day = fetched
+		case ok: // re-checking a provisional answer failed: it still beats no rate at all
+			slog.WarnContext(ctx, "rate re-check failed; using the earlier answer", "date", asked.Format(dateLayout), "err", err)
+		default:
 			slog.WarnContext(ctx, "rate fetch failed", "date", asked.Format(dateLayout), "err", err)
 			return nil, status.Error(codes.Unavailable, "rates are unavailable")
 		}
@@ -78,6 +85,12 @@ func (s *Service) GetRate(ctx context.Context, req *fxv1.GetRateRequest) (*fxv1.
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &fxv1.GetRateResponse{Rate: formatRate(rate), RateDate: day.Date.Format(dateLayout), Source: "ecb"}, nil
+}
+
+// provisional is an answer that may still change: an earlier ECB date, fetched before the asked day was over (the
+// morning, before the ECB published that day's rates). Once the day is past, such an answer is fetched again.
+func provisional(s Stored, asked time.Time) bool {
+	return s.Date.Before(asked) && s.FetchedAt.Before(asked.AddDate(0, 0, 1))
 }
 
 // RefreshToday fetches the latest ECB day and records it as today's, so today's lookups catch up once the ECB
