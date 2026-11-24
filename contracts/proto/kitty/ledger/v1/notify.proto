@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package kitty.ledger.v1;
+
+option csharp_namespace = "Kitty.Contracts.Ledger.V1";
+option go_package = "github.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/ledger/v1;ledgerv1";
+
+// Served by the ledger for pulse only (its client-credentials token, internal port), like RecurringService.
+service NotifyService {
+  // Queues one weekly summary for each person who owes something. Safe to call again in the same week.
+  rpc QueueWeeklySummaries(QueueWeeklySummariesRequest) returns (QueueWeeklySummariesResponse);
+  // Forgets a push token Firebase reported as dead.
+  rpc ForgetDevice(ForgetDeviceRequest) returns (ForgetDeviceResponse);
+}
+
+message QueueWeeklySummariesRequest {
+  // ISO week, e.g. 2026-W48.
+  string week = 1;
+}
+
+message QueueWeeklySummariesResponse {
+  int32 queued = 1;
+}
+
+message ForgetDeviceRequest {
+  string token = 1;
+}
+
+message ForgetDeviceResponse {}
