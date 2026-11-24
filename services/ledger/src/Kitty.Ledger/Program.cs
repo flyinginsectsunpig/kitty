@@ -69,6 +69,7 @@ if (KafkaOptions.From(builder.Configuration) is { } kafka)
     builder.Services.AddHostedService<InboxConsumer>();
 }
 builder.Services.AddFxRates(builder.Configuration);
+builder.Services.AddScoped<ExpenseRates>();
 builder.Services.AddScoped<GroupMemberFilter>();
 builder.Services.AddScoped<TableSessionService>();
 builder.Services.AddScoped<GuestFilter>();

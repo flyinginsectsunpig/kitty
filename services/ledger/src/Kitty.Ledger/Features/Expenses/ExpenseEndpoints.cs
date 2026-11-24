@@ -3,7 +3,9 @@ using System.Globalization;
 using System.Text;
 using Kitty.Ledger.Data;
 using Kitty.Ledger.Data.Entities;
+using Kitty.Ledger.Domain.Fx;
 using Kitty.Ledger.Domain.Splits;
+using Kitty.Ledger.Features.Fx;
 using Kitty.Ledger.Features.Groups;
 using Kitty.Ledger.Infrastructure;
 using Kitty.Ledger.Infrastructure.Audit;
@@ -31,7 +33,7 @@ public static class ExpenseEndpoints
     }
 
     private static async Task<IResult> CreateAsync(Guid groupId, ExpenseWriteDto body, HttpContext http, LedgerDbContext db,
-        AuditWriter audit, Outbox outbox, TimeProvider clock, CancellationToken ct)
+        AuditWriter audit, Outbox outbox, ExpenseRates rates, TimeProvider clock, CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
         var validation = await ValidateAsync(groupId, body, db, ct);
@@ -46,6 +48,9 @@ public static class ExpenseEndpoints
             SplitMethod = body.Split.Method, Version = 1, CreatedByUserId = caller.User.Id, CreatedAt = now, UpdatedAt = now,
         };
         Apply(expense, body, valid.Shares);
+        var groupCurrency = await GroupCurrencyAsync(db, groupId, ct);
+        var decision = await rates.DecideAsync(expense.Currency, groupCurrency, expense.OccurredOn, body.FxRate, null, ct);
+        if (ApplyRate(expense, decision, groupCurrency) is { } rateError) return rateError;
         db.Expenses.Add(expense);
 
         var dto = expense.ToDto();
@@ -63,7 +68,7 @@ public static class ExpenseEndpoints
     }
 
     private static async Task<IResult> UpdateAsync(Guid groupId, Guid expenseId, ExpenseWriteDto body, HttpContext http,
-        LedgerDbContext db, AuditWriter audit, Outbox outbox, TimeProvider clock, CancellationToken ct)
+        LedgerDbContext db, AuditWriter audit, Outbox outbox, ExpenseRates rates, TimeProvider clock, CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
         var expense = await db.Expenses.SingleOrDefaultAsync(x => x.Id == expenseId && x.GroupId == groupId && x.DeletedAt == null, ct);
@@ -75,6 +80,10 @@ public static class ExpenseEndpoints
 
         var validation = await ValidateAsync(groupId, body with { Id = expenseId }, db, ct);
         if (validation is not ExpenseValidation.Valid valid) return Invalid(validation);
+
+        var groupCurrency = await GroupCurrencyAsync(db, groupId, ct);
+        // Decided against the expense as stored: an unchanged currency and date keep their rate.
+        var decision = await rates.DecideAsync(body.Currency, groupCurrency, body.OccurredOn, body.FxRate, expense, ct);
 
         var before = expense.ToDto();
         // The concurrency token check compares against the version the client saw.
@@ -90,6 +99,7 @@ public static class ExpenseEndpoints
         expense.Payers.Clear();
         expense.Shares.Clear();
         Apply(expense, body, valid.Shares);
+        if (ApplyRate(expense, decision, groupCurrency) is { } rateError) return rateError;
 
         var dto = expense.ToDto();
         audit.Record(caller.User.Id, groupId, EntityType, expense.Id, AuditActions.Updated, before, dto);
@@ -169,6 +179,29 @@ public static class ExpenseEndpoints
             AmountMinor = s.Minor,
             InputValue = body.Split.Method == SplitMethod.Equal ? null : inputs[s.MemberId],
         }));
+    }
+
+    internal static async Task<string> GroupCurrencyAsync(LedgerDbContext db, Guid groupId, CancellationToken ct) =>
+        (await db.Groups.Where(g => g.Id == groupId).Select(g => g.BaseCurrency).SingleAsync(ct)).Trim();
+
+    /// <summary>Stores the decided rate and the converted amount on the expense, or returns the error to send.</summary>
+    internal static IResult? ApplyRate(Expense expense, RateDecision decision, string groupCurrency)
+    {
+        switch (decision)
+        {
+            case RateDecision.Invalid invalid:
+                return ApiError.BadRequest(ErrorCodes.FxRateInvalid, invalid.Detail);
+            case RateDecision.Rate rate:
+                var converted = FxConverter.Convert(expense.AmountMinor, rate.Value, expense.Currency.Trim(), groupCurrency);
+                if (converted > SplitCalculator.MaxTotalMinor)
+                    return ApiError.BadRequest(ErrorCodes.FxRateInvalid, "Converted amount is too large.");
+                (expense.FxRate, expense.FxRateDate, expense.FxRateSource, expense.ConvertedAmountMinor) =
+                    (rate.Value, rate.EcbDate, rate.Source, converted);
+                return null;
+            default: // None, or Missing: saved without a rate (spec: never blocked by pulse being down)
+                (expense.FxRate, expense.FxRateDate, expense.FxRateSource, expense.ConvertedAmountMinor) = (null, null, null, null);
+                return null;
+        }
     }
 
     private static string EncodeCursor(Expense e) =>

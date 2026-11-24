@@ -1877,7 +1877,11 @@
           "version",
           "createdBy",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "fxRate",
+          "fxRateDate",
+          "fxRateSource",
+          "convertedAmountMinor"
         ],
         "type": "object",
         "properties": {
@@ -1932,6 +1936,32 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "fxRate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fxRateDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "fxRateSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "convertedAmountMinor": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
           }
         }
       },
@@ -2006,6 +2036,12 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "fxRate": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

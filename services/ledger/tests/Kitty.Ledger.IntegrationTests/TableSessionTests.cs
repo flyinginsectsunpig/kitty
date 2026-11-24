@@ -16,10 +16,11 @@ public sealed record ActiveTableDto(Guid Id, string Title, string Status, bool H
 
 public static class TableData
 {
-    public static async Task<TableSessionDto> CreateSessionAsync(this HttpClient host, Guid groupId, Guid payerMemberId, string title = "Dinner")
+    public static async Task<TableSessionDto> CreateSessionAsync(this HttpClient host, Guid groupId, Guid payerMemberId, string title = "Dinner",
+        string currency = "ZAR")
     {
         var r = await host.PostJsonAsync($"/groups/{groupId}/table-sessions",
-            new { id = Guid.NewGuid(), title, currency = "ZAR", payerMemberId });
+            new { id = Guid.NewGuid(), title, currency, payerMemberId });
         r.EnsureSuccessStatusCode();
         return await r.ReadAsync<TableSessionDto>();
     }
@@ -41,7 +42,8 @@ public class TableSessionTests(LedgerApiFactory factory)
 {
     private readonly Guid Burger = Guid.NewGuid(), Salad = Guid.NewGuid(), Fries = Guid.NewGuid(); // per test: item ids are primary keys
 
-    private async Task<(HttpClient Host, HttpClient Friend, GroupDto Group, Guid HostMember, Guid FriendMember, TableSessionDto Session)> TableAsync()
+    private async Task<(HttpClient Host, HttpClient Friend, GroupDto Group, Guid HostMember, Guid FriendMember, TableSessionDto Session)> TableAsync(
+        string currency = "ZAR")
     {
         var host = factory.NewUser("Host");
         var g = await host.CreateGroupAsync();
@@ -49,7 +51,7 @@ public class TableSessionTests(LedgerApiFactory factory)
         var joined = await friend.JoinAsync(host, g.Id);
         var hostMember = joined.Members.Single(m => m.DisplayName == "Host").Id;
         var friendMember = joined.Members.Single(m => m.DisplayName == "Friend").Id;
-        var s = await host.CreateSessionAsync(g.Id, hostMember);
+        var s = await host.CreateSessionAsync(g.Id, hostMember, currency: currency);
         (await host.PutItemsAsync(g.Id, s.Id, (Burger, "Burger", 12000), (Salad, "Salad", 8000), (Fries, "Fries", 3000))).EnsureSuccessStatusCode();
         return (host, friend, joined, hostMember, friendMember, s);
     }
@@ -192,6 +194,42 @@ public class TableSessionTests(LedgerApiFactory factory)
         var balances = (await host.GetFromJsonAsync<BalancesDto>($"/groups/{g.Id}/balances", ApiClientExtensions.Json,
             TestContext.Current.CancellationToken))!;
         Assert.Equal(-10450, balances.Currencies.Single().Members.Single(m => m.MemberId == friendMember).NetMinor);
+    }
+
+    private async Task<ExpenseFxDto> ConfirmedExpenseAsync(string currency)
+    {
+        var (host, _, g, _, _, s) = await TableAsync(currency);
+        (await host.ClaimAsync(g.Id, s.Id, Burger)).EnsureSuccessStatusCode();
+        var r = await host.PostJsonAsync($"/groups/{g.Id}/table-sessions/{s.Id}/confirm", new { });
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var confirmed = await r.ReadAsync<TableSessionDto>();
+        return (await host.GetFromJsonAsync<ExpenseFxDto>($"/groups/{g.Id}/expenses/{confirmed.ExpenseId}", ApiClientExtensions.Json,
+            TestContext.Current.CancellationToken))!;
+    }
+
+    [Fact]
+    public async Task Table_confirm_in_foreign_currency_stores_the_rate()
+    {
+        // The bill is dated the day the table was opened (today, UTC).
+        factory.Fx.Set("EUR", "ZAR", DateOnly.FromDateTime(DateTime.UtcNow), 19.1987m);
+
+        var expense = await ConfirmedExpenseAsync("EUR");
+
+        Assert.Equal("19.1987", expense.FxRate);
+        Assert.Equal("ecb", expense.FxRateSource);
+        Assert.Equal(441570, expense.ConvertedAmountMinor); // EUR 230.00 of items
+    }
+
+    [Fact]
+    public async Task Table_confirm_saves_without_rate_when_pulse_is_down()
+    {
+        factory.Fx.Set("EUR", "ZAR", DateOnly.FromDateTime(DateTime.UtcNow), 19.1987m);
+        using var down = factory.Fx.GoDown();
+
+        var expense = await ConfirmedExpenseAsync("EUR");
+
+        Assert.Null(expense.FxRate);
+        Assert.Null(expense.ConvertedAmountMinor);
     }
 
     [Fact]

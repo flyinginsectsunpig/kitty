@@ -65,6 +65,8 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
             e.Property(x => x.Category).HasMaxLength(20);
             e.Property(x => x.Currency).HasMaxLength(3).IsFixedLength();
             e.Property(x => x.SplitMethod).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.FxRate).HasPrecision(20, 10);
+            e.Property(x => x.FxRateSource).HasMaxLength(6);
             e.Property(x => x.Version).IsConcurrencyToken();
             e.HasIndex(x => new { x.GroupId, x.OccurredOn, x.CreatedAt, x.Id });
             e.HasOne<Group>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);

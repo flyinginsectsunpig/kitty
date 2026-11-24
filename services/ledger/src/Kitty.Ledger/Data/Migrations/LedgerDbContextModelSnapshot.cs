@@ -76,6 +76,9 @@ namespace Kitty.Ledger.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<long?>("ConvertedAmountMinor")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -95,6 +98,17 @@ namespace Kitty.Ledger.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<decimal?>("FxRate")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)");
+
+                    b.Property<DateOnly?>("FxRateDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("FxRateSource")
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
