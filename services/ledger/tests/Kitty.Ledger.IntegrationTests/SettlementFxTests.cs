@@ -65,6 +65,35 @@ public class SettlementFxTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Paying_at_the_ecb_rate_the_page_showed_keeps_it_as_ecb()
+    {
+        var friday = Today.AddDays(-3);
+        factory.Fx.Set("EUR", "ZAR", Today, 19.1987m, rateDate: friday);
+        var (owner, g, me, gran) = await GroupAsync();
+
+        // The settle page shows today's ECB rate and the rand amount; paying in rand sends that rate back.
+        var s = await CreatedAsync(await SettleAsync(owner, g, gran, me, "EUR", 2000, fxRate: "19.1987", paidInGroupCurrency: true));
+
+        Assert.Equal("19.1987", s.FxRate);
+        Assert.Equal("ecb", s.FxRateSource);
+        Assert.Equal(friday, s.FxRateDate);
+        Assert.Equal(38397, s.ConvertedAmountMinor);
+    }
+
+    [Fact]
+    public async Task The_amount_shown_is_the_amount_stored_even_if_the_rate_moved_since()
+    {
+        factory.Fx.Set("EUR", "ZAR", Today, 19.9m); // the ECB published after the page loaded
+        var (owner, g, me, gran) = await GroupAsync();
+
+        var s = await CreatedAsync(await SettleAsync(owner, g, gran, me, "EUR", 2000, fxRate: "19.1987", paidInGroupCurrency: true));
+
+        Assert.Equal("19.1987", s.FxRate);
+        Assert.Equal(38397, s.ConvertedAmountMinor);
+        Assert.Equal("manual", s.FxRateSource);
+    }
+
+    [Fact]
     public async Task Pulse_down_without_rate_is_422()
     {
         var (owner, g, me, gran) = await GroupAsync();

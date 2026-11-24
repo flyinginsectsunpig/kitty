@@ -72,7 +72,14 @@ function TransferCard({ transfer: t, onPaid }: { transfer: Transfer; onPaid: () 
   const foreign = t.currency !== group.baseCurrency;
   const [inGroupCurrency, setInGroupCurrency] = useState(false);
   const [typedRate, setTypedRate] = useState("");
-  const fxRate = parseRate(typedRate.trim()) ?? undefined; // sent only when typed; otherwise the ledger uses today's ECB rate
+  const quote = useTodaysRate(foreign ? t.currency : null);
+  const ecb = quote && quote !== "failed" ? quote : null;
+  // The ledger couldn't look up a rate: ask for one.
+  const [needsRate, setNeedsRate] = useState(false);
+  const showRateBox = inGroupCurrency || quote === "failed" || needsRate;
+  // A rate the person typed (only while its box is showing); paying in the group's currency otherwise sends the ECB rate
+  // they were shown, so the amount stored is the amount they confirmed. Nothing sent: the ledger uses today's ECB rate.
+  const fxRate = (showRateBox ? parseRate(typedRate.trim()) : null) ?? (foreign && inGroupCurrency ? ecb?.rate : undefined);
   const pay = useAction(
     useCallback(
       (key: string) =>
@@ -88,6 +95,9 @@ function TransferCard({ transfer: t, onPaid }: { transfer: Transfer; onPaid: () 
       [ledger, group.id, id, t, fxRate, foreign, inGroupCurrency],
     ),
   );
+  useEffect(() => {
+    if (pay.error === errorMessage("fx_rate_required")) setNeedsRate(true);
+  }, [pay.error]);
   const mine = t.fromMemberId === me.id;
   const from = mine ? "You" : nameOf(t.fromMemberId);
   const to = t.toMemberId === me.id ? "you" : nameOf(t.toMemberId);
@@ -111,10 +121,9 @@ function TransferCard({ transfer: t, onPaid }: { transfer: Transfer; onPaid: () 
           <Text style={styles.small}>{nameOf(t.toMemberId)} hasn't added payment details yet.</Text>
         ))}
       {foreign && (
-        <ForeignFields transfer={t} groupCurrency={group.baseCurrency} inGroupCurrency={inGroupCurrency}
-          onInGroupCurrency={setInGroupCurrency} typedRate={typedRate} onTypedRate={setTypedRate}
-          // The ledger couldn't look up a rate: ask for one.
-          needsRate={pay.error === errorMessage("fx_rate_required")} />
+        <ForeignFields transfer={t} groupCurrency={group.baseCurrency} quote={quote} inGroupCurrency={inGroupCurrency}
+          onInGroupCurrency={setInGroupCurrency} typedRate={typedRate} onTypedRate={setTypedRate} showRateBox={showRateBox}
+        />
       )}
       <ErrorBanner message={pay.error} />
       <Button title="Mark as paid" busy={pay.busy} onPress={() => void pay.run().then((r) => r.ok && onPaid())} />
@@ -127,29 +136,36 @@ function TransferCard({ transfer: t, onPaid }: { transfer: Transfer; onPaid: () 
  * Settling a debt in another currency: today's ECB rate, the option to pay in the group's currency, and a rate box —
  * shown when paying in the group's currency, when the ECB rate couldn't be fetched, or after the ledger asked for one.
  */
-function ForeignFields({ transfer: t, groupCurrency, inGroupCurrency, onInGroupCurrency, typedRate, onTypedRate, needsRate }: {
-  transfer: Transfer;
-  groupCurrency: string;
-  inGroupCurrency: boolean;
-  onInGroupCurrency: (value: boolean) => void;
-  typedRate: string;
-  onTypedRate: (value: string) => void;
-  needsRate: boolean;
-}) {
+type Quote = { rate: string; rateDate: string } | "failed" | null;
+
+/** Today's ECB rate for a currency (null while loading, or when currency is null). */
+function useTodaysRate(currency: string | null): Quote {
   const { group } = useGroup();
   const fetchRate = useFetchRate(group.id);
-  const [quote, setQuote] = useState<{ rate: string; rateDate: string } | "failed" | null>(null);
-
+  const [quote, setQuote] = useState<Quote>(null);
   useEffect(() => {
+    if (!currency) return;
     let live = true;
-    fetchRate(t.currency, todayUtc())
+    fetchRate(currency, todayUtc())
       .then((q) => live && setQuote(q ?? "failed"))
       .catch(() => live && setQuote("failed"));
     return () => {
       live = false;
     };
-  }, [fetchRate, t.currency]);
+  }, [fetchRate, currency]);
+  return quote;
+}
 
+function ForeignFields({ transfer: t, groupCurrency, quote, inGroupCurrency, onInGroupCurrency, typedRate, onTypedRate, showRateBox }: {
+  transfer: Transfer;
+  groupCurrency: string;
+  quote: Quote;
+  inGroupCurrency: boolean;
+  onInGroupCurrency: (value: boolean) => void;
+  typedRate: string;
+  onTypedRate: (value: string) => void;
+  showRateBox: boolean;
+}) {
   const ecb = quote && quote !== "failed" ? quote : null;
   const rate = parseRate(typedRate.trim()) ?? ecb?.rate ?? null;
   return (
@@ -163,7 +179,7 @@ function ForeignFields({ transfer: t, groupCurrency, inGroupCurrency, onInGroupC
       {inGroupCurrency && rate && (
         <Text style={styles.strong}>{`Pay ${formatMoney(convertMinor(t.amountMinor, rate, t.currency, groupCurrency), groupCurrency)}`}</Text>
       )}
-      {(inGroupCurrency || quote === "failed" || needsRate) && (
+      {showRateBox && (
         <TextField label={`Rate (1 ${t.currency} in ${groupCurrency})`} value={typedRate} onChangeText={onTypedRate}
           keyboardType="decimal-pad" placeholder={ecb?.rate ?? "e.g. 19.5"} />
       )}

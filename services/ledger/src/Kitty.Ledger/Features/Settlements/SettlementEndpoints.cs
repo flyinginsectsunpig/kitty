@@ -5,6 +5,7 @@ using Kitty.Ledger.Domain.Fx;
 using Kitty.Ledger.Domain.Splits;
 using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Fx;
+using Kitty.Ledger.Infrastructure.Fx;
 using Kitty.Ledger.Features.Groups;
 using Kitty.Ledger.Infrastructure;
 using Kitty.Ledger.Infrastructure.Audit;
@@ -34,7 +35,7 @@ public static class SettlementEndpoints
     }
 
     private static async Task<IResult> CreateAsync(Guid groupId, SettlementWriteDto body, HttpContext http, LedgerDbContext db,
-        AuditWriter audit, ExpenseRates rates, TimeProvider clock, CancellationToken ct)
+        AuditWriter audit, ExpenseRates rates, IFxRates fx, TimeProvider clock, CancellationToken ct)
     {
         if (body.Id == Guid.Empty) return ApiError.Validation("id must be a client-generated UUID.");
         if (body.FromMemberId == body.ToMemberId) return ApiError.Validation("A member cannot settle with themselves.");
@@ -52,6 +53,11 @@ public static class SettlementEndpoints
         // Settlements have no date and can't be edited, so a foreign one always gets today's rate, or one typed in.
         var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
         var decision = await rates.DecideAsync(body.Currency!, groupCurrency, today, body.FxRate, null, ct);
+        // Paying in the group's currency sends back the rate the payer saw and confirmed, so the amount stored is the
+        // amount paid. When that is still today's ECB rate, say so.
+        if (decision is RateDecision.Rate { Source: FxEndpoints.ManualSource } sent
+            && await fx.GetAsync(body.Currency!, groupCurrency, today, ct) is { } ecb && ecb.Rate == sent.Value)
+            decision = new RateDecision.Rate(sent.Value, ecb.RateDate, FxEndpoints.EcbSource);
         long? converted = null;
         switch (decision)
         {

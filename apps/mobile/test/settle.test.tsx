@@ -71,6 +71,45 @@ describe("a debt in another currency", () => {
     expect(post.body).toMatchObject({ currency: "EUR", amountMinor: 2000, fxRate: "19.5", paidInGroupCurrency: true });
   });
 
+  test("paying in ZAR at the shown rate sends that rate, so the amount stored is the amount shown", async () => {
+    const { client, calls } = fakeLedger(
+      groupRoutes({
+        [`GET /groups/${G}/balances`]: () => json(200, euros),
+        [`GET /groups/${G}/fx-rate`]: ecb,
+        [`POST /groups/${G}/settlements`]: () => json(201, {}),
+      }),
+    );
+    await renderApp(routes, client, `/groups/${G}/settle`);
+    await screen.findByText("1 EUR = 19.1987 ZAR · ECB, 20 Nov 2026");
+    await fireEvent.press(screen.getByText("Pay in ZAR instead"));
+    expect(await screen.findByText(/^Pay R\s383,97$/)).toBeTruthy();
+    await fireEvent.press(screen.getByText("Mark as paid"));
+
+    expect(await screen.findByText("Payment recorded.")).toBeTruthy();
+    expect(calls.find((c) => c.method === "POST")!.body).toMatchObject({ fxRate: "19.1987", paidInGroupCurrency: true });
+  });
+
+  test("a rate typed and then hidden again isn't sent", async () => {
+    const { client, calls } = fakeLedger(
+      groupRoutes({
+        [`GET /groups/${G}/balances`]: () => json(200, euros),
+        [`GET /groups/${G}/fx-rate`]: ecb,
+        [`POST /groups/${G}/settlements`]: () => json(201, {}),
+      }),
+    );
+    await renderApp(routes, client, `/groups/${G}/settle`);
+    await screen.findByText("1 EUR = 19.1987 ZAR · ECB, 20 Nov 2026");
+    await fireEvent.press(screen.getByText("Pay in ZAR instead"));
+    await fireEvent.changeText(await screen.findByLabelText(/^Rate/), "25");
+    await fireEvent.press(screen.getByText("Pay in ZAR instead")); // changed their mind: paying in euros
+    await fireEvent.press(screen.getByText("Mark as paid"));
+
+    expect(await screen.findByText("Payment recorded.")).toBeTruthy();
+    const body = calls.find((c) => c.method === "POST")!.body;
+    expect(body).not.toHaveProperty("fxRate");
+    expect(body.paidInGroupCurrency).toBe(false);
+  });
+
   test("settle shows the rate input after fx_rate_required", async () => {
     const { client, calls } = fakeLedger(
       groupRoutes({

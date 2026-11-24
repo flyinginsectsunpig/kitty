@@ -31,11 +31,15 @@ export function ForeignSettleFields({ groupId, currency, groupCurrency, amountMi
   }, [groupId, currency, fetchRate]);
 
   const ecb = quote && quote !== "failed" ? quote : null;
-  const rate = parseRate(typed.trim()) ?? ecb?.rate ?? null;
   const showRateBox = inGroupCurrency || quote === "failed";
+  // What's sent: a rate typed into the box (only while it shows), or, when paying in the group's currency, the ECB rate
+  // shown — so the amount stored is the amount the payer confirmed. Empty: the ledger uses today's ECB rate.
+  const sent = (showRateBox ? parseRate(typed.trim()) : null) ?? (inGroupCurrency ? ecb?.rate : null) ?? "";
+  const rate = sent || ecb?.rate || null;
 
   return (
     <div className="space-y-2 text-sm">
+      <input type="hidden" name="fxRate" value={sent} />
       <label className="flex items-center gap-2">
         <input type="checkbox" name="paidInGroupCurrency" className="size-4 accent-brand-600" checked={inGroupCurrency}
           onChange={(e) => setInGroupCurrency(e.target.checked)} />
@@ -54,7 +58,7 @@ export function ForeignSettleFields({ groupId, currency, groupCurrency, amountMi
       {showRateBox && (
         <div>
           <label htmlFor={`rate-${currency}`} className="label">Rate (1 {currency} in {groupCurrency})</label>
-          <input id={`rate-${currency}`} name="fxRate" inputMode="decimal" className="field" placeholder={ecb?.rate ?? "e.g. 19.5"}
+          <input id={`rate-${currency}`} inputMode="decimal" className="field" placeholder={ecb?.rate ?? "e.g. 19.5"}
             value={typed} onChange={(e) => setTyped(e.target.value)} />
         </div>
       )}
