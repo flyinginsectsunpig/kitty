@@ -338,6 +338,54 @@
         }
       }
     },
+    "/groups/{groupId}/fx-rate": {
+      "get": {
+        "tags": [
+          "Exchange rates"
+        ],
+        "operationId": "GetFxRate",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FxRateDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/groups/{groupId}/activity": {
       "get": {
         "tags": [
@@ -1961,6 +2009,26 @@
           }
         }
       },
+      "FxRateDto": {
+        "required": [
+          "rate",
+          "rateDate",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "rate": {
+            "type": "string"
+          },
+          "rateDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
       "GroupDto": {
         "required": [
           "id",
@@ -2797,6 +2865,9 @@
     },
     {
       "name": "Balances"
+    },
+    {
+      "name": "Exchange rates"
     },
     {
       "name": "Activity"

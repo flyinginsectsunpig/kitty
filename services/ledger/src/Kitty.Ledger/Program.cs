@@ -5,6 +5,7 @@ using Kitty.Ledger.Features;
 using Kitty.Ledger.Features.Activity;
 using Kitty.Ledger.Features.Balances;
 using Kitty.Ledger.Features.Expenses;
+using Kitty.Ledger.Features.Fx;
 using Kitty.Ledger.Features.Settlements;
 using Kitty.Ledger.Features.Table;
 using Kitty.Ledger.Features.Groups;
@@ -15,6 +16,7 @@ using Kitty.Ledger.Infrastructure.Auth;
 using Kitty.Ledger.Infrastructure.Idempotency;
 using Kitty.Ledger.Infrastructure.Messaging;
 using Kitty.Ledger.Infrastructure.Blob;
+using Kitty.Ledger.Infrastructure.Fx;
 using Kitty.Ledger.Infrastructure.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
@@ -66,6 +68,7 @@ if (KafkaOptions.From(builder.Configuration) is { } kafka)
     builder.Services.AddHostedService<OutboxRelay>();
     builder.Services.AddHostedService<InboxConsumer>();
 }
+builder.Services.AddFxRates(builder.Configuration);
 builder.Services.AddScoped<GroupMemberFilter>();
 builder.Services.AddScoped<TableSessionService>();
 builder.Services.AddScoped<GuestFilter>();
@@ -105,6 +108,7 @@ group.MapMembers();
 group.MapExpenses();
 group.MapBalances();
 group.MapSettlements();
+group.MapFx();
 group.MapActivity();
 group.MapTableSessions();
 var guestTable = app.MapGuestTable();
