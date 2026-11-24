@@ -89,6 +89,24 @@ describe("a debt in another currency", () => {
     expect(calls.find((c) => c.method === "POST")!.body).toMatchObject({ fxRate: "19.1987", paidInGroupCurrency: true });
   });
 
+  test("an invalid typed rate is rejected, not swapped for the ECB rate", async () => {
+    const { client, calls } = fakeLedger(
+      groupRoutes({
+        [`GET /groups/${G}/balances`]: () => json(200, euros),
+        [`GET /groups/${G}/fx-rate`]: ecb,
+        [`POST /groups/${G}/settlements`]: () => json(400, { code: "fx_rate_invalid" }),
+      }),
+    );
+    await renderApp(routes, client, `/groups/${G}/settle`);
+    await screen.findByText("1 EUR = 19.1987 ZAR · ECB, 20 Nov 2026");
+    await fireEvent.press(screen.getByText("Pay in ZAR instead"));
+    await fireEvent.changeText(await screen.findByLabelText(/^Rate/), "19.");
+    await fireEvent.press(screen.getByText("Mark as paid"));
+
+    expect(await screen.findByText("That exchange rate doesn't look right.")).toBeTruthy();
+    expect(calls.find((c) => c.method === "POST")!.body.fxRate).toBe("19.");
+  });
+
   test("a rate typed and then hidden again isn't sent", async () => {
     const { client, calls } = fakeLedger(
       groupRoutes({

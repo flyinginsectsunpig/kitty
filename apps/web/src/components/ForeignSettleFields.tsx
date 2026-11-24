@@ -34,8 +34,10 @@ export function ForeignSettleFields({ groupId, currency, groupCurrency, amountMi
   const showRateBox = inGroupCurrency || quote === "failed";
   // What's sent: a rate typed into the box (only while it shows), or, when paying in the group's currency, the ECB rate
   // shown — so the amount stored is the amount the payer confirmed. Empty: the ledger uses today's ECB rate.
-  const sent = (showRateBox ? parseRate(typed.trim()) : null) ?? (inGroupCurrency ? ecb?.rate : null) ?? "";
-  const rate = sent || ecb?.rate || null;
+  // Something typed that isn't a rate is sent as typed, so the ledger rejects it: never swapped for the ECB rate.
+  const entered = showRateBox ? typed.trim() : "";
+  const sent = entered ? (parseRate(entered) ?? entered) : inGroupCurrency ? (ecb?.rate ?? "") : "";
+  const rate = entered ? parseRate(entered) : (ecb?.rate ?? null);
 
   return (
     <div className="space-y-2 text-sm">

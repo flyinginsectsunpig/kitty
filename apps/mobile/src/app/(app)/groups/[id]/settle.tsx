@@ -79,7 +79,9 @@ function TransferCard({ transfer: t, onPaid }: { transfer: Transfer; onPaid: () 
   const showRateBox = inGroupCurrency || quote === "failed" || needsRate;
   // A rate the person typed (only while its box is showing); paying in the group's currency otherwise sends the ECB rate
   // they were shown, so the amount stored is the amount they confirmed. Nothing sent: the ledger uses today's ECB rate.
-  const fxRate = (showRateBox ? parseRate(typedRate.trim()) : null) ?? (foreign && inGroupCurrency ? ecb?.rate : undefined);
+  // Something typed that isn't a rate is sent as typed, so the ledger rejects it: never swapped for the ECB rate.
+  const typed = showRateBox ? typedRate.trim() : "";
+  const fxRate = typed ? (parseRate(typed) ?? typed) : foreign && inGroupCurrency ? ecb?.rate : undefined;
   const pay = useAction(
     useCallback(
       (key: string) =>
