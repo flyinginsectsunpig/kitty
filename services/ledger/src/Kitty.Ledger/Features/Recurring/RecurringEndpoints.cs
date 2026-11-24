@@ -35,6 +35,9 @@ public static class RecurringEndpoints
 
     private static DateOnly Today(TimeProvider clock) => DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
 
+    /// <summary>The earliest start date allowed: UTC's yesterday is still today west of UTC (a phone sends its local date).</summary>
+    private static DateOnly EarliestStart(DateOnly today) => today.AddDays(-1);
+
     private static IQueryable<RecurringSchedule> Live(LedgerDbContext db, Guid groupId) =>
         db.RecurringSchedules.Where(s => s.GroupId == groupId && s.DeletedAt == null);
 
@@ -54,7 +57,7 @@ public static class RecurringEndpoints
     {
         var today = Today(clock);
         if (await ValidateAsync(groupId, body, db, ct) is { } invalid) return invalid;
-        if (body.StartsOn < today) return ApiError.Validation("startsOn can't be in the past.");
+        if (body.StartsOn < EarliestStart(today)) return ApiError.Validation("startsOn can't be in the past.");
         if (await db.RecurringSchedules.AnyAsync(s => s.Id == body.Id, ct)) return ApiError.Conflict(ErrorCodes.AlreadyExists);
 
         var caller = GroupMemberFilter.CallerMember(http);
@@ -86,7 +89,7 @@ public static class RecurringEndpoints
         {
             if (s.LastAddedPeriod is not null)
                 return ApiError.Conflict(ErrorCodes.ScheduleStarted, "This schedule has already added expenses, so its start date can't change.");
-            if (body.StartsOn < today) return ApiError.Validation("startsOn can't be in the past.");
+            if (body.StartsOn < EarliestStart(today)) return ApiError.Validation("startsOn can't be in the past.");
         }
 
         var before = s.ToDto(today);
@@ -139,8 +142,7 @@ public static class RecurringEndpoints
         var dto = s.ToDto(today);
         audit.Record(GroupMemberFilter.CallerMember(http).User.Id, groupId, EntityType, s.Id, AuditActions.Updated, before, dto);
         outbox.RecurringScheduleChanged(s);
-        await db.SaveChangesAsync(ct);
-        return Results.Ok(dto);
+        return await SaveAsync(db, ct) ?? Results.Ok(dto);
     }
 
     private static async Task<IResult> DeleteAsync(Guid groupId, Guid scheduleId, HttpContext http, LedgerDbContext db,
@@ -154,8 +156,7 @@ public static class RecurringEndpoints
         s.UpdatedAt = s.DeletedAt.Value;
         audit.Record(GroupMemberFilter.CallerMember(http).User.Id, groupId, EntityType, s.Id, AuditActions.Deleted, before, null);
         outbox.RecurringScheduleChanged(s);
-        await db.SaveChangesAsync(ct);
-        return Results.NoContent();
+        return await SaveAsync(db, ct) ?? Results.NoContent();
     }
 
     /// <summary>The template must be a valid expense (checked as one dated on the start date); no itemized splits.</summary>
@@ -172,6 +173,20 @@ public static class RecurringEndpoints
 
     private static ExpenseTemplate TemplateOf(RecurringWriteDto b) =>
         new(b.Description?.Trim() ?? "", b.Category, b.Currency, b.AmountMinor, b.Payers ?? [], b.Split);
+
+    /// <summary>Saves; someone else changing the schedule at the same moment is a version conflict (409), not a 500.</summary>
+    private static async Task<IResult?> SaveAsync(LedgerDbContext db, CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return null;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return VersionConflict();
+        }
+    }
 
     private static IResult VersionConflict() =>
         ApiError.Conflict(ErrorCodes.VersionConflict, "Someone else changed this schedule. Reload to see their version.");

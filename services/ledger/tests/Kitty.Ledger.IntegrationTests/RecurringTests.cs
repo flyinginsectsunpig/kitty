@@ -93,9 +93,19 @@ public class RecurringTests(LedgerApiFactory factory)
     {
         using var env = await GroupAsync();
         var r = await env.Owner.PostJsonAsync($"/groups/{env.G}/recurring",
-            RecurringData.Monthly(Guid.NewGuid(), env.Me, [env.Me], Today.AddDays(-1)));
+            RecurringData.Monthly(Guid.NewGuid(), env.Me, [env.Me], Today.AddDays(-2)));
         Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
         Assert.Equal("validation_failed", await r.ReadCodeAsync());
+    }
+
+    [Fact]
+    public async Task Yesterday_in_UTC_is_still_today_somewhere_and_is_accepted()
+    {
+        // A phone west of UTC in the evening is already on UTC's tomorrow: its "today" is the ledger's yesterday.
+        using var env = await GroupAsync();
+        var r = await env.Owner.PostJsonAsync($"/groups/{env.G}/recurring",
+            RecurringData.Monthly(Guid.NewGuid(), env.Me, [env.Me], Today.AddDays(-1)));
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
     }
 
     [Fact]
