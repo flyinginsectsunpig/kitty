@@ -21,7 +21,7 @@ def postgres_conninfo(dsn: str) -> str:
     return psycopg.conninfo.make_conninfo(**known)
 
 
-DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 
 class Settings(BaseSettings):
@@ -35,8 +35,9 @@ class Settings(BaseSettings):
     postgres_dsn: str = ""
     # Gemini (free tier) when a key is set; otherwise a local Ollama if configured; otherwise scans fail fast.
     gemini_api_key: str = ""
-    # A pinned model (the Gemini API has no "-latest" Flash alias): the receipt evals list the models the key can use,
-    # which shows when this one is retired. Override with AI_GEMINI_MODEL.
+    # A pinned model (the Gemini API has no "-latest" Flash alias): Flash Lite is the free tier's only model with room
+    # for real use (15 requests a minute, 500 a day; full Flash models get 20 a day). The receipt evals list the models
+    # the key can use, which shows when this one is retired. Override with AI_GEMINI_MODEL.
     gemini_model: str = DEFAULT_GEMINI_MODEL
     ollama_url: str = ""
     ollama_model: str = "qwen2.5:3b"
