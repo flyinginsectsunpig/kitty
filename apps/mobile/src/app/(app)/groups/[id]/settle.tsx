@@ -1,15 +1,19 @@
 import type { Schemas } from "@kitty/api-client";
-import { formatMoney } from "@kitty/money";
+import { describeRate, errorMessage } from "@kitty/core";
+import { convertMinor, formatMoney, parseRate } from "@kitty/money";
 import { randomUUID } from "expo-crypto";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../../components/Button";
+import { Checkbox } from "../../../../components/Checkbox";
+import { TextField } from "../../../../components/TextField";
 import { CopyButton } from "../../../../components/CopyButton";
 import { ErrorBanner } from "../../../../components/ErrorBanner";
 import { GroupNav } from "../../../../components/GroupNav";
 import { Card, LoadState, Screen } from "../../../../components/Screen";
 import { useGroup } from "../../../../group/GroupContext";
 import { useAction } from "../../../../hooks/useAction";
+import { useFetchRate } from "../../../../hooks/useFetchRate";
 import { useLoad } from "../../../../hooks/useLoad";
 import { useLedger } from "../../../../ledger";
 import { colors, font, radius, space } from "../../../../theme";
@@ -59,19 +63,29 @@ export default function SettleScreen() {
   );
 }
 
+const todayUtc = () => new Date().toISOString().slice(0, 10);
+
 function TransferCard({ transfer: t, onPaid }: { transfer: Transfer; onPaid: () => void }) {
   const ledger = useLedger();
   const { group, me, nameOf } = useGroup();
   const id = useRef(randomUUID()).current; // one settlement per card, however many times it's retried
+  const foreign = t.currency !== group.baseCurrency;
+  const [inGroupCurrency, setInGroupCurrency] = useState(false);
+  const [typedRate, setTypedRate] = useState("");
+  const fxRate = parseRate(typedRate.trim()) ?? undefined; // sent only when typed; otherwise the ledger uses today's ECB rate
   const pay = useAction(
     useCallback(
       (key: string) =>
         ledger.POST("/groups/{groupId}/settlements", {
           params: { path: { groupId: group.id } },
-          body: { id, fromMemberId: t.fromMemberId, toMemberId: t.toMemberId, currency: t.currency, amountMinor: t.amountMinor },
+          body: {
+            id, fromMemberId: t.fromMemberId, toMemberId: t.toMemberId, currency: t.currency, amountMinor: t.amountMinor,
+            ...(fxRate ? { fxRate } : {}),
+            paidInGroupCurrency: foreign && inGroupCurrency,
+          },
           headers: { "Idempotency-Key": key },
         }),
-      [ledger, group.id, id, t],
+      [ledger, group.id, id, t, fxRate, foreign, inGroupCurrency],
     ),
   );
   const mine = t.fromMemberId === me.id;
@@ -96,13 +110,69 @@ function TransferCard({ transfer: t, onPaid }: { transfer: Transfer; onPaid: () 
         ) : (
           <Text style={styles.small}>{nameOf(t.toMemberId)} hasn't added payment details yet.</Text>
         ))}
+      {foreign && (
+        <ForeignFields transfer={t} groupCurrency={group.baseCurrency} inGroupCurrency={inGroupCurrency}
+          onInGroupCurrency={setInGroupCurrency} typedRate={typedRate} onTypedRate={setTypedRate}
+          // The ledger couldn't look up a rate: ask for one.
+          needsRate={pay.error === errorMessage("fx_rate_required")} />
+      )}
       <ErrorBanner message={pay.error} />
       <Button title="Mark as paid" busy={pay.busy} onPress={() => void pay.run().then((r) => r.ok && onPaid())} />
     </Card>
   );
 }
 
+
+/**
+ * Settling a debt in another currency: today's ECB rate, the option to pay in the group's currency, and a rate box —
+ * shown when paying in the group's currency, when the ECB rate couldn't be fetched, or after the ledger asked for one.
+ */
+function ForeignFields({ transfer: t, groupCurrency, inGroupCurrency, onInGroupCurrency, typedRate, onTypedRate, needsRate }: {
+  transfer: Transfer;
+  groupCurrency: string;
+  inGroupCurrency: boolean;
+  onInGroupCurrency: (value: boolean) => void;
+  typedRate: string;
+  onTypedRate: (value: string) => void;
+  needsRate: boolean;
+}) {
+  const { group } = useGroup();
+  const fetchRate = useFetchRate(group.id);
+  const [quote, setQuote] = useState<{ rate: string; rateDate: string } | "failed" | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    fetchRate(t.currency, todayUtc())
+      .then((q) => live && setQuote(q ?? "failed"))
+      .catch(() => live && setQuote("failed"));
+    return () => {
+      live = false;
+    };
+  }, [fetchRate, t.currency]);
+
+  const ecb = quote && quote !== "failed" ? quote : null;
+  const rate = parseRate(typedRate.trim()) ?? ecb?.rate ?? null;
+  return (
+    <View style={styles.foreign}>
+      <Text style={styles.muted}>
+        {ecb ? describeRate({ from: t.currency, to: groupCurrency, rate: ecb.rate, rateDate: ecb.rateDate, source: "ecb" })
+          : quote === "failed" ? "Couldn't get today's ECB rate. Enter the rate you used."
+          : "Getting today's rate…"}
+      </Text>
+      <Checkbox label={`Pay in ${groupCurrency} instead`} checked={inGroupCurrency} onChange={onInGroupCurrency} />
+      {inGroupCurrency && rate && (
+        <Text style={styles.strong}>{`Pay ${formatMoney(convertMinor(t.amountMinor, rate, t.currency, groupCurrency), groupCurrency)}`}</Text>
+      )}
+      {(inGroupCurrency || quote === "failed" || needsRate) && (
+        <TextField label={`Rate (1 ${t.currency} in ${groupCurrency})`} value={typedRate} onChangeText={onTypedRate}
+          keyboardType="decimal-pad" placeholder={ecb?.rate ?? "e.g. 19.5"} />
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  foreign: { gap: space.xs },
   line: { fontSize: font.base, color: colors.text },
   strong: { fontWeight: "600" },
   details: { flexDirection: "row", alignItems: "flex-start", gap: space.sm },
