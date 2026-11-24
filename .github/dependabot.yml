@@ -24,6 +24,13 @@ updates:
       - dependency-name: "Npgsql*"
         update-types: ["version-update:semver-major"]
 
+  - package-ecosystem: gomod
+    directory: /services/pulse
+    schedule: { interval: weekly }
+    groups:
+      gomod-minor-and-patch:
+        update-types: ["minor", "patch"]
+
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }

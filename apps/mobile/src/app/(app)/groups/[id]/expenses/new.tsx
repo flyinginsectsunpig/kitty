@@ -6,6 +6,7 @@ import { useCallback, useMemo } from "react";
 import { ExpenseForm } from "../../../../../components/ExpenseForm";
 import { Screen } from "../../../../../components/Screen";
 import { useGroup } from "../../../../../group/GroupContext";
+import { useFetchRate } from "../../../../../hooks/useFetchRate";
 import { useLedger } from "../../../../../ledger";
 
 const today = () => {
@@ -28,10 +29,13 @@ export default function NewExpenseScreen() {
     [ledger, group.id],
   );
 
+  const fetchRate = useFetchRate(group.id);
+
   return (
     <Screen>
       <Stack.Screen options={{ title: "Add an expense" }} />
-      <ExpenseForm members={members} initial={initial} submitLabel="Save expense" save={save} onSaved={() => router.dismissTo(`/groups/${group.id}`)} />
+      <ExpenseForm members={members} initial={initial} submitLabel="Save expense" save={save} onSaved={() => router.dismissTo(`/groups/${group.id}`)}
+        groupCurrency={group.baseCurrency} fetchRate={fetchRate} />
     </Screen>
   );
 }

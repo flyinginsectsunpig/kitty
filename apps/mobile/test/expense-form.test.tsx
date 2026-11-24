@@ -118,3 +118,63 @@ test("an itemized expense is shown read-only with delete", async () => {
   expect(screen.queryByText(/^Save changes/)).toBeNull();
   expect(screen.getByText("Delete expense")).toBeTruthy();
 });
+
+describe("foreign currency", () => {
+  const ecb = () => json(200, { rate: "19.1987", rateDate: "2026-11-20", source: "ecb" });
+
+  async function fillForeign() {
+    await fillNew();
+    await fireEvent.press(screen.getByText("Change currency"));
+    await fireEvent.press(screen.getByText("EUR"));
+    await fireEvent.changeText(screen.getByLabelText("Amount"), "40");
+  }
+
+  test("shows the ECB rate and converted amount for a foreign currency", async () => {
+    const { client, calls } = fakeLedger(groupRoutes({ [`GET /groups/${G}/fx-rate`]: ecb }));
+    await renderApp(routes, client, `/groups/${G}/expenses/new`);
+    await fillForeign();
+
+    expect(await screen.findByText("1 EUR = 19.1987 ZAR · ECB, 20 Nov 2026")).toBeTruthy();
+    expect(screen.getByText(/^≈ R\s767,95$/)).toBeTruthy();
+    expect(calls.find((c) => c.path === `/groups/${G}/fx-rate`)!.search).toMatch(/currency=EUR/);
+  });
+
+  test("saving without editing the rate sends no fxRate", async () => {
+    const { client, calls } = fakeLedger(groupRoutes({ [`GET /groups/${G}/fx-rate`]: ecb, [`POST /groups/${G}/expenses`]: () => json(201, {}) }));
+    await renderApp(routes, client, `/groups/${G}/expenses/new`);
+    await fillForeign();
+    await screen.findByText("1 EUR = 19.1987 ZAR · ECB, 20 Nov 2026");
+    await fireEvent.press(screen.getByText(/^Save expense/));
+
+    expect(await screen.findByText("Group home")).toBeTruthy();
+    const post = calls.find((c) => c.method === "POST")!;
+    expect(post.body.currency).toBe("EUR");
+    expect(post.body).not.toHaveProperty("fxRate");
+  });
+
+  test("an edited rate is sent", async () => {
+    const { client, calls } = fakeLedger(groupRoutes({ [`GET /groups/${G}/fx-rate`]: ecb, [`POST /groups/${G}/expenses`]: () => json(201, {}) }));
+    await renderApp(routes, client, `/groups/${G}/expenses/new`);
+    await fillForeign();
+    await fireEvent.changeText(await screen.findByLabelText(/^Edit rate/), "19.50");
+    await fireEvent.press(screen.getByText(/^Save expense/));
+
+    expect(await screen.findByText("Group home")).toBeTruthy();
+    expect(calls.find((c) => c.method === "POST")!.body.fxRate).toBe("19.5");
+  });
+
+  test("rate fetch failure still lets you save", async () => {
+    const { client } = fakeLedger(
+      groupRoutes({
+        [`GET /groups/${G}/fx-rate`]: () => json(503, { code: "fx_rate_unavailable" }),
+        [`POST /groups/${G}/expenses`]: () => json(201, {}),
+      }),
+    );
+    await renderApp(routes, client, `/groups/${G}/expenses/new`);
+    await fillForeign();
+
+    expect(await screen.findByText("Couldn't get the ECB rate. Type it below, or save and add it later.")).toBeTruthy();
+    await fireEvent.press(screen.getByText(/^Save expense/));
+    expect(await screen.findByText("Group home")).toBeTruthy();
+  });
+});

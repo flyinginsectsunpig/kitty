@@ -25,6 +25,9 @@ public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLif
     private readonly AzuriteContainer _azurite = new AzuriteBuilder("mcr.microsoft.com/azure-storage/azurite:3.37.0")
         .WithCommand("--skipApiVersionCheck").Build();
 
+    /// <summary>pulse, faked: set the rates a test needs, or take it down.</summary>
+    public FakeFxRates Fx { get; } = new();
+
     public string BlobConnectionString => _azurite.GetConnectionString();
     public string KafkaBootstrap => _redpanda.GetBootstrapAddress();
     public string SchemaRegistryUrl => _redpanda.GetSchemaRegistryAddress();
@@ -43,7 +46,10 @@ public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLif
         builder.UseSetting("Auth:Audience", TestTokens.Audience);
         // Every test-server request has the same (unknown) client IP; the join limit has its own dedicated test.
         builder.UseSetting("Ledger:GuestJoinsPerMinute", "100000");
+        builder.UseSetting("Fx:Url", "http://localhost:1"); // never called: IFxRates is replaced below
         builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton<Kitty.Ledger.Infrastructure.Fx.IFxRates>(Fx);
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, o =>
             {
                 // Validate against the test key instead of fetching Keycloak's metadata.
@@ -53,7 +59,8 @@ public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLif
                 o.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(o.Configuration);
                 o.TokenValidationParameters.ValidIssuer = TestTokens.Issuer;
                 o.TokenValidationParameters.IssuerSigningKey = TestTokens.SigningKey;
-            }));
+            });
+        });
     }
 
     /// <summary>An HttpClient that sends a valid bearer token for the given Keycloak subject.</summary>

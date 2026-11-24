@@ -1,10 +1,15 @@
 "use client";
 
-import { formatMoney, parseMoney, previewSplit, supportedCurrencies, type SplitMethod } from "@kitty/money";
-import { useMemo, useState } from "react";
-import { CATEGORIES, splitProblemMessage, toExpenseWriteDto, type ExpenseFormState } from "@kitty/core";
+import { convertMinor, formatMoney, parseMoney, parseRate, previewSplit, supportedCurrencies, type SplitMethod } from "@kitty/money";
+import { useEffect, useMemo, useState } from "react";
+import { CATEGORIES, describeRate, splitProblemMessage, toExpenseWriteDto, type ExpenseFormState } from "@kitty/core";
 
 type Member = { id: string; displayName: string };
+
+/** The rate a saved expense already has (edit only). */
+export type SavedRate = { currency: string; occurredOn: string; fxRate: string | null; fxRateDate: string | null; fxRateSource: string | null };
+
+type Quote = { rate: string; rateDate: string } | "failed" | null;
 
 const METHODS: { value: SplitMethod; label: string; hint: string }[] = [
   { value: "equal", label: "Equally", hint: "" },
@@ -20,6 +25,9 @@ export function ExpenseForm({
   idempotencyKey,
   action,
   submitLabel,
+  groupCurrency,
+  fetchRate,
+  saved,
 }: {
   groupId: string;
   members: Member[];
@@ -27,8 +35,32 @@ export function ExpenseForm({
   idempotencyKey: string;
   action: (form: FormData) => Promise<void>;
   submitLabel: string;
+  groupCurrency: string;
+  fetchRate: (groupId: string, currency: string, date: string) => Promise<{ rate: string; rateDate: string } | null>;
+  saved?: SavedRate;
 }) {
   const [state, setState] = useState<ExpenseFormState>(initial);
+  const [quote, setQuote] = useState<Quote>(null);
+  const foreign = state.currency !== groupCurrency;
+  // An unchanged currency and date keep the saved rate (the ledger does the same); anything else shows the ECB rate.
+  const keepsSaved = !!saved?.fxRate && saved.currency === state.currency && saved.occurredOn === state.occurredOn;
+
+  useEffect(() => {
+    if (!foreign || keepsSaved || !/^\d{4}-\d{2}-\d{2}$/.test(state.occurredOn)) {
+      setQuote(null);
+      return;
+    }
+    let live = true;
+    const timer = setTimeout(() => {
+      fetchRate(groupId, state.currency, state.occurredOn)
+        .then((q) => live && setQuote(q ?? "failed"))
+        .catch(() => live && setQuote("failed"));
+    }, 300);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [foreign, keepsSaved, groupId, state.currency, state.occurredOn, fetchRate]);
   const dto = useMemo(() => toExpenseWriteDto(state), [state]);
   const nameOf = (id: string) => members.find((m) => m.id === id)?.displayName ?? "Someone";
 
@@ -66,7 +98,7 @@ export function ExpenseForm({
         </div>
         <div>
           <label htmlFor="currency" className="label">Currency</label>
-          <select id="currency" className="field" value={state.currency} onChange={(e) => set("currency", e.target.value)}>
+          <select id="currency" className="field" value={state.currency} onChange={(e) => setState((s) => ({ ...s, currency: e.target.value, fxRate: "" }))}>
             {supportedCurrencies.map((c) => <option key={c}>{c}</option>)}
           </select>
         </div>
@@ -82,9 +114,14 @@ export function ExpenseForm({
         <div>
           <label htmlFor="occurredOn" className="label">Date</label>
           <input id="occurredOn" type="date" required className="field" value={state.occurredOn}
-            onChange={(e) => set("occurredOn", e.target.value)} />
+            onChange={(e) => setState((s) => ({ ...s, occurredOn: e.target.value, fxRate: "" }))} />
         </div>
       </div>
+
+      {foreign && (
+        <RatePanel state={state} groupCurrency={groupCurrency} quote={quote} saved={keepsSaved ? saved : undefined}
+          amountMinor={amountMinor} onRate={(v) => set("fxRate", v)} />
+      )}
 
       <div>
         <label htmlFor="category" className="label">Category</label>
@@ -139,3 +176,34 @@ export function ExpenseForm({
   );
 }
 
+/** The exchange rate for a foreign-currency expense: the saved or ECB rate, the converted amount, and an edit box. */
+function RatePanel({ state, groupCurrency, quote, saved, amountMinor, onRate }: {
+  state: ExpenseFormState;
+  groupCurrency: string;
+  quote: Quote;
+  saved: SavedRate | undefined;
+  amountMinor: number | null;
+  onRate: (value: string) => void;
+}) {
+  const shown = saved?.fxRate
+    ? { rate: saved.fxRate, rateDate: saved.fxRateDate, source: saved.fxRateSource ?? "ecb" }
+    : quote && quote !== "failed" ? { rate: quote.rate, rateDate: quote.rateDate, source: "ecb" } : null;
+  const typed = parseRate(state.fxRate.trim());
+  const rate = typed ?? shown?.rate ?? null;
+
+  return (
+    <div className="space-y-2 rounded-xl bg-stone-50 p-3 text-sm dark:bg-stone-900">
+      <p className="text-stone-600 dark:text-stone-400">
+        {shown ? describeRate({ from: state.currency, to: groupCurrency, ...shown })
+          : quote === "failed" ? "Couldn't get the ECB rate. Type it below, or save and add it later."
+          : "Getting the ECB rate…"}
+      </p>
+      {rate && amountMinor ? (
+        <p className="font-medium tabular-nums">≈ {formatMoney(convertMinor(amountMinor, rate, state.currency, groupCurrency), groupCurrency)}</p>
+      ) : null}
+      <label htmlFor="fxRate" className="label">Edit rate (1 {state.currency} in {groupCurrency})</label>
+      <input id="fxRate" inputMode="decimal" className="field" placeholder={shown?.rate ?? "e.g. 19.5"}
+        value={state.fxRate} onChange={(e) => onRate(e.target.value)} />
+    </div>
+  );
+}

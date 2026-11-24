@@ -47,6 +47,17 @@ var blobs = storage.AddBlobs("blobs");
 // Only wired in when set: Aspire 17 treats an empty parameter as missing and holds the ai service until one is entered.
 var hasGeminiKey = !string.IsNullOrWhiteSpace(builder.Configuration["Parameters:gemini-api-key"]);
 
+// Exchange rates over gRPC (Go, run from source with `go run`). It creates its own "pulse" schema in the ledger database.
+// No developer-certificate trust: Aspire would set SSL_CERT_DIR to its dev certificate alone, and Go then trusts only
+// that, so pulse couldn't reach Frankfurter over HTTPS. pulse calls nothing that uses the dev certificate.
+#pragma warning disable ASPIRECERTIFICATES001
+var pulse = builder.AddExecutable("pulse", "go", "../../services/pulse", "run", "./cmd/pulse")
+    .WithDeveloperCertificateTrust(false)
+#pragma warning restore ASPIRECERTIFICATES001
+    .WithHttpEndpoint(env: "PULSE_PORT", name: "grpc")
+    .WithEnvironment("PULSE_DATABASE_URL", ledgerDb.Resource.UriExpression)
+    .WaitFor(ledgerDb);
+
 var ledger = builder.AddDotnetProject("ledger", "../../services/ledger/src/Kitty.Ledger/Kitty.Ledger.csproj")
     .WithReference(ledgerDb, connectionName: "ledger")
     .WaitFor(ledgerDb)
@@ -62,7 +73,9 @@ var ledger = builder.AddDotnetProject("ledger", "../../services/ledger/src/Kitty
     .WaitFor(redpanda)
     .WithReference(blobs)
     .WaitFor(storage)
-    .WithEnvironment("Blob__ConfigureCors", "true"); // the browser (on :3000) uploads to Azurite cross-origin
+    .WithEnvironment("Blob__ConfigureCors", "true") // the browser (on :3000) uploads to Azurite cross-origin
+    .WithEnvironment("Fx__Url", pulse.GetEndpoint("grpc"))
+    .WaitFor(pulse);
 
 // Reads receipt photos (local OCR, redaction, Gemini). Uses the ai service's own uv environment.
 var ai = builder.AddUvicornApp("ai", "../../services/ai", "kitty_ai.main:create_app")

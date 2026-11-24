@@ -338,6 +338,54 @@
         }
       }
     },
+    "/groups/{groupId}/fx-rate": {
+      "get": {
+        "tags": [
+          "Exchange rates"
+        ],
+        "operationId": "GetFxRate",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FxRateDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/groups/{groupId}/activity": {
       "get": {
         "tags": [
@@ -1677,7 +1725,8 @@
       },
       "BalancesDto": {
         "required": [
-          "currencies"
+          "currencies",
+          "converted"
         ],
         "type": "object",
         "properties": {
@@ -1686,6 +1735,16 @@
             "items": {
               "$ref": "#/components/schemas/CurrencyBalanceDto"
             }
+          },
+          "converted": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ConvertedBalanceDto"
+              }
+            ]
           }
         }
       },
@@ -1727,6 +1786,36 @@
           },
           "displayName": {
             "type": "string"
+          }
+        }
+      },
+      "ConvertedBalanceDto": {
+        "required": [
+          "currency",
+          "members",
+          "transfers",
+          "excludedCount"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberNetDto"
+            }
+          },
+          "transfers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferDto"
+            }
+          },
+          "excludedCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -1829,7 +1918,11 @@
           "version",
           "createdBy",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "fxRate",
+          "fxRateDate",
+          "fxRateSource",
+          "convertedAmountMinor"
         ],
         "type": "object",
         "properties": {
@@ -1884,6 +1977,32 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "fxRate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fxRateDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "fxRateSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "convertedAmountMinor": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
           }
         }
       },
@@ -1958,6 +2077,32 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "fxRate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "FxRateDto": {
+        "required": [
+          "rate",
+          "rateDate",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "rate": {
+            "type": "string"
+          },
+          "rateDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "source": {
+            "type": "string"
           }
         }
       },
@@ -2338,7 +2483,12 @@
           "currency",
           "amountMinor",
           "createdBy",
-          "createdAt"
+          "createdAt",
+          "fxRate",
+          "fxRateDate",
+          "fxRateSource",
+          "convertedAmountMinor",
+          "paidInGroupCurrency"
         ],
         "type": "object",
         "properties": {
@@ -2368,6 +2518,35 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "fxRate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fxRateDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "fxRateSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "convertedAmountMinor": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "paidInGroupCurrency": {
+            "type": "boolean"
           }
         }
       },
@@ -2399,6 +2578,16 @@
           "amountMinor": {
             "type": "integer",
             "format": "int64"
+          },
+          "fxRate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "paidInGroupCurrency": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -2797,6 +2986,9 @@
     },
     {
       "name": "Balances"
+    },
+    {
+      "name": "Exchange rates"
     },
     {
       "name": "Activity"

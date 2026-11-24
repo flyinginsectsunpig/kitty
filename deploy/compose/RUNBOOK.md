@@ -86,6 +86,10 @@ Pin `KITTY_TAG=sha-…` to roll back to a known build.
 `AI_DB_PASSWORD` (`openssl rand -hex 24`) to `.env` before `up`; compose refuses to start without them.
 `GEMINI_API_KEY` stays optional.
 
+**Upgrading to exchange rates (phase 3a):** add `PULSE_DB_PASSWORD` (`openssl rand -hex 24`) to `.env` before
+`up`. The new `pulse` service (a small Go binary, capped at 128 MB) answers the ledger's rate lookups; it needs outbound HTTPS to
+`api.frankfurter.dev`. If pulse is down, expenses still save (without a rate) and foreign payments ask for one.
+
 **Upgrading to the Android app (phase 2c):** Keycloak imports `infra/keycloak/kitty-realm.json` only when the
 realm doesn't exist yet (`--import-realm`), so a server set up before 2c lacks the app's `kitty-mobile` client. Add
 it once in the admin console (see below): Clients → Import client → pick the `kitty-mobile` entry from the realm file

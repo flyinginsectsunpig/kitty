@@ -42,4 +42,7 @@ public static class ErrorCodes
     public const string UploadTooLarge = "upload_too_large";
     public const string UploadNotImage = "upload_not_image";
     public const string NoSuggestion = "no_suggestion";
+    public const string FxRateUnavailable = "fx_rate_unavailable";
+    public const string FxRateRequired = "fx_rate_required";
+    public const string FxRateInvalid = "fx_rate_invalid";
 }

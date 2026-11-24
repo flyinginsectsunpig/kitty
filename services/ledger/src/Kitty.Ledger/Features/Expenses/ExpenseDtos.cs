@@ -20,7 +20,8 @@ public sealed record ExpenseWriteDto(
     DateOnly OccurredOn,
     IReadOnlyList<PayerDto> Payers,
     SplitDto Split,
-    int? Version);
+    int? Version,
+    string? FxRate = null);
 
 public sealed record ShareDto(Guid MemberId, long AmountMinor);
 
@@ -37,7 +38,11 @@ public sealed record ExpenseDto(
     int Version,
     Guid CreatedBy,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? FxRate,
+    DateOnly? FxRateDate,
+    string? FxRateSource,
+    long? ConvertedAmountMinor);
 
 public sealed record ExpensePageDto(IReadOnlyList<ExpenseDto> Items, string? NextCursor);
 
@@ -52,6 +57,7 @@ public static class ExpenseMapping
                 .Select(p => new PayerDto(p.MemberId, p.AmountMinor)).ToList(),
             new SplitDto(e.SplitMethod, shares.Select(s => new ParticipantDto(s.MemberId, s.InputValue)).ToList()),
             shares.Select(s => new ShareDto(s.MemberId, s.AmountMinor)).ToList(),
-            e.Version, e.CreatedByUserId, e.CreatedAt, e.UpdatedAt);
+            e.Version, e.CreatedByUserId, e.CreatedAt, e.UpdatedAt,
+            e.FxRate is { } rate ? Domain.Fx.FxRate.Format(rate) : null, e.FxRateDate, e.FxRateSource, e.ConvertedAmountMinor);
     }
 }

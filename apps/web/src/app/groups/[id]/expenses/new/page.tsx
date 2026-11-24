@@ -2,7 +2,7 @@ import { newExpenseForm } from "@kitty/core";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { loadGroup } from "@/lib/group-context";
-import { saveExpense } from "../../actions";
+import { fetchRate, saveExpense } from "../../actions";
 
 export default async function NewExpensePage({
   params,
@@ -26,6 +26,8 @@ export default async function NewExpensePage({
         idempotencyKey={crypto.randomUUID()}
         action={saveExpense}
         submitLabel="Save expense"
+        groupCurrency={group.baseCurrency}
+        fetchRate={fetchRate}
         initial={newExpenseForm({
           id: crypto.randomUUID(),
           today: new Date().toISOString().slice(0, 10),

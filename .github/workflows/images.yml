@@ -15,10 +15,12 @@ jobs:
     uses: ./.github/workflows/web.yml
   ai-tests:
     uses: ./.github/workflows/ai.yml
+  pulse-tests:
+    uses: ./.github/workflows/pulse.yml
 
   build:
     # Only images whose tests passed are published (the runbook deploys :latest).
-    needs: [ledger-tests, web-tests, ai-tests]
+    needs: [ledger-tests, web-tests, ai-tests, pulse-tests]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -29,6 +31,8 @@ jobs:
             dockerfile: apps/web/Dockerfile
           - name: kitty-ai
             dockerfile: services/ai/Dockerfile
+          - name: kitty-pulse
+            dockerfile: services/pulse/Dockerfile
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0

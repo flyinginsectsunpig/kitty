@@ -1,5 +1,5 @@
 import type { BalancesDto, ExpenseDto } from "@kitty/api-client";
-import { errorMessage } from "@kitty/core";
+import { errorMessage, expenseAmounts } from "@kitty/core";
 import { formatMoney } from "@kitty/money";
 import { Link } from "expo-router";
 import { useState } from "react";
@@ -80,9 +80,30 @@ export default function GroupOverview() {
 
 function Balances({ balances, groupId }: { balances: BalancesDto; groupId: string }) {
   const { me, nameOf } = useGroup();
+  const converted = balances.converted;
   return (
     <Card>
       <Text style={styles.h2}>Balances</Text>
+      {converted && (
+        <View style={styles.total}>
+          <Text style={styles.caps}>About {converted.currency} in total</Text>
+          {converted.members.filter((m) => m.netMinor !== 0).map((m) => (
+            <View key={m.memberId} style={styles.line}>
+              <Text style={styles.body}>{m.memberId === me.id ? "You" : nameOf(m.memberId)}</Text>
+              <Text style={m.netMinor > 0 ? styles.owed : styles.owes}>
+                {`${m.netMinor > 0 ? "gets back about" : "owes about"} ${formatMoney(Math.abs(m.netMinor), converted.currency)}`}
+              </Text>
+            </View>
+          ))}
+          <Text style={styles.muted}>
+            {`Uses each expense's saved exchange rate. Settle up in each currency below.${
+              converted.excludedCount > 0
+                ? ` ${converted.excludedCount} older ${converted.excludedCount === 1 ? "expense has" : "expenses have"} no rate yet.`
+                : ""
+            }`}
+          </Text>
+        </View>
+      )}
       {balances.currencies.length === 0 ? (
         <Text style={styles.muted}>Nothing to settle yet.</Text>
       ) : (
@@ -112,7 +133,7 @@ function Balances({ balances, groupId }: { balances: BalancesDto; groupId: strin
 /** The first page comes with the screen; "Older expenses" appends the next. */
 function Expenses({ groupId, first }: { groupId: string; first: { items: ExpenseDto[]; nextCursor: string | null } }) {
   const ledger = useLedger();
-  const { me, nameOf } = useGroup();
+  const { group, me, nameOf } = useGroup();
   const [items, setItems] = useState(first.items);
   const [cursor, setCursor] = useState(first.nextCursor);
   const [busy, setBusy] = useState(false);
@@ -153,7 +174,7 @@ function Expenses({ groupId, first }: { groupId: string; first: { items: Expense
                     <View style={styles.grow}>
                       <Text style={styles.name} numberOfLines={1}>{e.description}</Text>
                       <Text style={styles.small}>
-                        {e.occurredOn} · {payer} paid {formatMoney(e.amountMinor, e.currency)}
+                        {e.occurredOn} · {payer} paid {expenseAmounts(e, group.baseCurrency)}
                       </Text>
                     </View>
                     <Text style={styles.muted}>{myShare > 0 ? `your share ${formatMoney(myShare, e.currency)}` : "not involved"}</Text>
@@ -180,6 +201,7 @@ const styles = StyleSheet.create({
   body: { fontSize: font.sm, color: colors.text },
   small: { fontSize: 12, color: colors.muted },
   muted: { fontSize: font.sm, color: colors.muted },
+  total: { gap: space.xs, padding: space.sm, borderRadius: 12, backgroundColor: "#fafaf9" },
   caps: { fontSize: 12, fontWeight: "600", color: colors.muted, textTransform: "uppercase" },
   owed: { fontSize: font.sm, color: colors.owed },
   owes: { fontSize: font.sm, color: colors.owes },

@@ -1,0 +1,34 @@
+name: pulse
+
+on:
+  workflow_call: # images.yml runs these before publishing
+  push:
+    branches: [main]
+    paths: ["services/pulse/**", "contracts/proto/kitty/fx/**", "contracts/buf.yaml", ".github/workflows/pulse.yml"]
+  pull_request:
+    paths: ["services/pulse/**", "contracts/proto/kitty/fx/**", "contracts/buf.yaml", ".github/workflows/pulse.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/pulse
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: services/pulse/go.mod
+          cache-dependency-path: |
+            services/pulse/go.sum
+            services/pulse/tools.go.sum
+      - name: Lint the contract
+        run: go tool -modfile=tools.go.mod buf lint ../../contracts
+      - name: Generated code is current
+        run: go tool -modfile=tools.go.mod buf generate && git diff --exit-code -- gen
+      - run: go vet ./...
+      - name: Tests (store tests use Postgres via Testcontainers)
+        run: go test ./...

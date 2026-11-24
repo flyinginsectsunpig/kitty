@@ -10,6 +10,11 @@ function field(form: FormData, name: string): string {
   return value;
 }
 
+function optional(form: FormData, name: string): string | undefined {
+  const value = form.get(name);
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+}
+
 /** Each form renders its own Idempotency-Key, so a double-submit replays instead of duplicating. */
 function keyed(form: FormData) {
   return { headers: { "Idempotency-Key": field(form, "idempotencyKey") } };
@@ -17,6 +22,13 @@ function keyed(form: FormData) {
 
 function withError(path: string, error: unknown): never {
   redirect(`${path}${path.includes("?") ? "&" : "?"}error=${problemCode(error)}`);
+}
+
+/** The ECB rate for a foreign currency on a date, for the forms to show; null when pulse can't answer. */
+export async function fetchRate(groupId: string, currency: string, date: string): Promise<{ rate: string; rateDate: string } | null> {
+  const ledger = await getLedger();
+  const { data } = await ledger.GET("/groups/{groupId}/fx-rate", { params: { path: { groupId }, query: { currency, date } } });
+  return data ? { rate: data.rate, rateDate: data.rateDate } : null;
 }
 
 export async function saveExpense(form: FormData) {
@@ -102,6 +114,9 @@ export async function recordSettlement(form: FormData) {
       toMemberId: field(form, "toMemberId"),
       currency: field(form, "currency"),
       amountMinor: Number(field(form, "amountMinor")),
+      // Present only when the person typed a rate; otherwise the ledger uses today's ECB rate.
+      fxRate: optional(form, "fxRate"),
+      paidInGroupCurrency: form.get("paidInGroupCurrency") === "on",
     },
     ...keyed(form),
   });

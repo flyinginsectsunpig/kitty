@@ -9,6 +9,7 @@ import { ExpenseForm } from "../../../../../components/ExpenseForm";
 import { Card, LoadState, Screen } from "../../../../../components/Screen";
 import { useGroup } from "../../../../../group/GroupContext";
 import { useAction } from "../../../../../hooks/useAction";
+import { useFetchRate } from "../../../../../hooks/useFetchRate";
 import { useLoad } from "../../../../../hooks/useLoad";
 import { useLedger } from "../../../../../ledger";
 import { colors, font } from "../../../../../theme";
@@ -43,6 +44,7 @@ function Editor({ expense }: { expense: ExpenseDto }) {
   const router = useRouter();
   const { group, me } = useGroup();
   const back = () => router.dismissTo(`/groups/${group.id}`);
+  const fetchRate = useFetchRate(group.id);
   const path = { params: { path: { groupId: group.id, expenseId: expense.id } } };
 
   const save = useCallback(
@@ -90,6 +92,9 @@ function Editor({ expense }: { expense: ExpenseDto }) {
         members={group.members.map((m) => ({ id: m.id, displayName: m.id === me.id ? "You" : m.displayName }))}
         initial={editExpenseForm(expense, group.members.map((m) => m.id), me.id)}
         submitLabel="Save changes"
+        groupCurrency={group.baseCurrency}
+        fetchRate={fetchRate}
+        saved={expense}
         save={save}
         onSaved={back}
       />

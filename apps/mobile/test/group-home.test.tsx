@@ -93,3 +93,35 @@ test("an edited expense shows its new details after a reload", async () => {
   await act(async () => screen.getByTestId("screen").props.refreshControl.props.onRefresh()); // pull to refresh
   expect(await screen.findByText("Groceries and wine")).toBeTruthy();
 });
+
+test("group home shows the converted total card and hides it when null", async () => {
+  const mixed = {
+    currencies: [
+      { currency: "EUR", members: [{ memberId: ME, netMinor: -2000 }, { memberId: SAM, netMinor: 2000 }], transfers: [{ fromMemberId: ME, toMemberId: SAM, amountMinor: 2000 }] },
+      { currency: "ZAR", members: [{ memberId: ME, netMinor: -5000 }, { memberId: SAM, netMinor: 5000 }], transfers: [{ fromMemberId: ME, toMemberId: SAM, amountMinor: 5000 }] },
+    ],
+    converted: { currency: "ZAR", members: [{ memberId: ME, netMinor: -43397 }, { memberId: SAM, netMinor: 43397 }], transfers: [], excludedCount: 1 },
+  };
+  const { client } = fakeLedger(
+    groupRoutes({
+      [`GET /groups/${G}/balances`]: () => json(200, mixed),
+      [`GET /groups/${G}/table-sessions`]: () => json(200, []),
+      [`GET /groups/${G}/expenses`]: () => json(200, { items: [], nextCursor: null }),
+    }),
+  );
+  await renderApp(routes, client, `/groups/${G}`);
+
+  expect(await screen.findByText("About ZAR in total")).toBeTruthy();
+  expect(screen.getByText(/^owes about R\s433,97$/)).toBeTruthy();
+  expect(screen.getByText(/1 older expense has no rate yet\.$/)).toBeTruthy();
+});
+
+test("a foreign expense lists both amounts", async () => {
+  const foreign = { ...expense("e1", "Gelato"), currency: "EUR", amountMinor: 4000, convertedAmountMinor: 76795 };
+  const { client } = fakeLedger(overviewRoutes({ "": { items: [foreign], nextCursor: null } }));
+  await renderApp(routes, client, `/groups/${G}`);
+
+  expect(await screen.findByText("Gelato")).toBeTruthy();
+  expect(screen.queryByText("About ZAR in total")).toBeNull(); // no converted total in this response
+  expect(screen.getByText(/€\s?40,00 · R\s767,95/)).toBeTruthy();
+});

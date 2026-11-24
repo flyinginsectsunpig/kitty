@@ -3,6 +3,7 @@ using Kitty.Ledger.Data.Entities;
 using Kitty.Ledger.Domain;
 using Kitty.Ledger.Domain.Splits;
 using Kitty.Ledger.Features.Expenses;
+using Kitty.Ledger.Features.Fx;
 using Kitty.Ledger.Features.Groups;
 using Kitty.Ledger.Features.Scans;
 using Kitty.Ledger.Infrastructure;
@@ -261,7 +262,7 @@ public static class TableEndpoints
     /// any validation failure after it leaves the transaction uncommitted, so the status rolls back.
     /// </summary>
     private static async Task<IResult> ConfirmAsync(Guid groupId, Guid sessionId, HttpContext http, LedgerDbContext db,
-        TableSessionService svc, AuditWriter audit, Outbox outbox, TimeProvider clock, CancellationToken ct)
+        TableSessionService svc, AuditWriter audit, Outbox outbox, ExpenseRates rates, TimeProvider clock, CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
         var existing = await db.ReceiptSessions.AsNoTracking().SingleOrDefaultAsync(s => s.Id == sessionId && s.GroupId == groupId, ct);
@@ -269,6 +270,10 @@ public static class TableEndpoints
         if (existing.HostUserId != caller.User.Id) return HostOnly();
         if (existing.Status == SessionStatus.Confirmed) return Results.Ok(await svc.ToDtoAsync((await svc.LoadAsync(groupId, sessionId, ct))!, Viewer(http), ct));
         if (existing.Status == SessionStatus.Cancelled) return SessionClosed();
+
+        // Asked before the transaction, so a slow pulse never holds it open. Pulse down → saved without a rate.
+        var groupCurrency = await ExpenseEndpoints.GroupCurrencyAsync(db, groupId, ct);
+        var rate = await rates.DecideAsync(existing.Currency.Trim(), groupCurrency, BillDate(existing), null, null, ct);
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var now = clock.NowMicros();
@@ -302,11 +307,12 @@ public static class TableEndpoints
         var expense = new Expense
         {
             Id = Guid.NewGuid(), GroupId = groupId, Description = session.Title, Category = "food", Currency = session.Currency.Trim(),
-            AmountMinor = total, OccurredOn = DateOnly.FromDateTime(session.CreatedAt.UtcDateTime), SplitMethod = SplitMethod.Itemized,
+            AmountMinor = total, OccurredOn = BillDate(session), SplitMethod = SplitMethod.Itemized,
             Version = 1, CreatedByUserId = caller.User.Id, CreatedAt = now, UpdatedAt = now,
             Payers = [new ExpensePayer { MemberId = session.PayerMemberId, AmountMinor = total }],
             Shares = split.Shares.Select(x => new ExpenseShare { MemberId = x.MemberId, AmountMinor = x.Minor }).ToList(),
         };
+        if (ExpenseEndpoints.ApplyRate(expense, rate, groupCurrency) is { } rateError) return rateError;
         db.Expenses.Add(expense);
         session.ExpenseId = expense.Id;
         audit.Record(caller.User.Id, groupId, ExpenseEndpoints.EntityType, expense.Id, AuditActions.Created, null, expense.ToDto());
@@ -342,4 +348,7 @@ public static class TableEndpoints
     internal static IResult HostOnly() => ApiError.Problem(StatusCodes.Status403Forbidden, ErrorCodes.HostOnly, "Only the person running this table can do that.");
     public static IResult SessionLocked() => ApiError.Conflict(ErrorCodes.SessionLocked, "The host has locked this bill.");
     public static IResult SessionClosed() => ApiError.Conflict(ErrorCodes.SessionClosed, "This bill is already settled or cancelled.");
+
+    /// <summary>A table bill is dated the day the table was opened (UTC).</summary>
+    private static DateOnly BillDate(ReceiptSession s) => DateOnly.FromDateTime(s.CreatedAt.UtcDateTime);
 }

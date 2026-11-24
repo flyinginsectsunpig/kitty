@@ -67,6 +67,14 @@ public sealed class Expense
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
+    /// <summary>1 unit of <see cref="Currency"/> in the group's currency; null for the group's own currency, or when no rate was available.</summary>
+    public decimal? FxRate { get; set; }
+    /// <summary>The ECB publication the rate came from; null when typed by hand.</summary>
+    public DateOnly? FxRateDate { get; set; }
+    /// <summary>"ecb" or "manual".</summary>
+    public string? FxRateSource { get; set; }
+    /// <summary><see cref="AmountMinor"/> in the group's currency at <see cref="FxRate"/>.</summary>
+    public long? ConvertedAmountMinor { get; set; }
     public List<ExpensePayer> Payers { get; set; } = [];
     public List<ExpenseShare> Shares { get; set; } = [];
 }
@@ -96,6 +104,15 @@ public sealed class Settlement
     public Guid CreatedByUserId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
+    /// <summary>1 unit of <see cref="Currency"/> in the group's currency on the day it was recorded; null for the group's own currency.</summary>
+    public decimal? FxRate { get; set; }
+    public DateOnly? FxRateDate { get; set; }
+    /// <summary>"ecb" or "manual".</summary>
+    public string? FxRateSource { get; set; }
+    /// <summary><see cref="AmountMinor"/> in the group's currency at <see cref="FxRate"/>.</summary>
+    public long? ConvertedAmountMinor { get; set; }
+    /// <summary>The money changed hands in the group's currency (ConvertedAmountMinor of it), settling this much of the debt's currency.</summary>
+    public bool PaidInGroupCurrency { get; set; }
 }
 
 public sealed class AuditEntry

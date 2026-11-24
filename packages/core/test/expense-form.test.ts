@@ -15,6 +15,7 @@ function form(overrides: Partial<ExpenseFormState> = {}): ExpenseFormState {
     occurredOn: "2026-11-15",
     payerId: A,
     method: "equal",
+    fxRate: "",
     participants: [
       { memberId: A, included: true, value: "" },
       { memberId: B, included: true, value: "" },
@@ -24,6 +25,19 @@ function form(overrides: Partial<ExpenseFormState> = {}): ExpenseFormState {
 }
 
 describe("toExpenseWriteDto", () => {
+  test("toWrite omits fxRate when the field is empty", () => {
+    const dto = toExpenseWriteDto(form({ currency: "EUR" }));
+    expect(dto).not.toHaveProperty("fxRate");
+  });
+
+  test("toWrite sends a canonical typed rate", () => {
+    expect(toExpenseWriteDto(form({ currency: "EUR", fxRate: " 19.50 " }))).toMatchObject({ fxRate: "19.5" });
+  });
+
+  test("toWrite rejects an invalid rate", () => {
+    expect(toExpenseWriteDto(form({ currency: "EUR", fxRate: "abc" }))).toEqual({ error: "That exchange rate doesn't look right." });
+  });
+
   test("equal split builds participants with null values", () => {
     const dto = toExpenseWriteDto(form());
     expect(dto).toMatchObject({
@@ -102,6 +116,7 @@ describe("newExpenseForm", () => {
         { memberId: A, included: true, value: "" },
         { memberId: B, included: true, value: "" },
       ],
+      fxRate: "",
     });
   });
 });

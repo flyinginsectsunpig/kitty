@@ -1,0 +1,13 @@
+# Run with: go tool -modfile=tools.go.mod buf generate
+# The generators run as Go tools from tools.go.mod (kept apart from the service's own dependencies).
+version: v2
+inputs:
+  - directory: ../../contracts
+    paths: [../../contracts/proto/kitty/fx]
+plugins:
+  - local: [go, tool, -modfile=tools.go.mod, protoc-gen-go]
+    out: gen
+    opt: paths=source_relative
+  - local: [go, tool, -modfile=tools.go.mod, protoc-gen-go-grpc]
+    out: gen
+    opt: paths=source_relative

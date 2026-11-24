@@ -1,10 +1,11 @@
 import { formatMoney } from "@kitty/money";
 import { CopyButton } from "@/components/CopyButton";
+import { ForeignSettleFields } from "@/components/ForeignSettleFields";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { GroupNav } from "@/components/GroupNav";
 import { loadGroup } from "@/lib/group-context";
 import { unwrap } from "@/lib/ledger";
-import { recordSettlement } from "../actions";
+import { fetchRate, recordSettlement } from "../actions";
 
 export default async function SettlePage({
   params,
@@ -68,6 +69,12 @@ export default async function SettlePage({
                     <input type="hidden" name="toMemberId" value={t.toMemberId} />
                     <input type="hidden" name="currency" value={t.currency} />
                     <input type="hidden" name="amountMinor" value={t.amountMinor} />
+                    {t.currency !== group.baseCurrency && (
+                      <div className="mb-3">
+                        <ForeignSettleFields groupId={id} currency={t.currency} groupCurrency={group.baseCurrency}
+                          amountMinor={t.amountMinor} fetchRate={fetchRate} />
+                      </div>
+                    )}
                     <button className="btn-primary w-full">Mark as paid</button>
                   </form>
                 </li>

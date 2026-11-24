@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package kitty.fx.v1;
+
+option csharp_namespace = "Kitty.Contracts.Fx.V1";
+option go_package = "github.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/fx/v1;fxv1";
+
+// Exchange rates from the ECB (via Frankfurter). Rates are decimal strings, never floats.
+service RatesService {
+  rpc GetRate(GetRateRequest) returns (GetRateResponse);
+}
+
+message GetRateRequest {
+  // ISO 4217, e.g. "EUR".
+  string base = 1;
+  // ISO 4217, e.g. "ZAR".
+  string quote = 2;
+  // YYYY-MM-DD; a future date means today.
+  string date = 3;
+}
+
+message GetRateResponse {
+  // 1 base = rate quote, up to 10 decimal places.
+  string rate = 1;
+  // The ECB date actually used, YYYY-MM-DD.
+  string rate_date = 2;
+  // Where the rate came from: "ecb".
+  string source = 3;
+}
