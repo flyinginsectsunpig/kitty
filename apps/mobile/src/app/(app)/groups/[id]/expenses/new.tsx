@@ -1,4 +1,4 @@
-import type { ExpenseWriteDto } from "@kitty/api-client";
+import type { ExpenseWriteDto, RecurringWriteDto } from "@kitty/api-client";
 import { newExpenseForm } from "@kitty/core";
 import { randomUUID } from "expo-crypto";
 import { Stack, useRouter } from "expo-router";
@@ -30,12 +30,17 @@ export default function NewExpenseScreen() {
   );
 
   const fetchRate = useFetchRate(group.id);
+  const saveRecurring = useCallback(
+    (body: RecurringWriteDto, key: string) =>
+      ledger.POST("/groups/{groupId}/recurring", { params: { path: { groupId: group.id } }, body, headers: { "Idempotency-Key": key } }),
+    [ledger, group.id],
+  );
 
   return (
     <Screen>
       <Stack.Screen options={{ title: "Add an expense" }} />
       <ExpenseForm members={members} initial={initial} submitLabel="Save expense" save={save} onSaved={() => router.dismissTo(`/groups/${group.id}`)}
-        groupCurrency={group.baseCurrency} fetchRate={fetchRate} />
+        groupCurrency={group.baseCurrency} fetchRate={fetchRate} saveRecurring={saveRecurring} repeat={{ initial: "none", endsOn: "" }} />
     </Screen>
   );
 }

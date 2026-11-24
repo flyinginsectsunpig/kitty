@@ -25,6 +25,8 @@ public sealed class EventSerializers(ISchemaRegistryClient registry)
     {
         [ExpenseChanged.Descriptor.FullName] = For(ExpenseChanged.Parser, registry),
         [ReceiptUploaded.Descriptor.FullName] = For(ReceiptUploaded.Parser, registry),
+        [Kitty.Contracts.Recurring.V1.RecurringScheduleChanged.Descriptor.FullName] =
+            For(Kitty.Contracts.Recurring.V1.RecurringScheduleChanged.Parser, registry),
     };
 
     public Task<byte[]> SerializeAsync(string type, byte[] payload, string topic) =>

@@ -21,3 +21,15 @@ test("an unknown currency drops the amount instead of throwing", () => {
 });
 
 test("no snapshot falls back to the entity type", () => expect(describeActivity("expense", null)).toBe("expense"));
+
+test("an expense a schedule added says so", () => {
+  expect(
+    describeActivity("expense", { description: "Rent", amountMinor: 1200000, currency: "ZAR", recurringScheduleId: "s1" }),
+  ).toMatch(/^expense "Rent" \(R\s12\s000,00\), added automatically$/);
+});
+
+test("a repeating schedule is named", () => {
+  expect(describeActivity("recurring", { description: "Rent", amountMinor: 1200000, currency: "ZAR" })).toMatch(
+    /^repeating expense "Rent" \(R\s12\s000,00\)$/,
+  );
+});

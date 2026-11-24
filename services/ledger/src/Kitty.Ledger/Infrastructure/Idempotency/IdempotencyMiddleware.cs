@@ -23,9 +23,11 @@ public sealed class IdempotencyMiddleware(RequestDelegate next)
 
     public async Task InvokeAsync(HttpContext context, ICurrentUser currentUser, IServiceScopeFactory scopes, TimeProvider clock)
     {
-        // SignalR's negotiate/long-poll POSTs are transport, not business writes.
+        // SignalR's negotiate/long-poll POSTs are transport, not business writes. pulse's gRPC calls are idempotent by
+        // design (one expense per schedule period) and have no user to key on.
         if (!IsMutating(context.Request.Method) || context.User.Identity?.IsAuthenticated != true
-            || context.Request.Path.StartsWithSegments("/hubs"))
+            || context.Request.Path.StartsWithSegments("/hubs")
+            || (context.Request.Path.Value ?? "").StartsWith(Auth.ServiceTokenGuard.GrpcPathPrefix, StringComparison.Ordinal))
         {
             await next(context);
             return;

@@ -28,6 +28,7 @@ export default async function NewExpensePage({
         submitLabel="Save expense"
         groupCurrency={group.baseCurrency}
         fetchRate={fetchRate}
+        repeat={{ initial: "none", endsOn: "" }}
         initial={newExpenseForm({
           id: crypto.randomUUID(),
           today: new Date().toISOString().slice(0, 10),

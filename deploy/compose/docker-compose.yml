@@ -44,6 +44,8 @@ services:
       # Placeholders substituted into kitty-realm.json on first import:
       KITTY_PUBLIC_URL: https://${KITTY_HOST}
       KITTY_WEB_CLIENT_SECRET: ${KITTY_WEB_CLIENT_SECRET:?set KITTY_WEB_CLIENT_SECRET}
+      # pulse's client secret, read by the realm import (never the dev default from the repo).
+      PULSE_CLIENT_SECRET: ${PULSE_CLIENT_SECRET:?set PULSE_CLIENT_SECRET}
       KITTY_VERIFY_EMAIL: ${KITTY_VERIFY_EMAIL:-true}
       SMTP_HOST: ${SMTP_HOST:-smtp.resend.com}
       SMTP_PORT: ${SMTP_PORT:-465}
@@ -178,6 +180,11 @@ services:
     environment:
       PULSE_DATABASE_URL: postgres://pulse:${PULSE_DB_PASSWORD}@postgres:5432/ledger?sslmode=disable
       PULSE_PORT: "5090"
+      # Recurring expenses: follow the ledger's schedules (Kafka) and add due periods over its internal gRPC port.
+      PULSE_KAFKA_BOOTSTRAP: redpanda:9092
+      PULSE_LEDGER_GRPC: ledger:8082
+      PULSE_TOKEN_URL: http://keycloak:8080/auth/realms/kitty/protocol/openid-connect/token
+      PULSE_CLIENT_SECRET: ${PULSE_CLIENT_SECRET:?set PULSE_CLIENT_SECRET}
     healthcheck:
       test: ["CMD", "/pulse", "-health"]
       interval: 30s
@@ -186,6 +193,8 @@ services:
       start_period: 10s
     depends_on:
       pulse-db-setup: { condition: service_completed_successfully }
+      redpanda: { condition: service_healthy }
+      keycloak: { condition: service_started }
     deploy:
       resources: { limits: { memory: 128m } }
 
@@ -205,6 +214,9 @@ services:
       # Browsers upload receipt photos through Caddy (same origin); unset when using real Azure Blob.
       Blob__PublicUrl: ${BLOB_PUBLIC_URL-https://${KITTY_HOST}/blob}
       Fx__Url: http://pulse:5090 # exchange rates (gRPC)
+      # pulse adds recurring periods on this port (plain HTTP/2, never routed by Caddy).
+      ASPNETCORE_HTTP_PORTS: "8080;8082"
+      Ledger__GrpcPort: "8082"
     depends_on:
       postgres: { condition: service_healthy }
       pulse: { condition: service_healthy }

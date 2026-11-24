@@ -3,7 +3,7 @@
 version: v2
 inputs:
   - directory: ../../contracts
-    paths: [../../contracts/proto/kitty/fx]
+    paths: [../../contracts/proto/kitty/fx, ../../contracts/proto/kitty/recurring, ../../contracts/proto/kitty/ledger]
 plugins:
   - local: [go, tool, -modfile=tools.go.mod, protoc-gen-go]
     out: gen

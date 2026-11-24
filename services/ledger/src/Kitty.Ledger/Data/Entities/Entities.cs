@@ -75,6 +75,9 @@ public sealed class Expense
     public string? FxRateSource { get; set; }
     /// <summary><see cref="AmountMinor"/> in the group's currency at <see cref="FxRate"/>.</summary>
     public long? ConvertedAmountMinor { get; set; }
+    /// <summary>The schedule and period pulse added this for; null for expenses people added.</summary>
+    public Guid? RecurringScheduleId { get; set; }
+    public DateOnly? RecurringPeriod { get; set; }
     public List<ExpensePayer> Payers { get; set; } = [];
     public List<ExpenseShare> Shares { get; set; } = [];
 }

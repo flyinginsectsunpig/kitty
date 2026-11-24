@@ -1,7 +1,15 @@
 import { formatMoney, isSupported } from "@kitty/money";
 
 /** The parts of an audit snapshot the activity feed shows. */
-export type ActivitySnapshot = { description?: string; displayName?: string; name?: string; amountMinor?: number; currency?: string } | null;
+export type ActivitySnapshot = {
+  description?: string;
+  displayName?: string;
+  name?: string;
+  amountMinor?: number;
+  currency?: string;
+  /** Set on an expense a repeating schedule added. */
+  recurringScheduleId?: string;
+} | null;
 
 /** What an activity entry was about, in words: `expense "Petrol" (R 600,00)`, `a payment (R 5,00)`, `Sam`. */
 export function describeActivity(entityType: string, snapshot: ActivitySnapshot): string {
@@ -12,7 +20,9 @@ export function describeActivity(entityType: string, snapshot: ActivitySnapshot)
       : "";
   switch (entityType) {
     case "expense":
-      return `expense "${snapshot.description ?? ""}"${amount}`;
+      return `expense "${snapshot.description ?? ""}"${amount}${snapshot.recurringScheduleId ? ", added automatically" : ""}`;
+    case "recurring":
+      return `repeating expense "${snapshot.description ?? ""}"${amount}`;
     case "settlement":
       return `a payment${amount}`;
     case "member":

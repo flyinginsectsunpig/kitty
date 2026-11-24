@@ -116,6 +116,12 @@ namespace Kitty.Ledger.Data.Migrations
                     b.Property<DateOnly>("OccurredOn")
                         .HasColumnType("date");
 
+                    b.Property<DateOnly?>("RecurringPeriod")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("RecurringScheduleId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("SplitMethod")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -129,6 +135,9 @@ namespace Kitty.Ledger.Data.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RecurringScheduleId", "RecurringPeriod")
+                        .IsUnique();
 
                     b.HasIndex("GroupId", "OccurredOn", "CreatedAt", "Id");
 
@@ -548,6 +557,61 @@ namespace Kitty.Ledger.Data.Migrations
                     b.ToTable("ReceiptSessions");
                 });
 
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.RecurringSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("EndsOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("LastAddedPeriod")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("NotBefore")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("Paused")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateOnly>("StartsOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Template")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId");
+
+                    b.ToTable("RecurringSchedules");
+                });
+
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.Settlement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -809,6 +873,15 @@ namespace Kitty.Ledger.Data.Migrations
                     b.HasOne("Kitty.Ledger.Data.Entities.Member", null)
                         .WithMany()
                         .HasForeignKey("PayerMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.RecurringSchedule", b =>
+                {
+                    b.HasOne("Kitty.Ledger.Data.Entities.Group", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

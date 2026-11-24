@@ -1,4 +1,4 @@
-import { expenseAmounts } from "@kitty/core";
+import { describeSchedule, expenseAmounts } from "@kitty/core";
 import { formatMoney } from "@kitty/money";
 import Link from "next/link";
 import { GroupNav } from "@/components/GroupNav";
@@ -15,10 +15,11 @@ export default async function GroupPage({
   const { id } = await params;
   const { cursor } = await searchParams;
   const { ledger, group, me, nameOf } = await loadGroup(id);
-  const [balances, page, tables] = await Promise.all([
+  const [balances, page, tables, recurring] = await Promise.all([
     ledger.GET("/groups/{groupId}/balances", { params: { path: { groupId: id } } }).then(unwrap),
     ledger.GET("/groups/{groupId}/expenses", { params: { path: { groupId: id }, query: { cursor, limit: 30 } } }).then(unwrap),
     ledger.GET("/groups/{groupId}/table-sessions", { params: { path: { groupId: id } } }).then(unwrap),
+    ledger.GET("/groups/{groupId}/recurring", { params: { path: { groupId: id } } }).then(unwrap),
   ]);
 
   return (
@@ -103,6 +104,22 @@ export default async function GroupPage({
           </Link>
         )}
       </div>
+
+      {recurring.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="font-semibold">Repeating</h2>
+          <ul className="space-y-2">
+            {recurring.map((r) => (
+              <li key={r.id}>
+                <Link href={`/groups/${id}/recurring/${r.id}`} className="card flex flex-col gap-1 hover:border-brand-500">
+                  <span className="font-medium">{r.description}</span>
+                  <span className="text-sm text-stone-500">{describeSchedule(r)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="space-y-2">
         <h2 className="font-semibold">Expenses</h2>

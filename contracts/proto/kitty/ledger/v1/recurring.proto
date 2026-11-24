@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package kitty.ledger.v1;
+
+option csharp_namespace = "Kitty.Contracts.Ledger.V1";
+option go_package = "github.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/ledger/v1;ledgerv1";
+
+// Served by the ledger, called only by pulse (its client-credentials token), on an internal port.
+service RecurringService {
+  // Adds one period of a schedule as an expense. Adding the same period again returns the same expense.
+  // FAILED_PRECONDITION: the schedule is paused, deleted, ended, or the period isn't an occurrence (drop it).
+  // UNAVAILABLE "not due yet": the period is after the ledger's today (retry later).
+  rpc AddOccurrence(AddOccurrenceRequest) returns (AddOccurrenceResponse);
+}
+
+message AddOccurrenceRequest {
+  string schedule_id = 1;
+  // YYYY-MM-DD.
+  string period = 2;
+}
+
+message AddOccurrenceResponse {
+  string expense_id = 1;
+  bool already_added = 2;
+}

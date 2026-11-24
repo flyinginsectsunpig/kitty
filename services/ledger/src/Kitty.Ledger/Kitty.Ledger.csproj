@@ -17,6 +17,7 @@
     <PackageReference Include="Confluent.SchemaRegistry.Serdes.Protobuf" />
     <PackageReference Include="Google.Protobuf" />
     <PackageReference Include="protobuf-net.Reflection" />
+    <PackageReference Include="Grpc.AspNetCore" />
     <PackageReference Include="Grpc.Net.ClientFactory" />
     <PackageReference Include="Grpc.Tools" PrivateAssets="all" />
   </ItemGroup>
@@ -25,6 +26,9 @@
     <Protobuf Include="..\..\..\..\contracts\proto\kitty\events\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="None" />
     <!-- Exchange rates from pulse: the ledger is a gRPC client. -->
     <Protobuf Include="..\..\..\..\contracts\proto\kitty\fx\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="Client" />
+    <!-- Recurring schedules: the change event the ledger publishes, and the gRPC service pulse calls. -->
+    <Protobuf Include="..\..\..\..\contracts\proto\kitty\recurring\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="None" />
+    <Protobuf Include="..\..\..\..\contracts\proto\kitty\ledger\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="Both" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\aspire\Kitty.ServiceDefaults\Kitty.ServiceDefaults.csproj" />

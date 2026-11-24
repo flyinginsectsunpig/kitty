@@ -22,4 +22,16 @@ public static class TestTokens
             Subject = new ClaimsIdentity([new("sub", sub), new("name", name), new("email", email)]),
             SigningCredentials = new SigningCredentials(SigningKey, SecurityAlgorithms.RsaSha256),
         });
+
+    /// <summary>A client-credentials token like Keycloak gives a service account (pulse): no person, azp = the client.</summary>
+    public static string ForService(string clientId) =>
+        new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = Issuer,
+            Audience = Audience,
+            Expires = DateTime.UtcNow.AddMinutes(5),
+            Subject = new ClaimsIdentity([new("sub", $"service-account-{clientId}"), new("azp", clientId),
+                new("preferred_username", $"service-account-{clientId}")]),
+            SigningCredentials = new SigningCredentials(SigningKey, SecurityAlgorithms.RsaSha256),
+        });
 }

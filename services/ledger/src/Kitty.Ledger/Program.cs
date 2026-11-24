@@ -6,6 +6,7 @@ using Kitty.Ledger.Features.Activity;
 using Kitty.Ledger.Features.Balances;
 using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Fx;
+using Kitty.Ledger.Features.Recurring;
 using Kitty.Ledger.Features.Settlements;
 using Kitty.Ledger.Features.Table;
 using Kitty.Ledger.Features.Groups;
@@ -70,6 +71,15 @@ if (KafkaOptions.From(builder.Configuration) is { } kafka)
 }
 builder.Services.AddFxRates(builder.Configuration);
 builder.Services.AddScoped<ExpenseRates>();
+
+// pulse adds recurring periods over gRPC: plain HTTP/2 on its own port (not routed by Caddy), pulse's token only.
+var grpcPort = builder.Configuration.GetValue("Ledger:GrpcPort", 8082);
+builder.Services.AddGrpc();
+builder.Services.AddAuthorizationBuilder().AddPolicy("pulse", p => p.RequireClaim("azp", ServiceTokenGuard.PulseClientId));
+builder.WebHost.ConfigureKestrel(k => k.ConfigureEndpointDefaults(listen =>
+{
+    if (listen.IPEndPoint?.Port == grpcPort) listen.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2;
+}));
 builder.Services.AddScoped<GroupMemberFilter>();
 builder.Services.AddScoped<TableSessionService>();
 builder.Services.AddScoped<GuestFilter>();
@@ -97,6 +107,7 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseCors();
 app.UseAuthentication();
+app.UseMiddleware<ServiceTokenGuard>();
 app.UseAuthorization();
 app.UseRateLimiter();
 app.UseMiddleware<IdempotencyMiddleware>();
@@ -110,10 +121,12 @@ group.MapExpenses();
 group.MapBalances();
 group.MapSettlements();
 group.MapFx();
+group.MapRecurring();
 group.MapActivity();
 group.MapTableSessions();
 var guestTable = app.MapGuestTable();
 ListenTokens.Map(group, guestTable);
+app.MapGrpcService<RecurringGrpcService>().RequireHost($"*:{grpcPort}").RequireAuthorization("pulse");
 app.MapHub<TableHub>(TableHub.Path).AllowAnonymous().RequireCors("hub"); // JoinSession does the authorization
 app.MapInvites(group);
 
