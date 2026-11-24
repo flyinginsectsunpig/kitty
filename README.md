@@ -17,11 +17,14 @@ See [the design](docs/superpowers/specs/2026-11-15-kitty-design.md).
   Kitty's server; only the text, with card numbers, phone numbers and names removed, goes to an AI model.
 - **Android app:** everything above on the phone, with the camera for receipts and invite and table links that
   open in the app ([apps/mobile](apps/mobile/README.md)). The web app works on any phone too.
+- **Trips in other currencies:** an expense in euros or dollars gets the ECB exchange rate for its date (or one
+  you type), balances show a total in the group's currency, and a foreign debt can be paid back in rands. Rates
+  come from [pulse](services/pulse/README.md), a small Go service the ledger calls over gRPC.
 
 ## Local dev
 
-Needs the .NET 10 SDK, Node 24 with corepack (`corepack pnpm install` once), Docker, and
-[uv](https://docs.astral.sh/uv/) on your PATH (it sets up the Python ai service).
+Needs the .NET 10 SDK, Node 24 with corepack (`corepack pnpm install` once), Docker,
+[uv](https://docs.astral.sh/uv/) (it sets up the Python ai service) and Go 1.27 (pulse) on your PATH.
 
 ```bash
 dotnet run --project aspire/Kitty.AppHost

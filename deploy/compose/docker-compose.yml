@@ -156,6 +156,39 @@ services:
     deploy:
       resources: { limits: { memory: 1500m } }
 
+  pulse-db-setup:
+    # One-shot, every start: gives pulse its own role, limited to schema "pulse" (pulse-db-setup.sql).
+    image: pgvector/pgvector:pg17
+    restart: "no"
+    command: ["psql", "-v", "pulse_password=${PULSE_DB_PASSWORD:?set PULSE_DB_PASSWORD}", "-f", "/setup/pulse-db-setup.sql"]
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ledger
+    volumes:
+      - ./pulse-db-setup.sql:/setup/pulse-db-setup.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  pulse:
+    # Exchange rates (ECB, via Frankfurter) over gRPC for the ledger. Not exposed outside the compose network.
+    <<: *restart
+    image: ${KITTY_IMAGE_PREFIX}kitty-pulse:${KITTY_TAG:-latest}
+    environment:
+      PULSE_DATABASE_URL: postgres://pulse:${PULSE_DB_PASSWORD}@postgres:5432/ledger?sslmode=disable
+      PULSE_PORT: "5090"
+    healthcheck:
+      test: ["CMD", "/pulse", "-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      pulse-db-setup: { condition: service_completed_successfully }
+    deploy:
+      resources: { limits: { memory: 128m } }
+
   ledger:
     <<: *restart
     image: ${KITTY_IMAGE_PREFIX:?set KITTY_IMAGE_PREFIX}kitty-ledger:${KITTY_TAG:-latest}
@@ -171,8 +204,10 @@ services:
       ConnectionStrings__blobs: ${BLOB_CONNECTION_STRING:-DefaultEndpointsProtocol=http;AccountName=kitty;AccountKey=${BLOB_ACCOUNT_KEY};BlobEndpoint=http://azurite:10000/kitty;}
       # Browsers upload receipt photos through Caddy (same origin); unset when using real Azure Blob.
       Blob__PublicUrl: ${BLOB_PUBLIC_URL-https://${KITTY_HOST}/blob}
+      Fx__Url: http://pulse:5090 # exchange rates (gRPC)
     depends_on:
       postgres: { condition: service_healthy }
+      pulse: { condition: service_healthy }
       redis: { condition: service_healthy }
       redpanda: { condition: service_healthy }
       azurite: { condition: service_started }
