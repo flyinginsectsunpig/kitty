@@ -8,6 +8,9 @@ on:
       limit:
         description: Receipts to score
         default: "50"
+      model:
+        description: Gemini model to try instead of the service's default (e.g. gemini-3.5-flash-lite)
+        default: ""
   schedule:
     - cron: "17 2 * * *"
 
@@ -47,4 +50,8 @@ jobs:
         run: uv run python evals/fetch_cord.py --out "$RUNNER_TEMP/cord" --limit "${{ inputs.limit || '50' }}"
       - name: Score
         if: env.AI_GEMINI_API_KEY != ''
-        run: uv run python evals/run_receipts.py --data "$RUNNER_TEMP/cord" --min-total-accuracy 0.9
+        env:
+          MODEL: ${{ inputs.model }}
+        run: |
+          if [ -n "$MODEL" ]; then export AI_GEMINI_MODEL="$MODEL"; fi
+          uv run python evals/run_receipts.py --data "$RUNNER_TEMP/cord" --min-total-accuracy 0.9
