@@ -2,7 +2,16 @@
 
 import { convertMinor, formatMoney, parseMoney, parseRate, previewSplit, supportedCurrencies, type SplitMethod } from "@kitty/money";
 import { useEffect, useMemo, useState } from "react";
-import { CATEGORIES, describeRate, splitProblemMessage, toExpenseWriteDto, type ExpenseFormState } from "@kitty/core";
+import {
+  CATEGORIES,
+  describeRate,
+  describeRule,
+  splitProblemMessage,
+  toExpenseWriteDto,
+  toRecurringWriteDto,
+  type ExpenseFormState,
+  type Repeat,
+} from "@kitty/core";
 
 type Member = { id: string; displayName: string };
 
@@ -10,6 +19,9 @@ type Member = { id: string; displayName: string };
 export type SavedRate = { currency: string; occurredOn: string; fxRate: string | null; fxRateDate: string | null; fxRateSource: string | null };
 
 type Quote = { rate: string; rateDate: string } | "failed" | null;
+
+/** Offer "Repeat" (new expenses and schedules). `required`: editing a schedule, which can't stop repeating here. */
+export type RepeatOptions = { initial: Repeat; endsOn: string; dateLocked?: boolean; required?: boolean };
 
 const METHODS: { value: SplitMethod; label: string; hint: string }[] = [
   { value: "equal", label: "Equally", hint: "" },
@@ -28,6 +40,7 @@ export function ExpenseForm({
   groupCurrency,
   fetchRate,
   saved,
+  repeat: repeatOptions,
 }: {
   groupId: string;
   members: Member[];
@@ -38,8 +51,11 @@ export function ExpenseForm({
   groupCurrency: string;
   fetchRate: (groupId: string, currency: string, date: string) => Promise<{ rate: string; rateDate: string } | null>;
   saved?: SavedRate;
+  repeat?: RepeatOptions;
 }) {
   const [state, setState] = useState<ExpenseFormState>(initial);
+  const [repeat, setRepeat] = useState<Repeat>(repeatOptions?.initial ?? "none");
+  const [endsOn, setEndsOn] = useState(repeatOptions?.endsOn ?? "");
   const [quote, setQuote] = useState<Quote>(null);
   const foreign = state.currency !== groupCurrency;
   // An unchanged currency and date keep the saved rate (the ledger does the same); anything else shows the ECB rate.
@@ -61,7 +77,10 @@ export function ExpenseForm({
       clearTimeout(timer);
     };
   }, [foreign, keepsSaved, groupId, state.currency, state.occurredOn, fetchRate]);
-  const dto = useMemo(() => toExpenseWriteDto(state), [state]);
+  const dto = useMemo(
+    () => (repeat === "none" ? toExpenseWriteDto(state) : toRecurringWriteDto(state, repeat, endsOn)),
+    [state, repeat, endsOn],
+  );
   const nameOf = (id: string) => members.find((m) => m.id === id)?.displayName ?? "Someone";
 
   const preview = useMemo(() => {
@@ -83,6 +102,7 @@ export function ExpenseForm({
       <input type="hidden" name="groupId" value={groupId} />
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       <input type="hidden" name="payload" value={"error" in dto ? "" : JSON.stringify(dto)} />
+      <input type="hidden" name="kind" value={repeat === "none" ? "expense" : "recurring"} />
 
       <div>
         <label htmlFor="description" className="label">What was it for?</label>
@@ -114,13 +134,42 @@ export function ExpenseForm({
         <div>
           <label htmlFor="occurredOn" className="label">Date</label>
           <input id="occurredOn" type="date" required className="field" value={state.occurredOn}
+            readOnly={repeatOptions?.dateLocked} aria-describedby={repeatOptions?.dateLocked ? "date-locked" : undefined}
             onChange={(e) => setState((s) => ({ ...s, occurredOn: e.target.value, fxRate: "" }))} />
+          {repeatOptions?.dateLocked && (
+            <p id="date-locked" className="mt-1 text-xs text-stone-500">It has already added expenses, so the start date stays.</p>
+          )}
         </div>
       </div>
 
-      {foreign && (
+      {repeatOptions && (
+        <div className="space-y-2">
+          <label htmlFor="repeat" className="label">Repeat</label>
+          <select id="repeat" className="field" value={repeat} onChange={(e) => setRepeat(e.target.value as Repeat)}>
+            {!repeatOptions.required && <option value="none">Doesn&apos;t repeat</option>}
+            <option value="weekly">Every week</option>
+            <option value="monthly">Every month</option>
+          </select>
+          {repeat !== "none" && /^\d{4}-\d{2}-\d{2}$/.test(state.occurredOn) && (
+            <p className="text-sm text-stone-600 dark:text-stone-400">
+              {describeRule(repeat, state.occurredOn)}, starting {state.occurredOn}. Each one is added automatically on its day.
+            </p>
+          )}
+          {repeat !== "none" && (
+            <div>
+              <label htmlFor="endsOn" className="label">Ends (optional)</label>
+              <input id="endsOn" type="date" className="field" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {foreign && repeat === "none" && (
         <RatePanel state={state} groupCurrency={groupCurrency} quote={quote} saved={keepsSaved ? saved : undefined}
           amountMinor={amountMinor} onRate={(v) => set("fxRate", v)} />
+      )}
+      {foreign && repeat !== "none" && (
+        <p className="text-sm text-stone-600 dark:text-stone-400">Each time it repeats, it uses that day&apos;s ECB exchange rate.</p>
       )}
 
       <div>

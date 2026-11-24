@@ -1,6 +1,6 @@
 "use server";
 
-import type { ExpenseWriteDto } from "@kitty/api-client";
+import type { ExpenseWriteDto, RecurringWriteDto } from "@kitty/api-client";
 import { redirect } from "next/navigation";
 import { getLedger, problemCode } from "@/lib/ledger";
 
@@ -32,6 +32,7 @@ export async function fetchRate(groupId: string, currency: string, date: string)
 }
 
 export async function saveExpense(form: FormData) {
+  if (form.get("kind") === "recurring") return saveRecurring(form);
   const groupId = field(form, "groupId");
   const body = JSON.parse(field(form, "payload")) as ExpenseWriteDto;
   const ledger = await getLedger();
@@ -48,6 +49,42 @@ export async function saveExpense(form: FormData) {
     if (error) withError(`/groups/${groupId}/expenses/${body.id}/edit`, error);
   }
   redirect(`/groups/${groupId}`);
+}
+
+/** Creates or updates a repeating expense (the expense form with "Repeat" set). */
+export async function saveRecurring(form: FormData) {
+  const groupId = field(form, "groupId");
+  const body = JSON.parse(field(form, "payload")) as RecurringWriteDto;
+  const ledger = await getLedger();
+  if (body.version === null) {
+    const { error } = await ledger.POST("/groups/{groupId}/recurring", { params: { path: { groupId } }, body, ...keyed(form) });
+    if (error) withError(`/groups/${groupId}/expenses/new`, error);
+  } else {
+    const { error } = await ledger.PUT("/groups/{groupId}/recurring/{scheduleId}", {
+      params: { path: { groupId, scheduleId: body.id } },
+      body,
+      ...keyed(form),
+    });
+    if (error) withError(`/groups/${groupId}/recurring/${body.id}`, error);
+  }
+  redirect(`/groups/${groupId}`);
+}
+
+/** Pause, resume or delete a schedule (form field "op"). */
+export async function changeRecurring(form: FormData) {
+  const groupId = field(form, "groupId");
+  const scheduleId = field(form, "scheduleId");
+  const op = field(form, "op");
+  const ledger = await getLedger();
+  const path = { params: { path: { groupId, scheduleId } }, ...keyed(form) };
+  const { error } =
+    op === "pause"
+      ? await ledger.POST("/groups/{groupId}/recurring/{scheduleId}/pause", path)
+      : op === "resume"
+        ? await ledger.POST("/groups/{groupId}/recurring/{scheduleId}/resume", path)
+        : await ledger.DELETE("/groups/{groupId}/recurring/{scheduleId}", path);
+  if (error) withError(`/groups/${groupId}/recurring/${scheduleId}`, error);
+  redirect(op === "delete" ? `/groups/${groupId}` : `/groups/${groupId}/recurring/${scheduleId}`);
 }
 
 export async function deleteExpense(form: FormData) {
