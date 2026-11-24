@@ -11,10 +11,9 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// schema is pulse's own corner of the shared Postgres. date_map records which ECB date each asked-for date resolved
+// tables are pulse's own corner of the shared Postgres. date_map records which ECB date each asked-for date resolved
 // to, so a lookup never answers from a neighbouring stored date (which could be months stale).
-const schema = `
-CREATE SCHEMA IF NOT EXISTS pulse;
+const tables = `
 CREATE TABLE IF NOT EXISTS pulse.ecb_rates (
   ecb_date date NOT NULL,
   currency char(3) NOT NULL,
@@ -36,9 +35,22 @@ func OpenStore(ctx context.Context, url string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: %w", err)
 	}
-	if _, err := pool.Exec(ctx, schema); err != nil {
+	// In production the schema already exists, owned by role "pulse", which may not create schemas — and
+	// CREATE SCHEMA IF NOT EXISTS checks that right even when the schema is there. So look first.
+	var exists bool
+	if err := pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'pulse')`).Scan(&exists); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("store: create schema: %w", err)
+		return nil, fmt.Errorf("store: %w", err)
+	}
+	if !exists {
+		if _, err := pool.Exec(ctx, `CREATE SCHEMA pulse`); err != nil {
+			pool.Close()
+			return nil, fmt.Errorf("store: create schema: %w", err)
+		}
+	}
+	if _, err := pool.Exec(ctx, tables); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("store: create tables: %w", err)
 	}
 	return &Store{pool: pool}, nil
 }

@@ -3,11 +3,13 @@ package fx
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -101,6 +103,36 @@ func TestStore_UnaskedDateIsNotFound(t *testing.T) {
 	if _, ok, err := s.Lookup(ctx, date(2026, 6, 10)); err != nil || ok {
 		t.Fatalf("ok=%v err=%v, want not found", ok, err)
 	}
+}
+
+// In production pulse connects as its own role, which owns schema "pulse" but may not create schemas — and
+// CREATE SCHEMA IF NOT EXISTS checks that right even when the schema exists (deploy/compose/pulse-db-setup.sql).
+func TestStore_OpensAsRestrictedRole(t *testing.T) {
+	admin := openStore(t) // as the superuser: creates the schema, like pulse-db-setup does in compose
+	ctx := context.Background()
+	for _, sql := range []string{
+		`DO $$ BEGIN CREATE ROLE limited LOGIN PASSWORD 'limited' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+		 EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+		`REVOKE CREATE ON DATABASE ledger FROM PUBLIC`,
+		`ALTER SCHEMA pulse OWNER TO limited`,
+		`ALTER TABLE pulse.ecb_rates OWNER TO limited`,
+		`ALTER TABLE pulse.date_map OWNER TO limited`,
+	} {
+		if _, err := admin.pool.Exec(ctx, sql); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg, err := pgx.ParseConfig(testDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	url := fmt.Sprintf("postgres://limited:limited@%s:%d/ledger?sslmode=disable", cfg.Host, cfg.Port)
+
+	s, err := OpenStore(ctx, url)
+	if err != nil {
+		t.Fatalf("a role that owns schema pulse but may not create schemas can't start pulse: %v", err)
+	}
+	s.Close()
 }
 
 func TestStore_SaveIsIdempotent(t *testing.T) {
