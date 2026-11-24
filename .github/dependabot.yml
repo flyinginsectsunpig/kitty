@@ -1,9 +1,15 @@
 version: 2
+# Minor and patch updates arrive as one PR per ecosystem each week; majors stay one PR each, so a breaking change can be
+# looked at (and closed) on its own.
 updates:
   # Keeps the SHA-pinned actions current (Dependabot updates the SHA and the version comment).
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups:
+      actions-minor-and-patch:
+        update-types: ["minor", "patch"]
+
   - package-ecosystem: nuget
     directory: /
     schedule: { interval: weekly }
@@ -11,10 +17,33 @@ updates:
       # The AppHost and every Aspire integration move together: mixing versions builds but doesn't run.
       aspire:
         patterns: ["Aspire.*"]
+      nuget-minor-and-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      # Npgsql 11 waits for the EF Core provider to move to 11 (with .NET 11): the provider is built against Npgsql 10.
+      - dependency-name: "Npgsql*"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
+    groups:
+      npm-minor-and-patch:
+        update-types: ["minor", "patch"]
     ignore:
       # TypeScript 7 drops the compiler API that openapi-typescript (the API client generator) needs.
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
+      # The app must use the exact versions its Expo SDK expects (a mismatched React breaks it at runtime), so these
+      # move only with an Expo SDK upgrade (`npx expo install --fix`). React is shared by name with web, which follows.
+      - dependency-name: react
+      - dependency-name: react-dom
+      - dependency-name: "@types/react"
+      - dependency-name: react-native
+      - dependency-name: "react-native-*"
+      - dependency-name: "@react-native/*"
+      - dependency-name: "@react-native-community/*"
+      - dependency-name: expo
+      - dependency-name: "expo-*"
+      - dependency-name: jest-expo
+      - dependency-name: babel-preset-expo
