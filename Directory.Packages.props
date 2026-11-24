@@ -16,7 +16,7 @@
     <PackageVersion Include="Confluent.SchemaRegistry.Serdes.Protobuf" Version="2.16.0" />
     <PackageVersion Include="Google.Protobuf" Version="3.36.2" />
     <!-- Already pulled in by Confluent.SchemaRegistry.Serdes.Protobuf; referenced directly so its types compile. -->
-    <PackageVersion Include="protobuf-net.Reflection" Version="3.3.21" />
+    <PackageVersion Include="protobuf-net.Reflection" Version="3.4.40" />
     <PackageVersion Include="Grpc.Tools" Version="2.85.0" />
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.15" />
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.15" />
