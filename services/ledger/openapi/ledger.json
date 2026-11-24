@@ -1725,7 +1725,8 @@
       },
       "BalancesDto": {
         "required": [
-          "currencies"
+          "currencies",
+          "converted"
         ],
         "type": "object",
         "properties": {
@@ -1734,6 +1735,16 @@
             "items": {
               "$ref": "#/components/schemas/CurrencyBalanceDto"
             }
+          },
+          "converted": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ConvertedBalanceDto"
+              }
+            ]
           }
         }
       },
@@ -1775,6 +1786,36 @@
           },
           "displayName": {
             "type": "string"
+          }
+        }
+      },
+      "ConvertedBalanceDto": {
+        "required": [
+          "currency",
+          "members",
+          "transfers",
+          "excludedCount"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberNetDto"
+            }
+          },
+          "transfers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferDto"
+            }
+          },
+          "excludedCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

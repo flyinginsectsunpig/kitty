@@ -7,7 +7,8 @@ namespace Kitty.Ledger.IntegrationTests;
 public sealed record MemberNetDto(Guid MemberId, long NetMinor);
 public sealed record TransferDto(Guid FromMemberId, Guid ToMemberId, long AmountMinor);
 public sealed record CurrencyBalanceDto(string Currency, List<MemberNetDto> Members, List<TransferDto> Transfers);
-public sealed record BalancesDto(List<CurrencyBalanceDto> Currencies);
+public sealed record ConvertedBalanceDto(string Currency, List<MemberNetDto> Members, List<TransferDto> Transfers, int ExcludedCount);
+public sealed record BalancesDto(List<CurrencyBalanceDto> Currencies, ConvertedBalanceDto? Converted = null);
 public sealed record SettlementDto(Guid Id, Guid FromMemberId, Guid ToMemberId, string Currency, long AmountMinor);
 public sealed record ActivityDto(Guid Id, DateTimeOffset At, string ActorDisplayName, string EntityType, Guid EntityId,
     string Action, JsonElement? Before, JsonElement? After);
@@ -128,4 +129,50 @@ public class BalanceTests(LedgerApiFactory factory)
         Assert.Equal("Owner", feed[0].ActorDisplayName);
         Assert.True(feed.Zip(feed.Skip(1)).All(p => p.First.At >= p.Second.At));
     }
+
+    [Fact]
+    public async Task Balances_include_a_converted_total_for_mixed_currencies()
+    {
+        factory.Fx.Set("EUR", "ZAR", new DateOnly(2026, 11, 15), 19.1987m);
+        var (owner, g, me, gran, _) = await GroupAsync();
+        await owner.AddEqualAsync(g, 1000, me, [me, gran]);
+        await owner.AddEqualAsync(g, 4000, me, [me, gran], currency: "EUR");
+
+        var converted = (await BalancesAsync(owner, g)).Converted;
+
+        Assert.NotNull(converted);
+        Assert.Equal("ZAR", converted.Currency);
+        Assert.Equal(0, converted.ExcludedCount);
+        Assert.Equal(0, converted.Members.Sum(m => m.NetMinor));
+        // Gran owes R5.00 plus her converted half of EUR 40.00 (R383.97 or R383.98, by member order).
+        var granNet = converted.Members.Single(m => m.MemberId == gran).NetMinor;
+        Assert.InRange(granNet, -(500 + 38398), -(500 + 38397));
+        Assert.Equal(new TransferDto(gran, me, -granNet), Assert.Single(converted.Transfers));
+    }
+
+    [Fact]
+    public async Task Converted_is_null_when_everyone_is_square()
+    {
+        factory.Fx.Set("EUR", "ZAR", new DateOnly(2026, 11, 15), 19.1987m);
+        factory.Fx.Set("EUR", "ZAR", DateOnly.FromDateTime(DateTime.UtcNow), 19.5m);
+        var (owner, g, me, gran, _) = await GroupAsync();
+        await owner.AddEqualAsync(g, 4000, me, [me, gran], currency: "EUR");
+        (await owner.PostJsonAsync($"/groups/{g}/settlements", new
+        {
+            id = Guid.NewGuid(), fromMemberId = gran, toMemberId = me, currency = "EUR", amountMinor = 2000,
+        })).EnsureSuccessStatusCode();
+
+        // Drift leaves a few rand in the converted view, but nobody owes anything in any currency.
+        Assert.Null((await BalancesAsync(owner, g)).Converted);
+    }
+
+    [Fact]
+    public async Task Converted_is_null_when_only_the_group_currency_is_used()
+    {
+        var (owner, g, me, gran, _) = await GroupAsync();
+        await owner.AddEqualAsync(g, 1000, me, [me, gran]);
+
+        Assert.Null((await BalancesAsync(owner, g)).Converted);
+    }
+
 }
