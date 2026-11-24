@@ -15,10 +15,11 @@ import pathlib
 import sys
 import time
 
+from kitty_ai.contracts.kitty.events.v1 import receipts_pb2 as pb
 from kitty_ai.receipts.extract import RateLimited, extractor_from
 from kitty_ai.receipts.ocr import RapidOcr
 from kitty_ai.receipts.pipeline import process
-from kitty_ai.receipts.scoring import ReceiptLabel, score
+from kitty_ai.receipts.scoring import ReceiptLabel, describe_outcome, score
 from kitty_ai.settings import Settings
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp")
@@ -55,9 +56,9 @@ def main() -> int:
             except RateLimited:
                 time.sleep(30 * (attempt + 1))
         else:
-            outcome = 0  # still rate limited: counts as a failed read
+            outcome = pb.ScanFailure.Reason.RATE_LIMITED  # still rate limited: counts as a failed read
         pairs.append((label, outcome))
-        print(f"{path.stem}: {'read' if hasattr(outcome, 'items') else 'failed'}")
+        print(f"{path.stem}: {describe_outcome(outcome)}")
         time.sleep(args.delay)
 
     scores = score(pairs)

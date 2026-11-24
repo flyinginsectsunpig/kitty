@@ -35,3 +35,11 @@ def test_a_failed_scan_counts_as_wrong_and_finds_nothing():
 def test_same_price_but_different_item_does_not_match():
     scores = score([(ReceiptLabel(items=[("Burger", 12000)], total_minor=12000), parsed([("Steak", 12000)], 12000))])
     assert scores.item_f1 == 0.0
+
+
+def test_an_outcome_is_described_with_its_failure_reason():
+    from kitty_ai.receipts.scoring import describe_outcome
+
+    assert describe_outcome(parsed([("Burger", 12000)], 12000)) == "read"
+    assert describe_outcome(pb.ScanFailure.Reason.MODEL_UNAVAILABLE) == "failed (model_unavailable)"
+    assert describe_outcome(pb.ScanFailure.Reason.RATE_LIMITED) == "failed (rate_limited)"
