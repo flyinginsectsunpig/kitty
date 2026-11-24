@@ -5,6 +5,7 @@ using Kitty.Ledger.Domain.Splits;
 using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Fx;
 using Kitty.Ledger.Features.Groups;
+using Kitty.Ledger.Features.Notifications;
 using Kitty.Ledger.Features.Scans;
 using Kitty.Ledger.Infrastructure;
 using Kitty.Ledger.Infrastructure.Audit;
@@ -262,7 +263,8 @@ public static class TableEndpoints
     /// any validation failure after it leaves the transaction uncommitted, so the status rolls back.
     /// </summary>
     private static async Task<IResult> ConfirmAsync(Guid groupId, Guid sessionId, HttpContext http, LedgerDbContext db,
-        TableSessionService svc, AuditWriter audit, Outbox outbox, ExpenseRates rates, TimeProvider clock, CancellationToken ct)
+        TableSessionService svc, AuditWriter audit, Outbox outbox, ExpenseRates rates, Notifier notifier, TimeProvider clock,
+        CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
         var existing = await db.ReceiptSessions.AsNoTracking().SingleOrDefaultAsync(s => s.Id == sessionId && s.GroupId == groupId, ct);
@@ -318,6 +320,7 @@ public static class TableEndpoints
         audit.Record(caller.User.Id, groupId, ExpenseEndpoints.EntityType, expense.Id, AuditActions.Created, null, expense.ToDto());
         audit.Record(caller.User.Id, groupId, EntityType, session.Id, AuditActions.Updated, null, new { status = SessionStatus.Confirmed, expenseId = expense.Id });
         outbox.ExpenseChanged(groupId, expense.Id, ExpenseChanged.Types.Change.Created);
+        await notifier.ExpenseAddedAsync(expense, caller.User.Id, ct);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 

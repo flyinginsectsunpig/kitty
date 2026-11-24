@@ -7,6 +7,7 @@ using Kitty.Ledger.Domain.Fx;
 using Kitty.Ledger.Domain.Splits;
 using Kitty.Ledger.Features.Fx;
 using Kitty.Ledger.Features.Groups;
+using Kitty.Ledger.Features.Notifications;
 using Kitty.Ledger.Infrastructure;
 using Kitty.Ledger.Infrastructure.Audit;
 using Kitty.Ledger.Infrastructure.Errors;
@@ -33,7 +34,7 @@ public static class ExpenseEndpoints
     }
 
     private static async Task<IResult> CreateAsync(Guid groupId, ExpenseWriteDto body, HttpContext http, LedgerDbContext db,
-        AuditWriter audit, Outbox outbox, ExpenseRates rates, TimeProvider clock, CancellationToken ct)
+        AuditWriter audit, Outbox outbox, ExpenseRates rates, Notifier notifier, TimeProvider clock, CancellationToken ct)
     {
         var caller = GroupMemberFilter.CallerMember(http);
         var validation = await ValidateAsync(groupId, body, db, ct);
@@ -49,6 +50,7 @@ public static class ExpenseEndpoints
         var dto = expense.ToDto();
         audit.Record(caller.User.Id, groupId, EntityType, expense.Id, AuditActions.Created, null, dto);
         outbox.ExpenseChanged(groupId, expense.Id, ExpenseChanged.Types.Change.Created);
+        await notifier.ExpenseAddedAsync(expense, caller.User.Id, ct);
         await db.SaveChangesAsync(ct);
         return Results.Created($"/groups/{groupId}/expenses/{expense.Id}", dto);
     }

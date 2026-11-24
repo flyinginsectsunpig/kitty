@@ -99,6 +99,23 @@ public class RecurringGrpcTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Recurring_periods_tell_everyone_involved_including_the_creator()
+    {
+        using var env = await GroupAsync();
+        var id = await ScheduleAsync(env); // Rent R 12 000,00, split equally between the owner and Sam (a placeholder)
+        var owner = await env.Owner.MeAsync();
+
+        await AddAsync(env, id, Today);
+
+        using var scope = env.App.Services.CreateScope();
+        var payloads = await env.Db(scope).OutboxMessages.Where(m => m.Topic == "notifications.requested").Select(m => m.Payload).ToListAsync(Ct);
+        var r = Assert.Single(payloads.Select(Kitty.Contracts.Notify.V1.NotificationRequested.Parser.ParseFrom),
+            n => n.GroupId == env.G.ToString());
+        Assert.Equal(owner.Id.ToString(), r.UserId);
+        Assert.Equal("Rent was added · your share R 6 000,00", r.Body);
+    }
+
+    [Fact]
     public async Task Two_pulse_instances_adding_the_same_period_at_once_make_one_expense()
     {
         using var env = await GroupAsync();

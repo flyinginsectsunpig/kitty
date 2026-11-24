@@ -73,6 +73,7 @@ if (KafkaOptions.From(builder.Configuration) is { } kafka)
 builder.Services.AddFxRates(builder.Configuration);
 builder.Services.AddScoped<ExpenseRates>();
 builder.Services.AddScoped<NotifySettingsPublisher>();
+builder.Services.AddScoped<Notifier>();
 builder.Services.AddHostedService<NotifySettingsBackfill>();
 
 // pulse adds recurring periods over gRPC: plain HTTP/2 on its own port (not routed by Caddy), pulse's token only.
