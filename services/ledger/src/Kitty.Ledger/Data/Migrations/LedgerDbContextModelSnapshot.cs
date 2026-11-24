@@ -358,6 +358,37 @@ namespace Kitty.Ledger.Data.Migrations
                     b.ToTable("Members");
                 });
 
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.NotificationSettings", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("ExpenseEmail")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ExpensePush")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("PaymentEmail")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("PaymentPush")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("WeeklyEmail")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("WeeklyPush")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("NotificationSettings");
+                });
+
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -398,6 +429,33 @@ namespace Kitty.Ledger.Data.Migrations
                         .HasFilter("\"SentAt\" IS NULL");
 
                     b.ToTable("OutboxMessages");
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.PushDevice", b =>
+                {
+                    b.Property<string>("Token")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Token");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PushDevices");
                 });
 
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptCharge", b =>
@@ -687,6 +745,9 @@ namespace Kitty.Ledger.Data.Migrations
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
 
+                    b.Property<bool>("EmailVerified")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("KeycloakSub")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -828,6 +889,24 @@ namespace Kitty.Ledger.Data.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.NotificationSettings", b =>
+                {
+                    b.HasOne("Kitty.Ledger.Data.Entities.User", null)
+                        .WithOne()
+                        .HasForeignKey("Kitty.Ledger.Data.Entities.NotificationSettings", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.PushDevice", b =>
+                {
+                    b.HasOne("Kitty.Ledger.Data.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.ReceiptCharge", b =>

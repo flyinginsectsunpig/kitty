@@ -13,13 +13,14 @@ public static class TestTokens
 
     public static readonly RsaSecurityKey SigningKey = new(RSA.Create(2048)) { KeyId = "test-key" };
 
-    public static string For(string sub, string name, string email, string audience = Audience) =>
+    public static string For(string sub, string name, string email, string audience = Audience, bool emailVerified = true) =>
         new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
             Issuer = Issuer,
             Audience = audience,
             Expires = DateTime.UtcNow.AddMinutes(5),
-            Subject = new ClaimsIdentity([new("sub", sub), new("name", name), new("email", email)]),
+            Subject = new ClaimsIdentity([new("sub", sub), new("name", name), new("email", email),
+                new("email_verified", emailVerified ? "true" : "false", ClaimValueTypes.Boolean)]),
             SigningCredentials = new SigningCredentials(SigningKey, SecurityAlgorithms.RsaSha256),
         });
 

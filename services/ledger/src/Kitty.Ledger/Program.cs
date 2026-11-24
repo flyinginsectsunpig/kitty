@@ -6,6 +6,7 @@ using Kitty.Ledger.Features.Activity;
 using Kitty.Ledger.Features.Balances;
 using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Fx;
+using Kitty.Ledger.Features.Notifications;
 using Kitty.Ledger.Features.Recurring;
 using Kitty.Ledger.Features.Settlements;
 using Kitty.Ledger.Features.Table;
@@ -71,6 +72,8 @@ if (KafkaOptions.From(builder.Configuration) is { } kafka)
 }
 builder.Services.AddFxRates(builder.Configuration);
 builder.Services.AddScoped<ExpenseRates>();
+builder.Services.AddScoped<NotifySettingsPublisher>();
+builder.Services.AddHostedService<NotifySettingsBackfill>();
 
 // pulse adds recurring periods over gRPC: plain HTTP/2 on its own port (not routed by Caddy), pulse's token only.
 var grpcPort = builder.Configuration.GetValue("Ledger:GrpcPort", 8082);
@@ -115,6 +118,7 @@ app.UseMiddleware<IdempotencyMiddleware>();
 app.MapDefaultEndpoints();
 app.MapOpenApi().AllowAnonymous();
 app.MapMe();
+app.MapNotificationSettings();
 var group = app.MapGroups();
 group.MapMembers();
 group.MapExpenses();

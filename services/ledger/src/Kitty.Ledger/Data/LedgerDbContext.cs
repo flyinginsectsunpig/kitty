@@ -26,6 +26,8 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
     public DbSet<ReceiptScan> ReceiptScans => Set<ReceiptScan>();
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
     public DbSet<RecurringSchedule> RecurringSchedules => Set<RecurringSchedule>();
+    public DbSet<NotificationSettings> NotificationSettings => Set<NotificationSettings>();
+    public DbSet<PushDevice> PushDevices => Set<PushDevice>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -92,6 +94,21 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
                 s.HasKey("ExpenseId", nameof(ExpenseShare.MemberId));
                 s.HasOne<Member>().WithMany().HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Restrict);
             });
+        });
+
+        b.Entity<NotificationSettings>(e =>
+        {
+            e.HasKey(x => x.UserId);
+            e.HasOne<User>().WithOne().HasForeignKey<NotificationSettings>(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<PushDevice>(e =>
+        {
+            e.HasKey(x => x.Token);
+            e.Property(x => x.Token).HasMaxLength(4096);
+            e.Property(x => x.Platform).HasMaxLength(10);
+            e.HasIndex(x => x.UserId);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<RecurringSchedule>(e =>
