@@ -87,9 +87,15 @@ Pin `KITTY_TAG=sha-…` to roll back to a known build.
 `GEMINI_API_KEY` stays optional.
 
 **Upgrading to recurring expenses (phase 3b):** add `PULSE_CLIENT_SECRET` (`openssl rand -hex 24`) to `.env`.
-Keycloak imports the realm only once, so an existing server lacks pulse's client: in the admin console, Clients →
-Import client → pick the `kitty-pulse` entry from `infra/keycloak/kitty-realm.json` (confidential, service account
-only, the `kitty-ledger` audience mapper), then set its secret (Credentials tab) to the same `PULSE_CLIENT_SECRET`.
+A fresh install needs nothing else: compose passes it to Keycloak, whose realm import gives the `kitty-pulse` client
+that secret. Keycloak imports the realm only once, though, so an existing server lacks pulse's client. Add it:
+1. Copy the `kitty-pulse` object (the whole `{ … }` from the `clients` list in `infra/keycloak/kitty-realm.json`) into
+   a file of its own, e.g. `kitty-pulse.json`.
+2. Admin console → realm `kitty` → Clients → Import client → choose that file → Save.
+3. Clients → `kitty-pulse` → Credentials: set the client secret to exactly the `PULSE_CLIENT_SECRET` from `.env`
+   (the import leaves the literal `${…}` placeholder there; don't use Regenerate, which picks a random one).
+4. `docker compose … up -d` so pulse picks it up. Check `docker compose logs pulse`: no "service token" warnings.
+
 The ledger now also listens on 8082 inside the compose network for pulse; Caddy doesn't route it.
 
 **Upgrading to exchange rates (phase 3a):** add `PULSE_DB_PASSWORD` (`openssl rand -hex 24`) to `.env` before

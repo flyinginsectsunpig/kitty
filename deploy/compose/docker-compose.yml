@@ -44,6 +44,8 @@ services:
       # Placeholders substituted into kitty-realm.json on first import:
       KITTY_PUBLIC_URL: https://${KITTY_HOST}
       KITTY_WEB_CLIENT_SECRET: ${KITTY_WEB_CLIENT_SECRET:?set KITTY_WEB_CLIENT_SECRET}
+      # pulse's client secret, read by the realm import (never the dev default from the repo).
+      PULSE_CLIENT_SECRET: ${PULSE_CLIENT_SECRET:?set PULSE_CLIENT_SECRET}
       KITTY_VERIFY_EMAIL: ${KITTY_VERIFY_EMAIL:-true}
       SMTP_HOST: ${SMTP_HOST:-smtp.resend.com}
       SMTP_PORT: ${SMTP_PORT:-465}

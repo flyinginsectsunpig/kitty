@@ -91,13 +91,17 @@ public static class RecurringEndpoints
 
         var before = s.ToDto(today);
         db.Entry(s).Property(x => x.Version).OriginalValue = body.Version.Value;
-        if (s.LastAddedPeriod is null) s.NotBefore = body.StartsOn;
-        else if (body.Frequency != s.Frequency)
+        // NotBefore only ever moves for a reason, so an edit can't bring back periods a pause or an end date skipped.
+        if (body.StartsOn != s.StartsOn) s.NotBefore = body.StartsOn; // only before the first period (checked above)
+        else if (s.LastAddedPeriod is { } last && body.Frequency != s.Frequency)
         {
             // One expense per cycle: the new rule starts in the cycle after the last period added (in the old rule's cycles).
-            var nextCycle = Recurrence.NextCycleStart(s.Frequency, s.LastAddedPeriod.Value);
+            var nextCycle = Recurrence.NextCycleStart(s.Frequency, last);
             s.NotBefore = new[] { today, nextCycle, s.NotBefore }.Max();
         }
+        // An ended schedule that's extended carries on from today, like a resume: the gap isn't backfilled.
+        if (s.EndsOn is { } oldEnd && oldEnd < today && (body.EndsOn is null || body.EndsOn > oldEnd))
+            s.NotBefore = new[] { today, s.NotBefore }.Max();
         s.Template = TemplateOf(body);
         s.Frequency = body.Frequency;
         s.StartsOn = body.StartsOn;

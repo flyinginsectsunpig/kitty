@@ -99,6 +99,20 @@ public class RecurringGrpcTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Two_pulse_instances_adding_the_same_period_at_once_make_one_expense()
+    {
+        using var env = await GroupAsync();
+        var id = await ScheduleAsync(env);
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => AddAsync(env, id, Today)));
+
+        Assert.Single(results.Select(r => r.ExpenseId).Distinct());
+        Assert.Equal(5, results.Count(r => r.AlreadyAdded));
+        using var scope = env.App.Services.CreateScope();
+        Assert.Equal(1, await env.Db(scope).Expenses.CountAsync(x => x.RecurringScheduleId == id, Ct));
+    }
+
+    [Fact]
     public async Task A_deleted_added_expense_is_not_added_again()
     {
         using var env = await GroupAsync();

@@ -175,6 +175,58 @@ public class RecurringTests(LedgerApiFactory factory)
         Assert.Equal(new DateOnly(2026, 12, 10), row.NotBefore);
     }
 
+    private async Task<(WebApplicationFactory<Program> App, FakeTimeProvider Clock, HttpClient Owner, Guid G, Guid Me)> ClockedGroupAsync()
+    {
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 11, 24, 10, 0, 0, TimeSpan.Zero));
+        var app = factory.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<TimeProvider>(clock)));
+        var owner = app.CreateClient();
+        owner.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            TestTokens.For($"sub-{Guid.NewGuid()}", "Owner", "owner@example.com"));
+        var g = await owner.CreateGroupAsync();
+        return (app, clock, owner, g.Id, g.Members[0].Id);
+    }
+
+    private static async Task<DateOnly> NotBeforeAsync(WebApplicationFactory<Program> app, Guid id)
+    {
+        using var scope = app.Services.CreateScope();
+        return (await scope.ServiceProvider.GetRequiredService<LedgerDbContext>().RecurringSchedules.SingleAsync(x => x.Id == id, Ct)).NotBefore;
+    }
+
+    [Fact]
+    public async Task Editing_after_a_resume_keeps_the_paused_periods_out()
+    {
+        var (app, clock, owner, g, me) = await ClockedGroupAsync();
+        using var _ = app;
+        var id = Guid.NewGuid();
+        await CreatedAsync(await owner.PostJsonAsync($"/groups/{g}/recurring", RecurringData.Monthly(id, me, [me], Today)));
+        await owner.PostJsonAsync($"/groups/{g}/recurring/{id}/pause", new { });
+        clock.Advance(TimeSpan.FromDays(52)); // 15 Jan: Nov 24 and Dec 24 passed while paused
+        var resumed = await (await owner.PostJsonAsync($"/groups/{g}/recurring/{id}/resume", new { })).ReadAsync<RecurringDto>();
+
+        // A template-only edit (the amount) must not bring the paused periods back.
+        var r = await owner.PutJsonAsync($"/groups/{g}/recurring/{id}",
+            RecurringData.Monthly(id, me, [me], Today, amount: 1300000, version: resumed.Version));
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal(new DateOnly(2027, 1, 15), await NotBeforeAsync(app, id));
+    }
+
+    [Fact]
+    public async Task Extending_an_ended_schedule_continues_from_today()
+    {
+        var (app, clock, owner, g, me) = await ClockedGroupAsync();
+        using var _ = app;
+        var id = Guid.NewGuid();
+        var s = await CreatedAsync(await owner.PostJsonAsync($"/groups/{g}/recurring",
+            RecurringData.Monthly(id, me, [me], Today, endsOn: new DateOnly(2026, 12, 31))));
+        clock.Advance(TimeSpan.FromDays(100)); // 4 Mar 2027: it ended on 31 Dec
+
+        var r = await owner.PutJsonAsync($"/groups/{g}/recurring/{id}", RecurringData.Monthly(id, me, [me], Today, version: s.Version));
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal(new DateOnly(2027, 3, 4), await NotBeforeAsync(app, id)); // no backfill of Jan and Feb
+    }
+
     [Fact]
     public async Task Every_change_queues_a_RecurringScheduleChanged_with_full_state()
     {
