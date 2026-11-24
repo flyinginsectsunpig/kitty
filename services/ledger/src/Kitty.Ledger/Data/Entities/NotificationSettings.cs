@@ -14,6 +14,14 @@ public sealed class NotificationSettings
     public long Version { get; set; }
 }
 
+/// <summary>A weekly summary was queued for this person and ISO week (so a repeated run doesn't send it twice).</summary>
+public sealed class WeeklySummary
+{
+    public Guid UserId { get; set; }
+    public required string Week { get; set; }
+    public DateTimeOffset QueuedAt { get; set; }
+}
+
 /// <summary>A phone's Firebase push token. A token belongs to one person (the last one signed in on that phone).</summary>
 public sealed class PushDevice
 {

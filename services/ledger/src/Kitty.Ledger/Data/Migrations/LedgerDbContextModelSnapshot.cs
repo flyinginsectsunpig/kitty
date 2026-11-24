@@ -761,6 +761,23 @@ namespace Kitty.Ledger.Data.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("Kitty.Ledger.Data.Entities.WeeklySummary", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Week")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<DateTimeOffset>("QueuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "Week");
+
+                    b.ToTable("WeeklySummaries");
+                });
+
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.Expense", b =>
                 {
                     b.HasOne("Kitty.Ledger.Data.Entities.Group", null)

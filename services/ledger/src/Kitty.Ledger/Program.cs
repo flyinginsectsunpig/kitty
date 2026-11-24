@@ -132,6 +132,7 @@ group.MapTableSessions();
 var guestTable = app.MapGuestTable();
 ListenTokens.Map(group, guestTable);
 app.MapGrpcService<RecurringGrpcService>().RequireHost($"*:{grpcPort}").RequireAuthorization("pulse");
+app.MapGrpcService<NotifyGrpcService>().RequireHost($"*:{grpcPort}").RequireAuthorization("pulse");
 app.MapHub<TableHub>(TableHub.Path).AllowAnonymous().RequireCors("hub"); // JoinSession does the authorization
 app.MapInvites(group);
 
