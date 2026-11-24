@@ -90,6 +90,34 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "kitty-pulse",
+      "name": "pulse (service)",
+      "description": "pulse's own identity for adding recurring expenses through the ledger's internal gRPC port.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${PULSE_CLIENT_SECRET:dev-only-kitty-pulse-secret}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "redirectUris": [],
+      "webOrigins": [],
+      "protocolMappers": [
+        {
+          "name": "kitty-ledger-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "kitty-ledger",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "identityProviders": [

@@ -20,6 +20,8 @@ See [the design](docs/superpowers/specs/2026-11-15-kitty-design.md).
 - **Trips in other currencies:** an expense in euros or dollars gets the ECB exchange rate for its date (or one
   you type), balances show a total in the group's currency, and a foreign debt can be paid back in rands. Rates
   come from [pulse](services/pulse/README.md), a small Go service the ledger calls over gRPC.
+- **Repeating expenses:** rent on the 1st, a weekly subscription: set it up once and it lands on balances by itself
+  each time (pulse follows the schedules over Kafka and adds each period through the ledger with its own service login).
 
 ## Local dev
 

@@ -56,9 +56,20 @@ var pulse = builder.AddExecutable("pulse", "go", "../../services/pulse", "run", 
 #pragma warning restore ASPIRECERTIFICATES001
     .WithHttpEndpoint(env: "PULSE_PORT", name: "grpc")
     .WithEnvironment("PULSE_DATABASE_URL", ledgerDb.Resource.UriExpression)
-    .WaitFor(ledgerDb);
+    .WaitFor(ledgerDb)
+    // Recurring expenses: follow the ledger's schedules on Kafka, add due periods over the ledger's internal gRPC port
+    // with pulse's own Keycloak service token. pulse doesn't wait for the ledger (it retries), so there's no start-up cycle.
+    .WithEnvironment("PULSE_KAFKA_BOOTSTRAP", kafkaBootstrap)
+    .WithEnvironment("PULSE_LEDGER_GRPC", "localhost:" + LedgerGrpcPort.ToString(System.Globalization.CultureInfo.InvariantCulture))
+    .WithEnvironment("PULSE_TOKEN_URL", ReferenceExpression.Create($"{keycloak.GetEndpoint("http")}/realms/kitty/protocol/openid-connect/token"))
+    .WithEnvironment("PULSE_CLIENT_SECRET", "dev-only-kitty-pulse-secret")
+    .WaitFor(redpanda)
+    .WaitFor(keycloak);
 
 var ledger = builder.AddDotnetProject("ledger", "../../services/ledger/src/Kitty.Ledger/Kitty.Ledger.csproj")
+    // pulse's gRPC port: plain HTTP/2, fixed and unproxied so the Host header carries the port the ledger checks.
+    .WithHttpEndpoint(port: LedgerGrpcPort, targetPort: LedgerGrpcPort, name: "grpc", isProxied: false)
+    .WithEnvironment("Ledger__GrpcPort", LedgerGrpcPort.ToString(System.Globalization.CultureInfo.InvariantCulture))
     .WithReference(ledgerDb, connectionName: "ledger")
     .WaitFor(ledgerDb)
     .WaitFor(keycloak)
@@ -110,3 +121,8 @@ builder.AddJavaScriptApp("web", "../../apps/web", "dev")
     .WithEnvironment("AUTH_KEYCLOAK_ISSUER", realmUrl);
 
 builder.Build().Run();
+
+internal static partial class Program
+{
+    private const int LedgerGrpcPort = 5082;
+}
