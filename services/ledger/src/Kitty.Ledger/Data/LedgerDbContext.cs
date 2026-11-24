@@ -75,6 +75,8 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
             e.Property(x => x.FxRateSource).HasMaxLength(6);
             e.Property(x => x.Version).IsConcurrencyToken();
             e.HasIndex(x => new { x.GroupId, x.OccurredOn, x.CreatedAt, x.Id });
+            // One expense per schedule period, deleted ones included: a period someone deleted is not added again.
+            e.HasIndex(x => new { x.RecurringScheduleId, x.RecurringPeriod }).IsUnique();
             e.HasOne<Group>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
             e.OwnsMany(x => x.Payers, p =>
             {

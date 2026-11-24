@@ -116,6 +116,12 @@ namespace Kitty.Ledger.Data.Migrations
                     b.Property<DateOnly>("OccurredOn")
                         .HasColumnType("date");
 
+                    b.Property<DateOnly?>("RecurringPeriod")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("RecurringScheduleId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("SplitMethod")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -129,6 +135,9 @@ namespace Kitty.Ledger.Data.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RecurringScheduleId", "RecurringPeriod")
+                        .IsUnique();
 
                     b.HasIndex("GroupId", "OccurredOn", "CreatedAt", "Id");
 

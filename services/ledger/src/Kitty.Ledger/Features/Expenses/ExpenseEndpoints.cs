@@ -40,14 +40,7 @@ public static class ExpenseEndpoints
         if (validation is not ExpenseValidation.Valid valid) return Invalid(validation);
         if (await db.Expenses.AnyAsync(x => x.Id == body.Id, ct)) return ApiError.Conflict(ErrorCodes.AlreadyExists);
 
-        var now = clock.NowMicros();
-        var expense = new Expense
-        {
-            Id = body.Id, GroupId = groupId, Description = body.Description.Trim(), Category = body.Category,
-            Currency = body.Currency, AmountMinor = body.AmountMinor, OccurredOn = body.OccurredOn,
-            SplitMethod = body.Split.Method, Version = 1, CreatedByUserId = caller.User.Id, CreatedAt = now, UpdatedAt = now,
-        };
-        Apply(expense, body, valid.Shares);
+        var expense = NewExpense(groupId, body, valid.Shares, caller.User.Id, clock.NowMicros());
         var groupCurrency = await GroupCurrencyAsync(db, groupId, ct);
         var decision = await rates.DecideAsync(expense.Currency, groupCurrency, expense.OccurredOn, body.FxRate, null, ct);
         if (ApplyRate(expense, decision, groupCurrency) is { } rateError) return rateError;
@@ -185,7 +178,22 @@ public static class ExpenseEndpoints
         (await db.Groups.Where(g => g.Id == groupId).Select(g => g.BaseCurrency).SingleAsync(ct)).Trim();
 
     /// <summary>Stores the decided rate and the converted amount on the expense, or returns the error to send.</summary>
-    internal static IResult? ApplyRate(Expense expense, RateDecision decision, string groupCurrency)
+    /// <summary>A new expense from a validated write (shares computed by the validator).</summary>
+    internal static Expense NewExpense(Guid groupId, ExpenseWriteDto body, IReadOnlyList<Share> shares, Guid createdBy, DateTimeOffset now)
+    {
+        var expense = new Expense
+        {
+            Id = body.Id, GroupId = groupId, Description = body.Description.Trim(), Category = body.Category,
+            Currency = body.Currency, AmountMinor = body.AmountMinor, OccurredOn = body.OccurredOn,
+            SplitMethod = body.Split.Method, Version = 1, CreatedByUserId = createdBy, CreatedAt = now, UpdatedAt = now,
+        };
+        Apply(expense, body, shares);
+        return expense;
+    }
+
+    /// <param name="withoutRateIfTooLarge">Save without a rate instead of rejecting when the converted amount is too large
+    /// (recurring periods: nobody is there to fix it, and a period must not vanish).</param>
+    internal static IResult? ApplyRate(Expense expense, RateDecision decision, string groupCurrency, bool withoutRateIfTooLarge = false)
     {
         switch (decision)
         {
@@ -194,7 +202,10 @@ public static class ExpenseEndpoints
             case RateDecision.Rate rate:
                 var converted = FxConverter.Convert(expense.AmountMinor, rate.Value, expense.Currency.Trim(), groupCurrency);
                 if (converted > SplitCalculator.MaxTotalMinor)
-                    return ApiError.BadRequest(ErrorCodes.FxRateInvalid, "Converted amount is too large.");
+                {
+                    if (!withoutRateIfTooLarge) return ApiError.BadRequest(ErrorCodes.FxRateInvalid, "Converted amount is too large.");
+                    goto default;
+                }
                 (expense.FxRate, expense.FxRateDate, expense.FxRateSource, expense.ConvertedAmountMinor) =
                     (rate.Value, rate.EcbDate, rate.Source, converted);
                 return null;

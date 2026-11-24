@@ -28,7 +28,7 @@
     <Protobuf Include="..\..\..\..\contracts\proto\kitty\fx\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="Client" />
     <!-- Recurring schedules: the change event the ledger publishes, and the gRPC service pulse calls. -->
     <Protobuf Include="..\..\..\..\contracts\proto\kitty\recurring\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="None" />
-    <Protobuf Include="..\..\..\..\contracts\proto\kitty\ledger\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="Server" />
+    <Protobuf Include="..\..\..\..\contracts\proto\kitty\ledger\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="Both" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\aspire\Kitty.ServiceDefaults\Kitty.ServiceDefaults.csproj" />
