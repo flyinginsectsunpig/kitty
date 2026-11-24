@@ -1,0 +1,48 @@
+{
+  "rates": [
+    { "input": "19.1987", "canonical": "19.1987" },
+    { "input": "19.19870", "canonical": "19.1987" },
+    { "input": "20.0", "canonical": "20" },
+    { "input": "0.0000000001", "canonical": "0.0000000001" },
+    { "input": "1000000", "canonical": "1000000" },
+    { "input": "1000000.0", "canonical": "1000000" },
+    { "input": "1000000.1", "canonical": null },
+    { "input": "0", "canonical": null },
+    { "input": "0.0", "canonical": null },
+    { "input": "-1", "canonical": null },
+    { "input": "1e3", "canonical": null },
+    { "input": "01.5", "canonical": null },
+    { "input": "1.12345678901", "canonical": null },
+    { "input": "1.", "canonical": null },
+    { "input": ".5", "canonical": null },
+    { "input": " 19.2", "canonical": null },
+    { "input": "", "canonical": null }
+  ],
+  "conversions": [
+    { "name": "EUR to ZAR", "minor": 4000, "rate": "19.1987", "from": "EUR", "to": "ZAR", "expected": 76795 },
+    { "name": "half rounds away from zero", "minor": 1, "rate": "0.5", "from": "EUR", "to": "ZAR", "expected": 1 },
+    { "name": "just under half rounds down", "minor": 1, "rate": "0.4999999999", "from": "EUR", "to": "ZAR", "expected": 0 },
+    { "name": "JPY to ZAR", "minor": 1000, "rate": "0.1101", "from": "JPY", "to": "ZAR", "expected": 11010 },
+    { "name": "ZAR to JPY", "minor": 10000, "rate": "9.0807", "from": "ZAR", "to": "JPY", "expected": 908 },
+    { "name": "largest amount", "minor": 10000000000, "rate": "19.1987", "from": "EUR", "to": "ZAR", "expected": 191987000000 },
+    { "name": "zero", "minor": 0, "rate": "19.1987", "from": "EUR", "to": "ZAR", "expected": 0 }
+  ],
+  "spreads": [
+    { "name": "remainder goes to members in member order", "rate": "19.1987", "from": "EUR", "to": "ZAR",
+      "parts": [
+        { "memberId": "00000003-0000-0000-0000-000000000000", "minor": 1334 },
+        { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 1333 },
+        { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 1333 } ],
+      "expected": [
+        { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 25592 },
+        { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 25592 },
+        { "memberId": "00000003-0000-0000-0000-000000000000", "minor": 25611 } ] },
+    { "name": "equal split of EUR 40 between two", "rate": "19.1987", "from": "EUR", "to": "ZAR",
+      "parts": [
+        { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 2000 },
+        { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 2000 } ],
+      "expected": [
+        { "memberId": "00000001-0000-0000-0000-000000000000", "minor": 38398 },
+        { "memberId": "00000002-0000-0000-0000-000000000000", "minor": 38397 } ] }
+  ]
+}
