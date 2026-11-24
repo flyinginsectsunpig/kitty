@@ -27,6 +27,7 @@ const overviewRoutes = (pages: Record<string, unknown>) =>
     [`GET /groups/${G}/balances`]: () =>
       json(200, { currencies: [{ currency: "ZAR", members: [{ memberId: ME, netMinor: -5000 }, { memberId: SAM, netMinor: 5000 }], transfers: [{ fromMemberId: ME, toMemberId: SAM, amountMinor: 5000 }] }] }),
     [`GET /groups/${G}/table-sessions`]: () => json(200, []),
+    [`GET /groups/${G}/recurring`]: () => json(200, []),
     [`GET /groups/${G}/expenses`]: (req) => json(200, pages[new URL(req.url).searchParams.get("cursor") ?? ""]),
   });
 
@@ -106,6 +107,7 @@ test("group home shows the converted total card and hides it when null", async (
     groupRoutes({
       [`GET /groups/${G}/balances`]: () => json(200, mixed),
       [`GET /groups/${G}/table-sessions`]: () => json(200, []),
+      [`GET /groups/${G}/recurring`]: () => json(200, []),
       [`GET /groups/${G}/expenses`]: () => json(200, { items: [], nextCursor: null }),
     }),
   );

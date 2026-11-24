@@ -1,5 +1,5 @@
 import type { BalancesDto, ExpenseDto } from "@kitty/api-client";
-import { errorMessage, expenseAmounts } from "@kitty/core";
+import { describeSchedule, errorMessage, expenseAmounts } from "@kitty/core";
 import { formatMoney } from "@kitty/money";
 import { Link } from "expo-router";
 import { useState } from "react";
@@ -25,13 +25,14 @@ export default function GroupOverview() {
   const groupId = group.id;
   const path = { params: { path: { groupId } } };
   const state = useLoad(async () => {
-    const [balances, tables, first] = await Promise.all([
+    const [balances, tables, first, recurring] = await Promise.all([
       ledger.GET("/groups/{groupId}/balances", path),
       ledger.GET("/groups/{groupId}/table-sessions", path),
       ledger.GET("/groups/{groupId}/expenses", { params: { path: { groupId }, query: { limit: PAGE } } }),
+      ledger.GET("/groups/{groupId}/recurring", path),
     ]);
-    for (const r of [balances, tables, first]) if (r.data === undefined) return { ...r, data: undefined };
-    return { ...balances, data: { balances: balances.data!, tables: tables.data!, first: first.data! } };
+    for (const r of [balances, tables, first, recurring]) if (r.data === undefined) return { ...r, data: undefined };
+    return { ...balances, data: { balances: balances.data!, tables: tables.data!, first: first.data!, recurring: recurring.data! } };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ledger, groupId]);
 
@@ -49,7 +50,7 @@ export default function GroupOverview() {
         </Link>
       </View>
       <LoadState state={state}>
-        {({ balances, tables, first }) => (
+        {({ balances, tables, first, recurring }) => (
           <>
             {tables.length > 0 && (
               <View style={styles.section}>
@@ -69,6 +70,21 @@ export default function GroupOverview() {
               </View>
             )}
             <Balances balances={balances} groupId={groupId} />
+            {recurring.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.h2}>Repeating</Text>
+                {recurring.map((r) => (
+                  <Link key={r.id} href={`/groups/${groupId}/recurring/${r.id}`} asChild>
+                    <Pressable accessibilityRole="link">
+                      <Card>
+                        <Text style={styles.name}>{r.description}</Text>
+                        <Text style={styles.small}>{describeSchedule(r)}</Text>
+                      </Card>
+                    </Pressable>
+                  </Link>
+                ))}
+              </View>
+            )}
             {/* A reload that changed the first page (an edit, a new expense) starts the list over from it. */}
             <Expenses key={pageKey(first.items)} groupId={groupId} first={first} />
           </>

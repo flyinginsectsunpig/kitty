@@ -1,5 +1,14 @@
-import type { ExpenseWriteDto } from "@kitty/api-client";
-import { CATEGORIES, describeRate, splitProblemMessage, toExpenseWriteDto, type ExpenseFormState } from "@kitty/core";
+import type { ExpenseWriteDto, RecurringWriteDto } from "@kitty/api-client";
+import {
+  CATEGORIES,
+  describeRate,
+  describeRule,
+  splitProblemMessage,
+  toExpenseWriteDto,
+  toRecurringWriteDto,
+  type ExpenseFormState,
+  type Repeat,
+} from "@kitty/core";
 import { convertMinor, formatMoney, parseMoney, parseRate, previewSplit, type SplitMethod } from "@kitty/money";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -22,6 +31,11 @@ export type FetchRate = (currency: string, date: string) => Promise<{ rate: stri
 
 type Quote = { rate: string; rateDate: string } | "failed" | null;
 
+/** Offer "Repeat" (new expenses and schedules). `required`: editing a schedule, which can't stop repeating here. */
+export type RepeatOptions = { initial: Repeat; endsOn: string; dateLocked?: boolean; required?: boolean };
+
+const REPEAT_LABELS: Record<Repeat, string> = { none: "Doesn't repeat", weekly: "Every week", monthly: "Every month" };
+
 const METHODS: { value: SplitMethod; label: string; hint: string }[] = [
   { value: "equal", label: "Equally", hint: "" },
   { value: "exact", label: "Amounts", hint: "amount" },
@@ -36,17 +50,23 @@ const title = (c: string) => c[0]!.toUpperCase() + c.slice(1);
  * The expense form (web's, natively). The same id and Idempotency-Key are kept until the save succeeds, so a retry
  * after a dropped connection can't create a second expense.
  */
-export function ExpenseForm({ members, initial, submitLabel, save, onSaved, groupCurrency, fetchRate, saved }: {
+export function ExpenseForm({ members, initial, submitLabel, save, saveRecurring, onSaved, groupCurrency, fetchRate, saved, repeat: repeatOptions }: {
   members: Member[];
   initial: ExpenseFormState;
   submitLabel: string;
-  save: (dto: ExpenseWriteDto, idempotencyKey: string) => Promise<LedgerResult<unknown>>;
+  /** Saves a one-off expense (absent when editing a schedule, which always repeats). */
+  save?: (dto: ExpenseWriteDto, idempotencyKey: string) => Promise<LedgerResult<unknown>>;
+  /** Saves it as a repeating schedule instead (when Repeat is set). */
+  saveRecurring?: (dto: RecurringWriteDto, idempotencyKey: string) => Promise<LedgerResult<unknown>>;
   onSaved: () => void;
   groupCurrency: string;
   fetchRate: FetchRate;
   saved?: SavedRate;
+  repeat?: RepeatOptions;
 }) {
   const [state, setState] = useState<ExpenseFormState>(initial);
+  const [repeat, setRepeat] = useState<Repeat>(repeatOptions?.initial ?? "none");
+  const [endsOn, setEndsOn] = useState(repeatOptions?.endsOn ?? "");
   const [quote, setQuote] = useState<Quote>(null);
   const foreign = state.currency !== groupCurrency;
   // An unchanged currency and date keep the saved rate (the ledger does the same); anything else shows the ECB rate.
@@ -68,7 +88,10 @@ export function ExpenseForm({ members, initial, submitLabel, save, onSaved, grou
       clearTimeout(timer);
     };
   }, [foreign, keepsSaved, state.currency, state.occurredOn, fetchRate]);
-  const dto = useMemo(() => toExpenseWriteDto(state), [state]);
+  const dto = useMemo(
+    () => (repeat === "none" ? toExpenseWriteDto(state) : toRecurringWriteDto(state, repeat, endsOn)),
+    [state, repeat, endsOn],
+  );
   const nameOf = (id: string) => members.find((m) => m.id === id)?.displayName ?? "Someone";
 
   const preview = useMemo(() => {
@@ -93,7 +116,12 @@ export function ExpenseForm({ members, initial, submitLabel, save, onSaved, grou
             ? "Enter the date as YYYY-MM-DD."
             : null;
 
-  const action = useAction(useCallback((key: string) => save(dto as ExpenseWriteDto, key), [save, dto]));
+  const action = useAction(
+    useCallback(
+      (key: string) => (repeat === "none" ? save!(dto as ExpenseWriteDto, key) : saveRecurring!(dto as RecurringWriteDto, key)),
+      [save, saveRecurring, dto, repeat],
+    ),
+  );
 
   async function onSubmit() {
     if (problem) return action.setError(problem);
@@ -108,11 +136,28 @@ export function ExpenseForm({ members, initial, submitLabel, save, onSaved, grou
       <TextField label="Amount" value={state.amount} onChangeText={(v) => set("amount", v)} keyboardType="decimal-pad" placeholder="0.00" />
       <CurrencyPicker label="Currency" value={state.currency} onChange={(v) => setState((s) => ({ ...s, currency: v, fxRate: "" }))} />
       <Chips label="Paid by" options={members.map((m) => m.id)} value={state.payerId} onChange={(v) => set("payerId", v)} render={nameOf} />
-      <TextField label="Date" value={state.occurredOn} onChangeText={(v) => setState((s) => ({ ...s, occurredOn: v, fxRate: "" }))} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" />
-      {foreign && (
+      <TextField label="Date" value={state.occurredOn} onChangeText={(v) => setState((s) => ({ ...s, occurredOn: v, fxRate: "" }))} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation"
+        editable={!repeatOptions?.dateLocked} />
+      {repeatOptions?.dateLocked && <Text style={styles.note}>It has already added expenses, so the start date stays.</Text>}
+      {repeatOptions && (
+        <>
+          <Chips label="Repeat" options={repeatOptions.required ? (["weekly", "monthly"] as const) : (["none", "weekly", "monthly"] as const)}
+            value={repeat} onChange={setRepeat} render={(r) => REPEAT_LABELS[r]} />
+          {repeat !== "none" && DATE.test(state.occurredOn) && (
+            <Text style={styles.note}>
+              {describeRule(repeat, state.occurredOn)}, starting {state.occurredOn}. Each one is added automatically on its day.
+            </Text>
+          )}
+          {repeat !== "none" && (
+            <TextField label="Ends (optional)" value={endsOn} onChangeText={setEndsOn} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" />
+          )}
+        </>
+      )}
+      {foreign && repeat === "none" && (
         <RatePanel state={state} groupCurrency={groupCurrency} quote={quote} saved={keepsSaved ? saved : undefined}
           amountMinor={amountMinor} onRate={(v) => set("fxRate", v)} />
       )}
+      {foreign && repeat !== "none" && <Text style={styles.note}>Each time it repeats, it uses that day's ECB exchange rate.</Text>}
       <Chips label="Category" options={CATEGORIES} value={state.category as (typeof CATEGORIES)[number]} onChange={(v) => set("category", v)} render={title} />
       <Chips label="Split" options={METHODS.map((m) => m.value)} value={state.method} onChange={(v) => set("method", v)} render={(v) => METHODS.find((m) => m.value === v)!.label} />
       <View style={styles.people}>
@@ -181,6 +226,7 @@ function RatePanel({ state, groupCurrency, quote, saved, amountMinor, onRate }: 
 }
 
 const styles = StyleSheet.create({
+  note: { fontSize: font.sm, color: colors.muted },
   rate: { gap: space.xs, padding: space.sm, borderRadius: radius.field, backgroundColor: "#fafaf9" },
   rateText: { fontSize: font.sm, color: colors.muted },
   converted: { fontSize: font.base, fontWeight: "600", color: colors.text },
