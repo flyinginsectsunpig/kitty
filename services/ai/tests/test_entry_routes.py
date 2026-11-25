@@ -35,7 +35,16 @@ def ledger_client() -> httpx.Client:
             case "/me":
                 return httpx.Response(200, json={"id": ME_U, "displayName": "Zakhir", "email": None})
             case "/groups":
-                groups = [{"id": G, "name": "Flat 4B", "baseCurrency": "ZAR", "memberCount": 2, "myNet": []}]
+                groups = [
+                    {
+                        "id": G,
+                        "name": "Flat 4B",
+                        "baseCurrency": "ZAR",
+                        "memberCount": 2,
+                        "myNet": [],
+                        "createdAt": "2026-01-05T10:00:00+00:00",
+                    }
+                ]
                 return httpx.Response(200, json=groups)
             case "/groups/g-flat":
                 members = [

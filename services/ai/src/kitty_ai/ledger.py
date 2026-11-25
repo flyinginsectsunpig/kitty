@@ -20,6 +20,7 @@ class GroupSummary:
     id: str
     name: str
     base_currency: str
+    created_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -43,8 +44,8 @@ class LedgerReader:
         self._headers = {"Authorization": f"Bearer {token}"}
         self._client = client
 
-    def _get(self, path: str):
-        response = self._client.get(f"{self._base}{path}", headers=self._headers, timeout=10)
+    def _get(self, path: str, params: dict[str, str] | None = None):
+        response = self._client.get(f"{self._base}{path}", headers=self._headers, params=params, timeout=10)
         if response.status_code == 404:
             raise NotFound(path)
         response.raise_for_status()
@@ -55,7 +56,10 @@ class LedgerReader:
         return Me(id=m["id"], display_name=m["displayName"])
 
     def groups(self) -> list[GroupSummary]:
-        return [GroupSummary(id=g["id"], name=g["name"], base_currency=g["baseCurrency"]) for g in self._get("/groups")]
+        return [
+            GroupSummary(id=g["id"], name=g["name"], base_currency=g["baseCurrency"], created_at=g["createdAt"])
+            for g in self._get("/groups")
+        ]
 
     def group(self, group_id: str) -> Group:
         g = self._get(f"/groups/{group_id}")
@@ -74,3 +78,12 @@ class LedgerReader:
             if total > 0:
                 owed[c["currency"]] = total
         return owed
+
+    def owing(self) -> dict:
+        """What I owe and am owed across my groups: the ledger's /me/owing JSON, money already formatted."""
+        return self._get("/me/owing")
+
+    def spending(self, group_id: str, from_: str | None, to: str | None, category: str | None, q: str | None) -> dict:
+        """A group's spending: the ledger's /groups/{id}/spending JSON. Filters left as None are not sent."""
+        params = {k: v for k, v in {"from": from_, "to": to, "category": category, "q": q}.items() if v is not None}
+        return self._get(f"/groups/{group_id}/spending", params)
