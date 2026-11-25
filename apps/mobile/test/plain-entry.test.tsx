@@ -199,3 +199,150 @@ test("ai unavailable offers the full form", async () => {
 
   expect(await screen.findByText("Kitty can't read sentences right now. Use the form instead.")).toBeTruthy();
 });
+
+describe("a payment card", () => {
+  const PIZZA = "44444444-4444-4444-8444-444444444444";
+  const UBER = "55555555-5555-4555-8555-555555555555";
+  const pizza = { expenseId: PIZZA, description: "Pizza", date: "2026-11-01", openMinor: 9500 };
+  const uber = { expenseId: UBER, description: "Uber", date: "2026-11-10", openMinor: 2500 };
+  const uberPayment = (covers: { expenseId: string; amountMinor: number }[]): PlainDraft => ({
+    ...base,
+    parsed: { kind: "payment", counterpart: "Sam", direction: "i_paid" },
+    intent: "payment",
+    issues: [],
+    payment: {
+      fromMemberId: ME,
+      toMemberId: SAM,
+      currency: "ZAR",
+      amountMinor: covers.reduce((sum, c) => sum + c.amountMinor, 0),
+      statedAmountMinor: null,
+      openItems: [pizza, uber],
+      covers,
+    },
+  });
+  const money = (minor: number) => ({ currency: "ZAR", minor, text: "" });
+  const openBoth = (iOwe: number, theyOwe: number) => ({
+    fromMemberId: ME,
+    toMemberId: SAM,
+    currencies: [{ currency: "ZAR", fromOwes: [], fromOwesTotal: money(iOwe), toOwes: [], toOwesTotal: money(theyOwe) }],
+  });
+
+  test("a payment card saves the covers", async () => {
+    const { client, calls } = fakeLedger(groupRoutes({ ...groupsList, [`POST /groups/${G}/settlements`]: () => json(201, {}) }));
+    await renderApp(routes, client, "/groups", fakeAi({ draft: uberPayment([{ expenseId: UBER, amountMinor: 2500 }]) }));
+
+    await type("paid Sam for the Uber");
+    expect(await screen.findByText(/^You paid Sam R\s25,00$/)).toBeTruthy();
+    await fireEvent.press(screen.getByText("Save"));
+
+    expect(await screen.findByText("Payment recorded.")).toBeTruthy();
+    const post = calls.find((c) => c.method === "POST" && c.path === `/groups/${G}/settlements`)!;
+    expect(post.body).toMatchObject({ fromMemberId: ME, toMemberId: SAM, currency: "ZAR", amountMinor: 2500, covers: [{ expenseId: UBER, amountMinor: 2500 }] });
+    expect(post.headers.get("Idempotency-Key")).toBe(post.body.id);
+  });
+
+  test("unticking an item re-totals the card", async () => {
+    const { client } = fakeLedger(groupRoutes(groupsList));
+    const both = uberPayment([
+      { expenseId: PIZZA, amountMinor: 9500 },
+      { expenseId: UBER, amountMinor: 2500 },
+    ]);
+    await renderApp(routes, client, "/groups", fakeAi({ draft: both }));
+
+    await type("paid Sam for the pizza and the Uber");
+    expect(await screen.findByText(/^You paid Sam R\s120,00$/)).toBeTruthy();
+    await fireEvent.press(screen.getByRole("checkbox", { name: /^Pizza · 1 Nov · R\s95,00 open$/ }));
+
+    expect(await screen.findByText(/^You paid Sam R\s25,00$/)).toBeTruthy();
+  });
+
+  test("the counting-both line shows after saving", async () => {
+    const { client } = fakeLedger(
+      groupRoutes({
+        ...groupsList,
+        [`POST /groups/${G}/settlements`]: () => json(201, {}),
+        [`GET /groups/${G}/open-items`]: () => json(200, openBoth(3000, 5000)),
+      }),
+    );
+    await renderApp(routes, client, "/groups", fakeAi({ draft: uberPayment([{ expenseId: UBER, amountMinor: 2500 }]) }));
+
+    await type("paid Sam for the Uber");
+    await fireEvent.press(await screen.findByText("Save"));
+
+    expect(await screen.findByText("Payment recorded.")).toBeTruthy();
+    expect(await screen.findByText(/^Counting what Sam owes you, Sam owes you R\s20,00\.$/)).toBeTruthy();
+  });
+
+  test("a retried Save keeps its key; a changed card gets a new one", async () => {
+    let attempts = 0;
+    const { client, calls } = fakeLedger(
+      groupRoutes({
+        ...groupsList,
+        [`POST /groups/${G}/settlements`]: () => {
+          attempts++;
+          if (attempts <= 2) throw new TypeError("Network request failed");
+          return json(201, {});
+        },
+      }),
+    );
+    const both = uberPayment([
+      { expenseId: PIZZA, amountMinor: 9500 },
+      { expenseId: UBER, amountMinor: 2500 },
+    ]);
+    await renderApp(routes, client, "/groups", fakeAi({ draft: both }));
+
+    await type("paid Sam for the pizza and the Uber");
+    await fireEvent.press(await screen.findByText("Save"));
+    expect(await screen.findByText("Couldn't reach Kitty. Check your connection and try again.")).toBeTruthy();
+    await fireEvent.press(screen.getByText("Save"));
+    await waitFor(() => expect(attempts).toBe(2));
+    await fireEvent.press(screen.getByRole("checkbox", { name: /^Pizza/ }));
+    await fireEvent.press(screen.getByText("Save"));
+
+    expect(await screen.findByText("Payment recorded.")).toBeTruthy();
+    const keys = calls.filter((c) => c.path === `/groups/${G}/settlements`).map((c) => c.headers.get("Idempotency-Key"));
+    expect(keys[1]).toBe(keys[0]);
+    expect(keys[2]).not.toBe(keys[1]);
+  });
+
+  test("an item that matched several open items is picked on the card", async () => {
+    const { client } = fakeLedger(groupRoutes(groupsList));
+    const unsure: PlainDraft = {
+      ...uberPayment([]),
+      issues: [{ field: "payment.items[0]", kind: "ambiguous", text: "food", candidates: [PIZZA, UBER] }],
+    };
+    await renderApp(routes, client, "/groups", fakeAi({ draft: unsure }));
+
+    await type("paid Sam for the food");
+    expect(await screen.findByText("Which food?")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save" }).props.accessibilityState).toMatchObject({ disabled: true });
+    await fireEvent.press(screen.getByRole("button", { name: /^Pizza · 1 Nov/ }));
+
+    expect(await screen.findByText(/^You paid Sam R\s95,00$/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save" }).props.accessibilityState).toMatchObject({ disabled: false });
+  });
+
+  test("picking the other person reads the sentence again with that name", async () => {
+    const { client } = fakeLedger(groupRoutes(groupsList));
+    const unsure: PlainDraft = {
+      ...uberPayment([]),
+      payment: { ...uberPayment([]).payment!, toMemberId: null, openItems: [] },
+      issues: [{ field: "payment.counterpart", kind: "no_match", text: "Sammy", candidates: [] }],
+    };
+    const resolved: unknown[] = [];
+    const ai: AiClient = {
+      parse: async () => ({ draft: unsure }),
+      resolve: async (parsed, groupId) => (resolved.push({ parsed, groupId }), { draft: uberPayment([{ expenseId: UBER, amountMinor: 2500 }]) }),
+      ask: async () => ({ error: "unexpected" }),
+    };
+    await renderApp(routes, client, "/groups", ai);
+
+    await type("paid Sammy for the Uber");
+    expect(await screen.findByText("“Sammy” isn't someone you can pay in this group. Who did you mean?")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Zee" })).toBeNull(); // not yourself
+    await fireEvent.press(screen.getByRole("button", { name: "Sam" }));
+
+    expect(await screen.findByText(/^You paid Sam R\s25,00$/)).toBeTruthy();
+    expect(resolved).toEqual([{ parsed: { kind: "payment", counterpart: "Sam", direction: "i_paid" }, groupId: G }]);
+  });
+});
