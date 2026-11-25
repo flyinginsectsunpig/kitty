@@ -172,6 +172,7 @@ func startNotifications(ctx context.Context, cfg map[string]string, dbURL string
 	}()
 	go d.RunRetries(ctx, 15*time.Second) // requests a provider failed for now: off the topic, so they hold nothing up
 	go notify.RunWeekly(ctx, ledger, time.Now)
+	go store.RunPruning(ctx, 7*24*time.Hour) // a request is redelivered within minutes, not days
 	return nil
 }
 

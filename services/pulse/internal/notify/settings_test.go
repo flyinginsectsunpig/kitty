@@ -142,6 +142,28 @@ func TestPending_DeferDueRescheduleDrop(t *testing.T) {
 	}
 }
 
+func TestDeliveries_PruneForgetsOnlyOldOnes(t *testing.T) {
+	s := openStore(t)
+	ctx := context.Background()
+	old, recent := "e0000000-0000-0000-0000-0000000000a1", "e0000000-0000-0000-0000-0000000000a2"
+	_ = s.MarkDelivered(ctx, old, ChannelPush)
+	_ = s.MarkDelivered(ctx, recent, ChannelPush)
+	if _, err := s.pool.Exec(ctx, `UPDATE pulse.deliveries SET delivered_at = now() - interval '8 days' WHERE notification_id = $1`, old); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.PruneDeliveries(ctx, time.Now().Add(-7*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	if done, _ := s.Delivered(ctx, old, ChannelPush); done {
+		t.Fatal("old delivery kept")
+	}
+	if done, _ := s.Delivered(ctx, recent, ChannelPush); !done {
+		t.Fatal("recent delivery pruned")
+	}
+}
+
 func TestDecodeSettings_FromTheLedgersMessage(t *testing.T) {
 	b, _ := proto.Marshal(&notifyv1.NotifySettingsChanged{UserId: userA, Email: "x@example.com", ExpensePush: true, PushTokens: []string{"t"}, Version: 3})
 	got, err := DecodeSettings(append([]byte{0, 0, 0, 0, 4, 0}, b...))

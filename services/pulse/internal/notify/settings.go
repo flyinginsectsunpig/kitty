@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	notifyv1 "github.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/notify/v1"
@@ -140,6 +141,26 @@ func (s *Store) MarkDelivered(ctx context.Context, notificationID string, ch Cha
 		return fmt.Errorf("deliveries: mark %s %s: %w", notificationID, ch, err)
 	}
 	return nil
+}
+
+// PruneDeliveries forgets deliveries recorded before cutoff: long after Kafka could redeliver their request.
+func (s *Store) PruneDeliveries(ctx context.Context, cutoff time.Time) error {
+	if _, err := s.pool.Exec(ctx, `DELETE FROM pulse.deliveries WHERE delivered_at < $1`, cutoff); err != nil {
+		return fmt.Errorf("deliveries: prune: %w", err)
+	}
+	return nil
+}
+
+// RunPruning prunes deliveries older than keep, every hour until ctx ends.
+func (s *Store) RunPruning(ctx context.Context, keep time.Duration) {
+	for {
+		if err := s.PruneDeliveries(ctx, time.Now().Add(-keep)); err != nil && ctx.Err() == nil {
+			slog.WarnContext(ctx, "pruning deliveries failed; trying again later", "err", err)
+		}
+		if Sleep(ctx, time.Hour) != nil {
+			return
+		}
+	}
 }
 
 // PendingRequest is a request whose delivery failed for now, waiting for the retry loop.
