@@ -48,7 +48,8 @@ public sealed partial class NotifyGrpcService(LedgerDbContext db, Notifier notif
             var amounts = string.Join(" and ", byCurrency.OrderBy(c => c.Key, StringComparer.Ordinal).Select(c => MoneyText.Format(c.Value, c.Key)));
             var body = $"You owe {amounts} across {groups.Count} {(groups.Count == 1 ? "group" : "groups")}";
             db.WeeklySummaries.Add(new WeeklySummary { UserId = userId, Week = request.Week!, QueuedAt = clock.GetUtcNow() });
-            notifier.Queue(userId, Kind.WeeklySummary, "Kitty", body, groupId: null);
+            notifier.Queue(userId, Kind.WeeklySummary, "Kitty", body, groupId: null,
+                notificationId: NotificationIds.Weekly(userId, request.Week!));
             queued++;
         }
         await db.SaveChangesAsync(ct);

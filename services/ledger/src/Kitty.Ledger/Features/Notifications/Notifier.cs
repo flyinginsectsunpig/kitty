@@ -21,7 +21,7 @@ public sealed class Notifier(LedgerDbContext db, Outbox outbox, TimeProvider clo
     /// <param name="actorUserId">Who added it; null when nobody did (a recurring period added automatically).</param>
     public async Task ExpenseAddedAsync(Expense e, Guid? actorUserId, CancellationToken ct)
     {
-        var (groupName, members) = await GroupAsync(e.GroupId, ct);
+        var (groupName, _, members) = await GroupAsync(e.GroupId, ct);
         var actor = actorUserId is { } a ? members.Values.FirstOrDefault(m => m.UserId == a)?.DisplayName ?? "Someone" : null;
         var involved = e.Payers.Select(p => p.MemberId).Concat(e.Shares.Select(s => s.MemberId)).Distinct();
 
@@ -39,9 +39,13 @@ public sealed class Notifier(LedgerDbContext db, Outbox outbox, TimeProvider clo
 
     public async Task PaymentAsync(Settlement s, Guid actorUserId, CancellationToken ct)
     {
-        var (groupName, members) = await GroupAsync(s.GroupId, ct);
+        var (groupName, groupCurrency, members) = await GroupAsync(s.GroupId, ct);
         var actor = members.Values.FirstOrDefault(m => m.UserId == actorUserId)?.DisplayName ?? "Someone";
-        var money = MoneyText.Format(s.AmountMinor, s.Currency.Trim());
+        var debt = MoneyText.Format(s.AmountMinor, s.Currency.Trim());
+        // Paid back in the group's currency: say what actually changed hands (what the bank statement shows) first.
+        var money = s.PaidInGroupCurrency && s.ConvertedAmountMinor is { } paid
+            ? $"{MoneyText.Format(paid, groupCurrency)} ({debt})"
+            : debt;
         foreach (var (memberId, direction) in new[] { (s.ToMemberId, "to"), (s.FromMemberId, "by") })
         {
             if (!members.TryGetValue(memberId, out var m) || m.UserId == actorUserId) continue;
@@ -63,12 +67,12 @@ public sealed class Notifier(LedgerDbContext db, Outbox outbox, TimeProvider clo
             OccurredAt = Timestamp.FromDateTimeOffset(clock.GetUtcNow()),
         });
 
-    /// <summary>The group's name and its members who have an account, by member id.</summary>
-    private async Task<(string Name, Dictionary<Guid, Member> Members)> GroupAsync(Guid groupId, CancellationToken ct)
+    /// <summary>The group's name, its currency, and its members who have an account, by member id.</summary>
+    private async Task<(string Name, string Currency, Dictionary<Guid, Member> Members)> GroupAsync(Guid groupId, CancellationToken ct)
     {
-        var name = await db.Groups.Where(g => g.Id == groupId).Select(g => g.Name).SingleAsync(ct);
+        var group = await db.Groups.Where(g => g.Id == groupId).Select(g => new { g.Name, g.BaseCurrency }).SingleAsync(ct);
         var members = await db.Members.Where(m => m.GroupId == groupId && m.UserId != null)
             .Select(m => new Member(m.Id, m.UserId!.Value, m.DisplayName)).ToDictionaryAsync(m => m.Id, ct);
-        return (name, members);
+        return (group.Name, group.BaseCurrency.Trim(), members);
     }
 }

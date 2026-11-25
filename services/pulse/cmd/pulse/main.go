@@ -139,7 +139,11 @@ func startNotifications(ctx context.Context, cfg map[string]string, dbURL string
 		if from == "" {
 			return fmt.Errorf("PULSE_SMTP_FROM is required when PULSE_SMTP_HOST is set")
 		}
-		d.Mail = notify.NewSMTP(host, port, os.Getenv("PULSE_SMTP_USER"), os.Getenv("PULSE_SMTP_PASSWORD"), from, cfg["PULSE_WEB_URL"])
+		tlsMode, err := notify.ParseTLSMode(os.Getenv("PULSE_SMTP_SSL"), os.Getenv("PULSE_SMTP_STARTTLS"), port)
+		if err != nil {
+			return fmt.Errorf("PULSE_SMTP_SSL / PULSE_SMTP_STARTTLS: %w", err)
+		}
+		d.Mail = notify.NewSMTP(host, port, tlsMode, os.Getenv("PULSE_SMTP_USER"), os.Getenv("PULSE_SMTP_PASSWORD"), from, cfg["PULSE_WEB_URL"])
 	} else {
 		slog.Info("email notifications are off: PULSE_SMTP_HOST isn't set")
 	}
@@ -168,6 +172,7 @@ func startNotifications(ctx context.Context, cfg map[string]string, dbURL string
 	}()
 	go d.RunRetries(ctx, 15*time.Second) // requests a provider failed for now: off the topic, so they hold nothing up
 	go notify.RunWeekly(ctx, ledger, time.Now)
+	go store.RunPruning(ctx, 7*24*time.Hour) // a request is redelivered within minutes, not days
 	return nil
 }
 

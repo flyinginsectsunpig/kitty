@@ -4,6 +4,7 @@ using Kitty.Ledger.Infrastructure;
 using Kitty.Ledger.Infrastructure.Auth;
 using Kitty.Ledger.Infrastructure.Errors;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Kitty.Ledger.Features.Notifications;
 
@@ -43,7 +44,16 @@ public static class NotificationSettingsEndpoints
         if (db.Entry(settings).State == EntityState.Added)
         {
             await publisher.QueueAsync(user, ct);
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                // Another request created (and published) this person's defaults at the same moment: read theirs.
+                db.ChangeTracker.Clear();
+                settings = await db.NotificationSettings.SingleAsync(s => s.UserId == user.Id, ct);
+            }
         }
         return Results.Ok(ToDto(settings, user));
     }
