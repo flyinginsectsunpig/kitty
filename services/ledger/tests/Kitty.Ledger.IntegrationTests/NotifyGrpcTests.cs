@@ -1,3 +1,4 @@
+using Kitty.Ledger.Features.Notifications;
 using System.Net.Http.Headers;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
@@ -70,6 +71,17 @@ public class NotifyGrpcTests(LedgerApiFactory factory)
         await AsPulse.QueueWeeklySummariesAsync(new QueueWeeklySummariesRequest { Week = "2026-W50" }, cancellationToken: Ct);
 
         Assert.Equal(2, (await SummariesForAsync(friend)).Count); // one for each week
+    }
+
+    [Fact]
+    public async Task A_weekly_summarys_id_is_named_after_the_person_and_week()
+    {
+        var (_, friend) = await DebtsAsync();
+
+        await AsPulse.QueueWeeklySummariesAsync(new QueueWeeklySummariesRequest { Week = "2026-W52" }, cancellationToken: Ct);
+
+        var expected = NotificationIds.Weekly(friend, "2026-W52").ToString();
+        Assert.Single(await SummariesForAsync(friend), x => x.NotificationId == expected);
     }
 
     [Fact]
