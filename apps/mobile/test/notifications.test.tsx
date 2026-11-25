@@ -122,9 +122,43 @@ test("the settings screen saves a switch", async () => {
   expect(calls.find((c) => c.method === "PUT")!.body).toEqual({ ...write, expenseEmail: true });
 });
 
+test("after a save the other switches can be used again", async () => {
+  const { client, calls } = fakeLedger({
+    "GET /me/notifications": () => json(200, settings),
+    "PUT /me/notifications": () => json(204),
+  });
+  await renderApp({ "(app)/notifications": NotificationsScreen }, client, "/notifications");
+
+  await fireEvent.press(await screen.findByLabelText("Someone adds you to an expense: email"));
+  await waitFor(() =>
+    expect(screen.getByLabelText("A payment with you is recorded: email").props.accessibilityState).toMatchObject({ disabled: false }),
+  );
+  await fireEvent.press(screen.getByLabelText("A payment with you is recorded: email"));
+
+  await waitFor(() => expect(calls.filter((c) => c.method === "PUT")).toHaveLength(2));
+  expect(calls.filter((c) => c.method === "PUT")[1]?.body).toMatchObject({ expenseEmail: true, paymentEmail: true });
+});
+
 test("email switches are off until the email address is verified", async () => {
   const { client } = fakeLedger({ "GET /me/notifications": () => json(200, { ...settings, emailAvailable: false }) });
   await renderApp({ "(app)/notifications": NotificationsScreen }, client, "/notifications");
   expect(await screen.findByText("Verify your email address to get email.")).toBeTruthy();
   expect(screen.getByLabelText("Someone adds you to an expense: email").props.accessibilityState).toMatchObject({ disabled: true });
+});
+
+// Last in the file: holding a save open across React's act() leaves the act queue unsettled for the tests after it.
+test("switches wait while one is saving, so a tap is never silently undone", async () => {
+  let finish!: () => void;
+  const { client, calls } = fakeLedger({
+    "GET /me/notifications": () => json(200, settings),
+    "PUT /me/notifications": () => new Promise<Response>((resolve) => (finish = () => resolve(json(204)))),
+  });
+  await renderApp({ "(app)/notifications": NotificationsScreen }, client, "/notifications");
+
+  const saving = fireEvent.press(await screen.findByLabelText("Someone adds you to an expense: email")); // held until finish()
+  await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
+
+  expect(screen.getByLabelText("A payment with you is recorded: email").props.accessibilityState).toMatchObject({ disabled: true });
+  finish();
+  await saving;
 });

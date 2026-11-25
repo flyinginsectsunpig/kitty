@@ -11,7 +11,7 @@ import { useLoad } from "../../hooks/useLoad";
 import { useLedger } from "../../ledger";
 import { colors, font, space } from "../../theme";
 
-/** Which news reaches this person, by push and by email. Each switch saves as it's flipped. */
+/** Which news reaches this person, by push and by email. Each switch saves as it's flipped; the others wait meanwhile. */
 export default function NotificationsScreen() {
   const ledger = useLedger();
   const loaded = useLoad(() => ledger.GET("/me/notifications"), [ledger]);
@@ -49,13 +49,14 @@ export default function NotificationsScreen() {
                       label="Push"
                       accessibilityLabel={`${row.label}: push`}
                       checked={settings[row.push]}
+                      disabled={save.busy}
                       onChange={(on) => flip(row.push, on)}
                     />
                     <Checkbox
                       label="Email"
                       accessibilityLabel={`${row.label}: email`}
                       checked={settings[row.email]}
-                      disabled={!settings.emailAvailable}
+                      disabled={save.busy || !settings.emailAvailable}
                       onChange={(on) => flip(row.email, on)}
                     />
                   </View>
