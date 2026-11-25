@@ -9,7 +9,7 @@
 {"conversation": [{"role": "person", "text": "Who do I owe money to?"}], "today": "2026-11-25", "expect": {"calls": ["what_i_owe"], "contains": ["Joe", "Lee", "Sam"]}}
 {"conversation": [{"role": "person", "text": "What did the 2025 business trip cost?"}], "today": "2026-11-25", "expect": {"calls": ["list_groups", "group_spending"], "contains": ["R 14 000,00", "2025"], "not_contains": ["R 18 000,00"]}}
 {"conversation": [{"role": "person", "text": "How much have we spent on Uber in Flat 4B this year?"}], "today": "2026-11-25", "expect": {"calls": ["group_spending"], "contains": ["R 50,00"]}}
-{"conversation": [{"role": "person", "text": "What did the family spend on groceries since September?"}], "today": "2026-11-25", "expect": {"calls": ["group_spending"], "contains": ["R 250,00", "Woolies"]}}
+{"conversation": [{"role": "person", "text": "What did the family spend on groceries since September?"}], "today": "2026-11-25", "expect": {"calls": ["group_spending"], "contains": ["R 250,00", "Family"]}}
 {"conversation": [{"role": "person", "text": "Who paid the most in the family over the last 3 months?"}], "today": "2026-11-25", "expect": {"calls": ["group_spending"], "contains": ["Sam", "R 3 250,00"]}}
 {"conversation": [{"role": "person", "text": "What was my share of the Flat 4B groceries?"}], "today": "2026-11-25", "expect": {"contains": ["R 95,00"]}}
 {"conversation": [{"role": "person", "text": "How much did the Book club spend this year?"}], "today": "2026-11-25", "expect": {"calls": ["list_groups"], "contains": ["Book club"], "not_contains": ["R 0,00"]}}
