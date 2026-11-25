@@ -11,3 +11,4 @@ export * from "./activity";
 export * from "./fx";
 export * from "./recurring";
 export * from "./notifications";
+export * from "./plain-entry";

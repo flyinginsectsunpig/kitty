@@ -9,10 +9,10 @@ export default async function NewExpensePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; draft?: string }>;
 }) {
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, draft } = await searchParams;
   const { group, me } = await loadGroup(id);
 
   return (
@@ -29,6 +29,7 @@ export default async function NewExpensePage({
         groupCurrency={group.baseCurrency}
         fetchRate={fetchRate}
         repeat={{ initial: "none", endsOn: "" }}
+        fromDraft={draft === "1"}
         initial={newExpenseForm({
           id: crypto.randomUUID(),
           today: new Date().toISOString().slice(0, 10),

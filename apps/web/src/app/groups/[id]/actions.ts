@@ -160,3 +160,16 @@ export async function recordSettlement(form: FormData) {
   if (error) withError(`/groups/${groupId}/settle`, error);
   redirect(`/groups/${groupId}/settle?settled=1`);
 }
+
+/** Reminds someone what they owe the signed-in person (the ledger works out the amount; once a day each). */
+export async function remindMember(form: FormData) {
+  const groupId = field(form, "groupId");
+  const ledger = await getLedger();
+  const { error } = await ledger.POST("/groups/{groupId}/reminders", {
+    params: { path: { groupId } },
+    body: { memberId: field(form, "memberId") },
+    ...keyed(form),
+  });
+  if (error) withError(`/groups/${groupId}/settle`, error);
+  redirect(`/groups/${groupId}/settle?reminded=1`);
+}

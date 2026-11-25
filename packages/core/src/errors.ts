@@ -29,6 +29,14 @@ const messages: Record<string, string> = {
   fx_rate_unavailable: "Couldn't get today's exchange rate. Type the rate instead.",
   fx_rate_required: "We couldn't look up the exchange rate. Enter it to record this payment.",
   fx_rate_invalid: "That exchange rate doesn't look right.",
+  ai_signed_out: "Sign out and in again to type expenses in a sentence.",
+  ai_rate_limited: "That's a lot of sentences for one hour. Use the form, or try again later.",
+  ai_unavailable: "Kitty can't read sentences right now. Use the form instead.",
+  unclear: "Kitty couldn't understand that. Try other words, or use the form.",
+  sentence_invalid: "Type a sentence of up to 500 characters.",
+  nothing_owed: "They don't owe you anything in this group.",
+  no_account: "They haven't joined Kitty, so there's no one to remind.",
+  already_reminded: "You've already reminded them today.",
 };
 
 export function errorMessage(code: string | undefined): string | null {
