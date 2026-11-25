@@ -7,19 +7,19 @@ import (
 	"time"
 )
 
-// Weekly asks the ledger for the weekly summaries on Mondays from 06:00 UTC, once a week. The ledger queues each
-// person's summary once per week, so asking again after a restart is harmless.
+// Weekly asks the ledger for each ISO week's summaries once, from Monday 06:00 UTC, or later that week if pulse was
+// down then. The ledger queues each person's summary once per week, so asking again after a restart is harmless.
 type Weekly struct {
 	Ledger Ledger
 	Now    func() time.Time
 	done   string // the ISO week already asked for
 }
 
-// Tick asks for this week's summaries if it's time and that hasn't happened yet.
+// Tick asks for this week's summaries unless it's before Monday 06:00 or that already happened.
 func (w *Weekly) Tick(ctx context.Context) error {
 	now := w.Now().UTC()
-	if now.Weekday() != time.Monday || now.Hour() < 6 {
-		return nil
+	if now.Weekday() == time.Monday && now.Hour() < 6 {
+		return nil // this week's summaries go out from 06:00
 	}
 	year, week := now.ISOWeek()
 	name := fmt.Sprintf("%d-W%02d", year, week)

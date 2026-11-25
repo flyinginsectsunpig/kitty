@@ -29,3 +29,17 @@ func TestWeekly_QueuesOnMondayAfterSixUTCOnce(t *testing.T) {
 		t.Fatalf("weeks = %v", l.weeks)
 	}
 }
+
+// pulse was down all Monday: the week's summaries still go out once it's back, later that week.
+func TestWeekly_CatchesUpLaterInTheWeek(t *testing.T) {
+	l := &fakeLedger{}
+	now := time.Date(2026, 12, 2, 9, 0, 0, 0, time.UTC) // Wednesday of 2026-W49, nothing asked yet
+	w := &Weekly{Ledger: l, Now: func() time.Time { return now }}
+
+	_ = w.Tick(context.Background())
+	_ = w.Tick(context.Background())
+
+	if !slices.Equal(l.weeks, []string{"2026-W49"}) {
+		t.Fatalf("weeks = %v", l.weeks)
+	}
+}
