@@ -6,6 +6,7 @@ import AppLayout from "../../src/app/(app)/_layout";
 import { AuthProvider } from "../../src/auth/AuthProvider";
 import type { AuthClient } from "../../src/auth/client";
 import type { TokenStore } from "../../src/auth/tokens";
+import { AiProvider, type AiClient } from "../../src/ai";
 import { LedgerProvider } from "../../src/ledger";
 
 export function memoryStore(): TokenStore & { data: Map<string, string> } {
@@ -20,7 +21,7 @@ export const fakeAuthClient = (): AuthClient => ({
 });
 
 /** Renders signed-in app routes (keys under "(app)/") against a fake ledger. */
-export async function renderApp(routes: Record<string, ComponentType<any>>, ledger: LedgerClient, initialUrl: string) {
+export async function renderApp(routes: Record<string, ComponentType<any>>, ledger: LedgerClient, initialUrl: string, ai?: AiClient) {
   const store = memoryStore();
   const expiresAt = Math.floor(Date.now() / 1000) + 3600;
   await store.set("kitty.tokens", JSON.stringify({ accessToken: "a", refreshToken: "r", expiresAt, idToken: "id" }));
@@ -30,7 +31,9 @@ export async function renderApp(routes: Record<string, ComponentType<any>>, ledg
       _layout: () => (
         <AuthProvider client={authClient} store={store}>
           <LedgerProvider client={ledger}>
-            <Slot />
+            <AiProvider client={ai}>
+              <Slot />
+            </AiProvider>
           </LedgerProvider>
         </AuthProvider>
       ),

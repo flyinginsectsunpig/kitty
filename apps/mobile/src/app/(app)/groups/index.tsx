@@ -4,6 +4,7 @@ import { Link, Stack } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../../../auth/AuthProvider";
 import { Button } from "../../../components/Button";
+import { PlainEntry } from "../../../components/PlainEntry";
 import { Card, LoadState, Screen } from "../../../components/Screen";
 import { useLoad } from "../../../hooks/useLoad";
 import { useReloadOnReturn } from "../../../hooks/useReloadOnReturn";
@@ -31,6 +32,7 @@ export default function GroupsScreen() {
       <Link href="/groups/new" asChild>
         <Button title="New group" onPress={() => {}} />
       </Link>
+      {(groups.data?.length ?? 0) > 0 && <PlainEntry />}
       <LoadState state={groups}>
         {(list) =>
           list.length === 0 ? (

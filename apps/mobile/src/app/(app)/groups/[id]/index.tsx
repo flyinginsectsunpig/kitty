@@ -7,6 +7,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../../components/Button";
 import { ErrorBanner } from "../../../../components/ErrorBanner";
 import { GroupNav } from "../../../../components/GroupNav";
+import { PlainEntry } from "../../../../components/PlainEntry";
 import { Card, LoadState, Screen } from "../../../../components/Screen";
 import { useGroup } from "../../../../group/GroupContext";
 import { problemMessage } from "../../../../hooks/useAction";
@@ -41,6 +42,7 @@ export default function GroupOverview() {
   return (
     <Screen onRefresh={() => void state.reload()} refreshing={state.loading && state.data !== null}>
       <GroupNav groupId={groupId} active="" />
+      <PlainEntry groupId={groupId} />
       <View style={styles.actions}>
         <Link href={`/groups/${groupId}/expenses/new`} asChild>
           <Button title="Add an expense" onPress={() => {}} />

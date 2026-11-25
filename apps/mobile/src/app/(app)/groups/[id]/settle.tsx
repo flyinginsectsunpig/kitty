@@ -45,15 +45,20 @@ export default function SettleScreen() {
           return (
             <>
               <Text style={styles.muted}>The fewest payments that settle everyone. Pay outside Kitty, then mark it as paid.</Text>
-              {transfers.map((t) => (
-                <TransferCard
-                  key={`${t.currency}-${t.fromMemberId}-${t.toMemberId}-${t.amountMinor}`}
-                  transfer={t}
-                  onPaid={() => {
-                    setRecorded(true);
-                    void balances.reload();
-                  }}
-                />
+              {transfers.map((t, i) => (
+                <View key={`${t.currency}-${t.fromMemberId}-${t.toMemberId}-${t.amountMinor}`} style={styles.stack}>
+                  <TransferCard
+                    transfer={t}
+                    onPaid={() => {
+                      setRecorded(true);
+                      void balances.reload();
+                    }}
+                  />
+                  {/* Someone who owes you: one Remind per person, under their first payment to you. */}
+                  {t.toMemberId === me.id && transfers.findIndex((x) => x.toMemberId === me.id && x.fromMemberId === t.fromMemberId) === i && (
+                    <RemindButton memberId={t.fromMemberId} />
+                  )}
+                </View>
               ))}
             </>
           );
@@ -64,6 +69,31 @@ export default function SettleScreen() {
 }
 
 const todayUtc = () => new Date().toISOString().slice(0, 10);
+
+/** Reminds someone what they owe you (the ledger works out the amount; once a day). */
+function RemindButton({ memberId }: { memberId: string }) {
+  const ledger = useLedger();
+  const { group, nameOf } = useGroup();
+  const [sent, setSent] = useState(false);
+  const remind = useAction(
+    useCallback(
+      (key: string) =>
+        ledger.POST("/groups/{groupId}/reminders", {
+          params: { path: { groupId: group.id } },
+          body: { memberId },
+          headers: { "Idempotency-Key": key },
+        }),
+      [ledger, group.id, memberId],
+    ),
+  );
+  if (sent) return <Text style={styles.success}>Reminder sent to {nameOf(memberId)}.</Text>;
+  return (
+    <>
+      <ErrorBanner message={remind.error} />
+      <Button title={`Remind ${nameOf(memberId)}`} variant="secondary" busy={remind.busy} onPress={() => void remind.run().then((r) => r.ok && setSent(true))} />
+    </>
+  );
+}
 
 function TransferCard({ transfer: t, onPaid }: { transfer: Transfer; onPaid: () => void }) {
   const ledger = useLedger();
@@ -190,6 +220,7 @@ function ForeignFields({ transfer: t, groupCurrency, quote, inGroupCurrency, onI
 }
 
 const styles = StyleSheet.create({
+  stack: { gap: space.sm },
   foreign: { gap: space.xs },
   line: { fontSize: font.base, color: colors.text },
   strong: { fontWeight: "600" },
