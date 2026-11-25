@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 from google.genai import errors
 
+from kitty_ai.entry import parse
 from kitty_ai.entry.parse import GeminiParser, NoModel, parser_from
 from kitty_ai.entry.schema import ParsedSentence
 from kitty_ai.receipts.extract import ModelUnavailable, RateLimited, UnusableOutput
@@ -75,3 +76,14 @@ def test_no_model_raises_unavailable():
     with pytest.raises(ModelUnavailable):
         NoModel().parse("x", date(2026, 11, 25), "ZAR")
     assert isinstance(parser_from(Settings(gemini_api_key="", ollama_url="")), NoModel)
+
+
+def test_payment_fields_validate():
+    parsed = ParsedSentence.model_validate(
+        {"intent": "payment", "direction": "i_paid", "counterpart": "Joe", "items": ["Uber"]}
+    )
+    assert (parsed.direction, parsed.counterpart, parsed.items) == ("i_paid", "Joe", ["Uber"])
+
+
+def test_prompt_describes_payments():
+    assert "cross off the Uber for Joe, I paid him" in parse.SYSTEM

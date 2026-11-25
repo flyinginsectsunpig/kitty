@@ -4,7 +4,20 @@ import pathlib
 from kitty_ai.entry.schema import ParsedSentence
 
 PHRASES = pathlib.Path(__file__).resolve().parents[1] / "evals" / "nl" / "phrases.jsonl"
-EXPECT_FIELDS = {"intent", "amount", "currency", "people", "split", "group", "payer", "category", "reminder_amount"}
+EXPECT_FIELDS = {
+    "intent",
+    "amount",
+    "currency",
+    "people",
+    "split",
+    "group",
+    "payer",
+    "category",
+    "reminder_amount",
+    "direction",
+    "counterpart",
+    "items",
+}
 
 
 def test_nl_evals_file_is_well_formed():
@@ -13,7 +26,7 @@ def test_nl_evals_file_is_well_formed():
     for case in lines:
         assert set(case) == {"text", "today", "currency", "expect"}, case
         assert set(case["expect"]) <= EXPECT_FIELDS, case
-        assert case["expect"]["intent"] in {"expense", "reminder", "question", "unclear"}
+        assert case["expect"]["intent"] in {"expense", "reminder", "question", "payment", "unclear"}
         # Every expected value has to be something the model could return.
         ParsedSentence.model_validate({"intent": case["expect"]["intent"]})
 

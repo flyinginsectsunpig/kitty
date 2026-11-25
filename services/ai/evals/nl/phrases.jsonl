@@ -35,3 +35,11 @@
 {"text": "Add groceries to Family budget. I spent R2000", "today": "2026-11-25", "currency": "ZAR", "expect": {"intent": "expense", "amount": "2000", "category": "groceries", "group": "family", "payer": "me"}}
 {"text": "Me and Joe split on Uber for R50, split it between me and him", "today": "2026-11-25", "currency": "ZAR", "expect": {"intent": "expense", "amount": "50", "people": ["me", "Joe"], "split": "equal", "category": "transport"}}
 {"text": "what did we spend on groceries this month?", "today": "2026-11-25", "currency": "ZAR", "expect": {"intent": "question"}}
+{"text": "Cross off the Uber for Joe, I paid him", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "direction": "i_paid", "counterpart": "Joe", "items": ["Uber"]}}
+{"text": "Joe paid me back for the pizza", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "direction": "they_paid", "counterpart": "Joe", "items": ["pizza"]}}
+{"text": "Cross off the Uber and the groceries, I paid Joe", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "direction": "i_paid", "counterpart": "Joe", "items": ["Uber", "groceries"]}}
+{"text": "Cross off the pizza, Joe paid me back", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "direction": "they_paid", "counterpart": "Joe", "items": ["pizza"]}}
+{"text": "Ana paid me back for the tickets", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "direction": "they_paid", "counterpart": "Ana", "items": ["tickets"]}}
+{"text": "I paid Joe R10 for the Uber", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "direction": "i_paid", "counterpart": "Joe", "items": ["Uber"], "amount": "10"}}
+{"text": "Sam paid me back", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "direction": "they_paid", "counterpart": "Sam", "items": []}}
+{"text": "cross off the Uber", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "items": ["Uber"]}}
