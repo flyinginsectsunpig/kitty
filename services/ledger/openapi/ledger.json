@@ -2791,6 +2791,8 @@
           "paymentEmail",
           "weeklyPush",
           "weeklyEmail",
+          "reminderPush",
+          "reminderEmail",
           "emailAvailable"
         ],
         "type": "object",
@@ -2813,6 +2815,12 @@
           "weeklyEmail": {
             "type": "boolean"
           },
+          "reminderPush": {
+            "type": "boolean"
+          },
+          "reminderEmail": {
+            "type": "boolean"
+          },
           "emailAvailable": {
             "type": "boolean"
           }
@@ -2825,7 +2833,9 @@
           "paymentPush",
           "paymentEmail",
           "weeklyPush",
-          "weeklyEmail"
+          "weeklyEmail",
+          "reminderPush",
+          "reminderEmail"
         ],
         "type": "object",
         "properties": {
@@ -2845,6 +2855,12 @@
             "type": "boolean"
           },
           "weeklyEmail": {
+            "type": "boolean"
+          },
+          "reminderPush": {
+            "type": "boolean"
+          },
+          "reminderEmail": {
             "type": "boolean"
           }
         }

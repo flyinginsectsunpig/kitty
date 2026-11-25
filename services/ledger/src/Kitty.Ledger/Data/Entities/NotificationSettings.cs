@@ -1,6 +1,6 @@
 namespace Kitty.Ledger.Data.Entities;
 
-/// <summary>What a person wants to be told, on which channel. Defaults: push for expenses and payments, nothing else.</summary>
+/// <summary>What a person wants to be told, on which channel. Defaults: push for expenses, payments and reminders, nothing else.</summary>
 public sealed class NotificationSettings
 {
     public Guid UserId { get; set; }
@@ -10,6 +10,10 @@ public sealed class NotificationSettings
     public bool PaymentEmail { get; set; }
     public bool WeeklyPush { get; set; }
     public bool WeeklyEmail { get; set; }
+    public bool ReminderPush { get; set; } = true;
+    public bool ReminderEmail { get; set; }
+    /// <summary>Whether pulse has been sent the reminder settings (rows from before 4a are re-published once).</summary>
+    public bool RemindersPublished { get; set; }
     /// <summary>Bumped on every publish, so pulse keeps the newest state.</summary>
     public long Version { get; set; }
 }

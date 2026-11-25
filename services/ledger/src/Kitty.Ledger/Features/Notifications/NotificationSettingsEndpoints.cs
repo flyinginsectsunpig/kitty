@@ -10,10 +10,10 @@ namespace Kitty.Ledger.Features.Notifications;
 
 /// <summary>Per kind, push and email on or off. EmailAvailable: the person has a verified address.</summary>
 public sealed record NotificationSettingsDto(bool ExpensePush, bool ExpenseEmail, bool PaymentPush, bool PaymentEmail,
-    bool WeeklyPush, bool WeeklyEmail, bool EmailAvailable);
+    bool WeeklyPush, bool WeeklyEmail, bool ReminderPush, bool ReminderEmail, bool EmailAvailable);
 
 public sealed record NotificationSettingsWriteDto(bool ExpensePush, bool ExpenseEmail, bool PaymentPush, bool PaymentEmail,
-    bool WeeklyPush, bool WeeklyEmail);
+    bool WeeklyPush, bool WeeklyEmail, bool ReminderPush, bool ReminderEmail);
 
 /// <summary>A phone's push token. Always in the body: URLs end up in logs and traces.</summary>
 public sealed record DeviceDto(string Token, string Platform);
@@ -34,7 +34,7 @@ public static class NotificationSettingsEndpoints
     }
 
     private static NotificationSettingsDto ToDto(NotificationSettings s, User u) =>
-        new(s.ExpensePush, s.ExpenseEmail, s.PaymentPush, s.PaymentEmail, s.WeeklyPush, s.WeeklyEmail,
+        new(s.ExpensePush, s.ExpenseEmail, s.PaymentPush, s.PaymentEmail, s.WeeklyPush, s.WeeklyEmail, s.ReminderPush, s.ReminderEmail,
             EmailAvailable: u.EmailVerified && !string.IsNullOrEmpty(u.Email));
 
     private static async Task<IResult> GetAsync(ICurrentUser current, NotifySettingsPublisher publisher, LedgerDbContext db, CancellationToken ct)
@@ -63,8 +63,9 @@ public static class NotificationSettingsEndpoints
     {
         var user = await current.GetAsync(ct);
         var s = await publisher.SettingsAsync(user.Id, ct);
-        (s.ExpensePush, s.ExpenseEmail, s.PaymentPush, s.PaymentEmail, s.WeeklyPush, s.WeeklyEmail) =
-            (body.ExpensePush, body.ExpenseEmail, body.PaymentPush, body.PaymentEmail, body.WeeklyPush, body.WeeklyEmail);
+        (s.ExpensePush, s.ExpenseEmail, s.PaymentPush, s.PaymentEmail, s.WeeklyPush, s.WeeklyEmail, s.ReminderPush, s.ReminderEmail) =
+            (body.ExpensePush, body.ExpenseEmail, body.PaymentPush, body.PaymentEmail, body.WeeklyPush, body.WeeklyEmail,
+                body.ReminderPush, body.ReminderEmail);
         await publisher.QueueAsync(user, ct);
         if (!await SaveAsync(db, ct)) return Conflict();
         return Results.Ok(ToDto(s, user));

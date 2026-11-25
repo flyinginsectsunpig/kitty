@@ -870,6 +870,8 @@ export interface components {
             paymentEmail: boolean;
             weeklyPush: boolean;
             weeklyEmail: boolean;
+            reminderPush: boolean;
+            reminderEmail: boolean;
             emailAvailable: boolean;
         };
         NotificationSettingsWriteDto: {
@@ -879,6 +881,8 @@ export interface components {
             paymentEmail: boolean;
             weeklyPush: boolean;
             weeklyEmail: boolean;
+            reminderPush: boolean;
+            reminderEmail: boolean;
         };
         ParticipantDto: {
             /** Format: uuid */

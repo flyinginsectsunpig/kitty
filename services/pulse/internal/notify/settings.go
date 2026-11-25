@@ -35,6 +35,7 @@ type Settings struct {
 	UserID                                                                        string
 	Email                                                                         string // verified only; empty = no email
 	ExpensePush, ExpenseEmail, PaymentPush, PaymentEmail, WeeklyPush, WeeklyEmail bool
+	ReminderPush, ReminderEmail                                                   bool
 	Tokens                                                                        []string
 	Version                                                                       int64
 }
@@ -49,6 +50,8 @@ CREATE TABLE IF NOT EXISTS pulse.notify_settings (
   tokens text[] NOT NULL,
   version bigint NOT NULL
 );
+ALTER TABLE pulse.notify_settings ADD COLUMN IF NOT EXISTS reminder_push boolean NOT NULL DEFAULT true;
+ALTER TABLE pulse.notify_settings ADD COLUMN IF NOT EXISTS reminder_email boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS pulse.deliveries (
   notification_id uuid NOT NULL,
   channel text NOT NULL,
@@ -92,14 +95,14 @@ func (s *Store) Upsert(ctx context.Context, x Settings) error {
 	}
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO pulse.notify_settings (user_id, email, expense_push, expense_email, payment_push, payment_email,
-		  weekly_push, weekly_email, tokens, version)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		  weekly_push, weekly_email, tokens, version, reminder_push, reminder_email)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, expense_push = EXCLUDED.expense_push,
 		  expense_email = EXCLUDED.expense_email, payment_push = EXCLUDED.payment_push, payment_email = EXCLUDED.payment_email,
 		  weekly_push = EXCLUDED.weekly_push, weekly_email = EXCLUDED.weekly_email, tokens = EXCLUDED.tokens,
-		  version = EXCLUDED.version
+		  version = EXCLUDED.version, reminder_push = EXCLUDED.reminder_push, reminder_email = EXCLUDED.reminder_email
 		WHERE pulse.notify_settings.version < EXCLUDED.version`,
-		x.UserID, x.Email, x.ExpensePush, x.ExpenseEmail, x.PaymentPush, x.PaymentEmail, x.WeeklyPush, x.WeeklyEmail, tokens, x.Version)
+		x.UserID, x.Email, x.ExpensePush, x.ExpenseEmail, x.PaymentPush, x.PaymentEmail, x.WeeklyPush, x.WeeklyEmail, tokens, x.Version, x.ReminderPush, x.ReminderEmail)
 	if err != nil {
 		return fmt.Errorf("notify settings: upsert %s: %w", x.UserID, err)
 	}
@@ -110,9 +113,11 @@ func (s *Store) Upsert(ctx context.Context, x Settings) error {
 func (s *Store) Get(ctx context.Context, userID string) (Settings, bool, error) {
 	x := Settings{UserID: userID}
 	err := s.pool.QueryRow(ctx, `
-		SELECT email, expense_push, expense_email, payment_push, payment_email, weekly_push, weekly_email, tokens, version
+		SELECT email, expense_push, expense_email, payment_push, payment_email, weekly_push, weekly_email, tokens, version,
+		  reminder_push, reminder_email
 		FROM pulse.notify_settings WHERE user_id = $1`, userID).
-		Scan(&x.Email, &x.ExpensePush, &x.ExpenseEmail, &x.PaymentPush, &x.PaymentEmail, &x.WeeklyPush, &x.WeeklyEmail, &x.Tokens, &x.Version)
+		Scan(&x.Email, &x.ExpensePush, &x.ExpenseEmail, &x.PaymentPush, &x.PaymentEmail, &x.WeeklyPush, &x.WeeklyEmail, &x.Tokens, &x.Version,
+			&x.ReminderPush, &x.ReminderEmail)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Settings{}, false, nil
 	}
@@ -230,6 +235,7 @@ func DecodeSettings(value []byte) (Settings, error) {
 		ExpensePush: m.GetExpensePush(), ExpenseEmail: m.GetExpenseEmail(),
 		PaymentPush: m.GetPaymentPush(), PaymentEmail: m.GetPaymentEmail(),
 		WeeklyPush: m.GetWeeklyPush(), WeeklyEmail: m.GetWeeklyEmail(),
+		ReminderPush: m.GetReminderPush(), ReminderEmail: m.GetReminderEmail(),
 		Tokens: m.GetPushTokens(), Version: m.GetVersion(),
 	}, nil
 }

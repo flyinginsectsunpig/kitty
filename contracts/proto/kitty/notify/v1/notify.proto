@@ -15,6 +15,8 @@ message NotificationRequested {
     KIND_EXPENSE_ADDED = 1;
     KIND_PAYMENT = 2;
     KIND_WEEKLY_SUMMARY = 3;
+    // Someone in the group reminded this person what they owe them.
+    KIND_REMINDER = 4;
   }
   // Delivery is once per (notification_id, channel).
   string notification_id = 1;
@@ -43,4 +45,6 @@ message NotifySettingsChanged {
   repeated string push_tokens = 9;
   // Higher wins.
   int64 version = 10;
+  bool reminder_push = 11;
+  bool reminder_email = 12;
 }

@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Kitty.Ledger.IntegrationTests;
 
 public sealed record NotificationSettingsDto(bool ExpensePush, bool ExpenseEmail, bool PaymentPush, bool PaymentEmail,
-    bool WeeklyPush, bool WeeklyEmail, bool EmailAvailable);
+    bool WeeklyPush, bool WeeklyEmail, bool ReminderPush, bool ReminderEmail, bool EmailAvailable);
 
 [Collection(ApiCollection.Name)]
 public class NotificationSettingsTests(LedgerApiFactory factory)
@@ -42,7 +42,8 @@ public class NotificationSettingsTests(LedgerApiFactory factory)
 
         var s = (await c.GetFromJsonAsync<NotificationSettingsDto>("/me/notifications", ApiClientExtensions.Json, Ct))!;
 
-        Assert.Equal(new NotificationSettingsDto(true, false, true, false, false, false, EmailAvailable: true), s);
+        Assert.Equal(new NotificationSettingsDto(true, false, true, false, false, false, ReminderPush: true, ReminderEmail: false,
+            EmailAvailable: true), s);
     }
 
     [Fact]
@@ -66,12 +67,13 @@ public class NotificationSettingsTests(LedgerApiFactory factory)
 
         var r = await c.PutJsonAsync("/me/notifications", new
         {
-            expensePush = false, expenseEmail = true, paymentPush = true, paymentEmail = true, weeklyPush = true, weeklyEmail = false,
+            expensePush = false, expenseEmail = true, paymentPush = true, paymentEmail = true, weeklyPush = true, weeklyEmail = false, reminderPush = false, reminderEmail = true,
         });
 
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         var e = (await LatestAsync(me.Id))!;
         Assert.Equal((false, true, true, true, true, false), (e.ExpensePush, e.ExpenseEmail, e.PaymentPush, e.PaymentEmail, e.WeeklyPush, e.WeeklyEmail));
+        Assert.Equal((false, true), (e.ReminderPush, e.ReminderEmail));
         Assert.Equal(["tok-b1"], e.PushTokens);
         Assert.Equal("b@example.com", e.Email);
     }
@@ -120,7 +122,7 @@ public class NotificationSettingsTests(LedgerApiFactory factory)
     {
         var c = User($"sub-{Guid.NewGuid()}", "race2@example.com");
         await c.GetAsync("/me/notifications", Ct);
-        var body = new { expensePush = false, expenseEmail = false, paymentPush = true, paymentEmail = false, weeklyPush = false, weeklyEmail = false };
+        var body = new { expensePush = false, expenseEmail = false, paymentPush = true, paymentEmail = false, weeklyPush = false, weeklyEmail = false, reminderPush = false, reminderEmail = true };
 
         var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => c.PutJsonAsync("/me/notifications", body)));
 
@@ -196,7 +198,7 @@ public class NotificationSettingsTests(LedgerApiFactory factory)
         var me = await c.MeAsync();
         (await c.PutJsonAsync("/me/notifications", new
         {
-            expensePush = true, expenseEmail = true, paymentPush = true, paymentEmail = false, weeklyPush = false, weeklyEmail = false,
+            expensePush = true, expenseEmail = true, paymentPush = true, paymentEmail = false, weeklyPush = false, weeklyEmail = false, reminderPush = true, reminderEmail = false,
         })).EnsureSuccessStatusCode();
 
         var events = await KafkaProbe.WaitForAsync<NotifySettingsChanged>(factory, "ledger.notify-settings",

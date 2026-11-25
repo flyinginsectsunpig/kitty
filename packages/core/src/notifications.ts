@@ -4,7 +4,7 @@ export type NotificationField = Exclude<keyof NotificationSettingsDto, "emailAva
 
 /** The notification settings screen: one row per kind of news, a push and an email switch each. */
 export const NOTIFICATION_ROWS: readonly {
-  kind: "expense" | "payment" | "weekly";
+  kind: "expense" | "payment" | "weekly" | "reminder";
   label: string;
   push: NotificationField;
   email: NotificationField;
@@ -12,6 +12,7 @@ export const NOTIFICATION_ROWS: readonly {
   { kind: "expense", label: "Someone adds you to an expense", push: "expensePush", email: "expenseEmail" },
   { kind: "payment", label: "A payment with you is recorded", push: "paymentPush", email: "paymentEmail" },
   { kind: "weekly", label: "Weekly: what you owe (Mondays)", push: "weeklyPush", email: "weeklyEmail" },
+  { kind: "reminder", label: "Someone reminds you what you owe", push: "reminderPush", email: "reminderEmail" },
 ];
 
 /**

@@ -27,6 +27,7 @@ public sealed class NotifySettingsPublisher(LedgerDbContext db, Outbox outbox)
     {
         var settings = await SettingsAsync(user.Id, ct);
         settings.Version++;
+        settings.RemindersPublished = true;
         // Pending adds and removals in this unit of work count too.
         var saved = await db.PushDevices.Where(d => d.UserId == user.Id).Select(d => d.Token).ToListAsync(ct);
         var tracked = db.ChangeTracker.Entries<PushDevice>().ToList();
@@ -46,6 +47,8 @@ public sealed class NotifySettingsPublisher(LedgerDbContext db, Outbox outbox)
             PaymentEmail = settings.PaymentEmail,
             WeeklyPush = settings.WeeklyPush,
             WeeklyEmail = settings.WeeklyEmail,
+            ReminderPush = settings.ReminderPush,
+            ReminderEmail = settings.ReminderEmail,
             Version = settings.Version,
         };
         message.PushTokens.AddRange(tokens);

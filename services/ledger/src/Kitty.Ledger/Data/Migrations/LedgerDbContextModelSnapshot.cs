@@ -375,6 +375,15 @@ namespace Kitty.Ledger.Data.Migrations
                     b.Property<bool>("PaymentPush")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("ReminderEmail")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ReminderPush")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RemindersPublished")
+                        .HasColumnType("boolean");
+
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
