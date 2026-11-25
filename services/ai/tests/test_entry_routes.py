@@ -64,6 +64,9 @@ def ledger_client() -> httpx.Client:
                     },
                 ]
                 return httpx.Response(200, json={"id": G, "name": "Flat 4B", "baseCurrency": "ZAR", "members": members})
+            case "/groups/g-flat/open-items":
+                assert dict(request.url.params) == {"from": ME_M, "to": BOB_M}
+                return httpx.Response(200, json=OPEN_ITEMS)
         return httpx.Response(404, json={"code": "not_found"})
 
     return httpx.Client(transport=httpx.MockTransport(handle))
@@ -72,6 +75,34 @@ def ledger_client() -> httpx.Client:
 EXPENSE = ParsedSentence.model_validate(
     {"intent": "expense", "description": "Dinner", "amount": "300", "people": [{"name": "me"}, {"name": "Bob"}]}
 )
+PAYMENT = ParsedSentence.model_validate(
+    {"intent": "payment", "direction": "i_paid", "counterpart": "Bob", "items": ["Uber"]}
+)
+UBER = {
+    "item": {
+        "expenseId": "e-uber",
+        "description": "Uber",
+        "date": "2026-11-18",
+        "category": "transport",
+        "total": {"currency": "ZAR", "minor": 5000, "text": "R 50,00"},
+        "myShare": {"currency": "ZAR", "minor": 2500, "text": "R 25,00"},
+        "paidBy": "Bob",
+    },
+    "open": {"currency": "ZAR", "minor": 2500, "text": "R 25,00"},
+}
+OPEN_ITEMS = {
+    "fromMemberId": ME_M,
+    "toMemberId": BOB_M,
+    "currencies": [
+        {
+            "currency": "ZAR",
+            "fromOwes": [UBER],
+            "fromOwesTotal": {"currency": "ZAR", "minor": 2500, "text": "R 25,00"},
+            "toOwes": [],
+            "toOwesTotal": {"currency": "ZAR", "minor": 0, "text": "R 0,00"},
+        }
+    ],
+}
 
 
 @pytest.fixture
@@ -108,6 +139,18 @@ def test_parse_returns_draft_groups_members_and_parsed(rig):
     assert body["members"][1] == {"id": BOB_M, "displayName": "Bob"}
     assert body["parsed"]["amount"] == "300"
     assert parser.calls == [(SENTENCE, date(2026, 11, 25), "ZAR")]
+
+
+def test_parse_payment_returns_a_payment_draft(rig):
+    client, parser, _ = rig
+    parser.result = PAYMENT
+    r = client.post("/parse", json={"text": "cross off the Uber for Bob, I paid him", "groupId": G})
+    assert r.status_code == 200
+    body = r.json()
+    assert (body["intent"], body["issues"]) == ("payment", [])
+    pay = body["payment"]
+    assert (pay["fromMemberId"], pay["toMemberId"], pay["amountMinor"]) == (ME_M, BOB_M, 2500)
+    assert pay["covers"] == [{"expenseId": "e-uber", "amountMinor": 2500}]
 
 
 def test_resolve_rematches_without_the_model(rig):

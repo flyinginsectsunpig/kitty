@@ -68,7 +68,12 @@ def make_router(
         if me_member is None:
             raise NotFound(group_id)
         return build_draft(
-            parsed, group, me_member, today(), lambda member: reader.owed_to_me(group.id, me_member, member)
+            parsed,
+            group,
+            me_member,
+            today(),
+            lambda member: reader.owed_to_me(group.id, me_member, member),
+            lambda f, t: reader.open_items(group.id, f, t),
         )
 
     def respond(draft: dict, parsed: ParsedSentence, groups) -> JSONResponse:
