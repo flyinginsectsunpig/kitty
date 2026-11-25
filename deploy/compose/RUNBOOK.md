@@ -43,6 +43,8 @@ Keycloak requires email verification (it stops account takeover through Google s
   DNS records, which a DuckDNS name can't have): `SMTP_HOST=smtp.resend.com`, `SMTP_USER=resend`,
   `SMTP_PASSWORD` = the API key, `SMTP_FROM` on the verified domain.
 
+Notification emails (section 3b) go out through the same account, from "Kitty <SMTP_FROM>".
+
 ## 3a. Receipt scanning
 
 Optional: create a free API key in Google AI Studio and put it in `GEMINI_API_KEY`. Photos never leave the server:
@@ -54,6 +56,25 @@ Receipt photos are stored in Azurite on the server (`BLOB_ACCOUNT_KEY` protects 
 after the bill closes. To use a real Azure storage account instead, set `BLOB_CONNECTION_STRING` to its
 connection string, set `BLOB_PUBLIC_URL=` (empty, so browsers upload to Azure directly), and add a CORS
 rule on the account allowing `PUT` from `https://<your host>`.
+
+## 3b. Notifications
+
+pulse tells people when they're added to an expense or a payment with them is recorded, and on Mondays what they
+owe. Each person picks push and/or email for each in Settings → Notifications (push for expenses and payments is on
+by default; email only reaches a verified address). Email needs nothing beyond section 3.
+
+Push (the Android app) needs a free Firebase project, once:
+
+1. In the [Firebase console](https://console.firebase.google.com), add a project (Analytics not needed), then add an
+   Android app with package name `za.kitty.app`. Download its `google-services.json`: that goes into the app build
+   (see [apps/mobile/README.md](../../apps/mobile/README.md), "Push notifications").
+2. Project settings → Service accounts → Generate new private key. Copy the file to the server as
+   `deploy/compose/secrets/fcm.json` (readable by the container: `chmod 644`), and set
+   `PULSE_FCM_CREDENTIALS=/secrets/fcm.json` in `.env`. Keep it secret: it can send push to every Kitty phone.
+3. `docker compose up -d pulse`. Its log no longer says "push notifications are off".
+
+Phones register when someone signs in to an APK built with `google-services.json`; a phone that uninstalls the app is
+forgotten the next time a push to it fails.
 
 ## 4. Configure and start
 

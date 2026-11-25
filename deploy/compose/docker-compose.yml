@@ -185,6 +185,18 @@ services:
       PULSE_LEDGER_GRPC: ledger:8082
       PULSE_TOKEN_URL: http://keycloak:8080/auth/realms/kitty/protocol/openid-connect/token
       PULSE_CLIENT_SECRET: ${PULSE_CLIENT_SECRET:?set PULSE_CLIENT_SECRET}
+      # Notifications. Email goes out through the same SMTP account as Keycloak's; links open the site.
+      PULSE_SMTP_HOST: ${SMTP_HOST:-smtp.resend.com}
+      PULSE_SMTP_PORT: ${SMTP_PORT:-465}
+      PULSE_SMTP_USER: ${SMTP_USER:-resend}
+      PULSE_SMTP_PASSWORD: ${SMTP_PASSWORD:?set SMTP_PASSWORD}
+      PULSE_SMTP_FROM: Kitty <${SMTP_FROM:?set SMTP_FROM}>
+      PULSE_WEB_URL: https://${KITTY_HOST}
+      # Push: put the Firebase service-account key at ./secrets/fcm.json and set PULSE_FCM_CREDENTIALS=/secrets/fcm.json
+      # (RUNBOOK.md, "Notifications"). Empty: push is off.
+      PULSE_FCM_CREDENTIALS: ${PULSE_FCM_CREDENTIALS:-}
+    volumes:
+      - ./secrets:/secrets:ro
     healthcheck:
       test: ["CMD", "/pulse", "-health"]
       interval: 30s
