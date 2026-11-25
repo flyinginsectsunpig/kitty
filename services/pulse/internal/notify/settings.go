@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	notifyv1 "github.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/notify/v1"
 	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/kafkaconsume"
@@ -52,6 +53,13 @@ CREATE TABLE IF NOT EXISTS pulse.deliveries (
   channel text NOT NULL,
   delivered_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (notification_id, channel)
+);
+CREATE TABLE IF NOT EXISTS pulse.pending_notifications (
+  notification_id uuid PRIMARY KEY,
+  request bytea NOT NULL,
+  occurred_at timestamptz NOT NULL,
+  attempts int NOT NULL DEFAULT 0,
+  next_attempt timestamptz NOT NULL
 );`
 
 // Store keeps settings and what has been delivered, in pulse's schema.
@@ -130,6 +138,58 @@ func (s *Store) MarkDelivered(ctx context.Context, notificationID string, ch Cha
 		notificationID, string(ch))
 	if err != nil {
 		return fmt.Errorf("deliveries: mark %s %s: %w", notificationID, ch, err)
+	}
+	return nil
+}
+
+// PendingRequest is a request whose delivery failed for now, waiting for the retry loop.
+type PendingRequest struct {
+	ID                      string
+	Request                 []byte // the record's value, as read from the topic
+	OccurredAt, NextAttempt time.Time
+	Attempts                int
+}
+
+// Defer parks a request for a later attempt (again: its request and time stay as first parked).
+func (s *Store) Defer(ctx context.Context, id string, request []byte, occurredAt, next time.Time) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO pulse.pending_notifications (notification_id, request, occurred_at, next_attempt) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (notification_id) DO UPDATE SET next_attempt = EXCLUDED.next_attempt`, id, request, occurredAt, next)
+	if err != nil {
+		return fmt.Errorf("pending: defer %s: %w", id, err)
+	}
+	return nil
+}
+
+// Due lists up to limit parked requests whose next attempt has come, oldest first.
+func (s *Store) Due(ctx context.Context, now time.Time, limit int) ([]PendingRequest, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT notification_id::text, request, occurred_at, next_attempt, attempts FROM pulse.pending_notifications
+		WHERE next_attempt <= $1 ORDER BY next_attempt LIMIT $2`, now, limit)
+	if err != nil {
+		return nil, fmt.Errorf("pending: due: %w", err)
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (PendingRequest, error) {
+		var p PendingRequest
+		err := r.Scan(&p.ID, &p.Request, &p.OccurredAt, &p.NextAttempt, &p.Attempts)
+		p.OccurredAt, p.NextAttempt = p.OccurredAt.UTC(), p.NextAttempt.UTC()
+		return p, err
+	})
+}
+
+// Reschedule counts an attempt and sets the next.
+func (s *Store) Reschedule(ctx context.Context, id string, next time.Time) error {
+	_, err := s.pool.Exec(ctx, `UPDATE pulse.pending_notifications SET attempts = attempts + 1, next_attempt = $2 WHERE notification_id = $1`, id, next)
+	if err != nil {
+		return fmt.Errorf("pending: reschedule %s: %w", id, err)
+	}
+	return nil
+}
+
+// Drop removes a parked request (delivered, or given up).
+func (s *Store) Drop(ctx context.Context, id string) error {
+	if _, err := s.pool.Exec(ctx, `DELETE FROM pulse.pending_notifications WHERE notification_id = $1`, id); err != nil {
+		return fmt.Errorf("pending: drop %s: %w", id, err)
 	}
 	return nil
 }

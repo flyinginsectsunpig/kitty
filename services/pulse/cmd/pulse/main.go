@@ -118,7 +118,7 @@ func startNotifications(ctx context.Context, cfg map[string]string, dbURL string
 	}
 	context.AfterFunc(ctx, store.Close)
 
-	d := &notify.Dispatcher{Deliveries: store, Settings: store, Ledger: ledger, Now: time.Now, Wait: notify.Sleep}
+	d := &notify.Dispatcher{Deliveries: store, Settings: store, Pending: store, Ledger: ledger, Now: time.Now, Wait: notify.Sleep}
 	if path := os.Getenv("PULSE_FCM_CREDENTIALS"); path != "" {
 		key, err := os.ReadFile(path)
 		if err != nil {
@@ -166,6 +166,7 @@ func startNotifications(ctx context.Context, cfg map[string]string, dbURL string
 			slog.Error("notification consumer stopped", "err", err)
 		}
 	}()
+	go d.RunRetries(ctx, 15*time.Second) // requests a provider failed for now: off the topic, so they hold nothing up
 	go notify.RunWeekly(ctx, ledger, time.Now)
 	return nil
 }

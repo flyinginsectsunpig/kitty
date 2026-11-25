@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/textproto"
+	"regexp"
 	"time"
 
 	ledgerv1 "github.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/ledger/v1"
 	notifyv1 "github.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/notify/v1"
 	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/kafkaconsume"
+	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/recurring"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -48,8 +51,17 @@ type Dispatcher struct {
 	Push       Pusher // nil: push is off (no Firebase credentials)
 	Mail       Mailer // nil: email is off (no SMTP host)
 	Ledger     Ledger
+	Pending    Pending // requests waiting for another attempt
 	Now        func() time.Time
 	Wait       func(ctx context.Context, d time.Duration) error // sleeps; replaced in tests
+}
+
+// Pending keeps requests whose delivery failed for now, so they wait off the topic instead of holding it up.
+type Pending interface {
+	Defer(ctx context.Context, id string, request []byte, occurredAt, next time.Time) error
+	Due(ctx context.Context, now time.Time, limit int) ([]PendingRequest, error)
+	Reschedule(ctx context.Context, id string, next time.Time) error
+	Drop(ctx context.Context, id string) error
 }
 
 // errRetry marks a delivery that failed for now (a provider busy or unreachable).
@@ -58,20 +70,92 @@ type errRetry struct{ err error }
 func (e errRetry) Error() string { return e.err.Error() }
 func (e errRetry) Unwrap() error { return e.err }
 
-// Handle delivers one NotificationRequested. nil: done. Skip: will never be delivered. Other errors: try again.
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// Handle delivers one NotificationRequested from the topic. A delivery that fails for now is parked (and the topic
+// moves on); RetryDue tries it again. nil: done or parked. Skip: will never be delivered. Other errors (the
+// database): Run tries the record again.
 func (d *Dispatcher) Handle(ctx context.Context, value []byte) error {
-	payload, err := kafkaconsume.StripConfluentHeader(value)
+	req, err := decodeRequest(value)
 	if err != nil {
 		return kafkaconsume.Skip{Err: err}
 	}
+	err = d.deliver(ctx, req)
+	var r errRetry
+	if !errors.As(err, &r) {
+		return err
+	}
+	occurred := req.GetOccurredAt().AsTime()
+	if d.Now().Sub(occurred) >= GiveUpAfter {
+		return kafkaconsume.Skip{Err: fmt.Errorf("gave up after %s: %w", GiveUpAfter, err)}
+	}
+	return d.Pending.Defer(ctx, req.GetNotificationId(), value, occurred, d.Now().Add(retryDelay(0)))
+}
+
+// RetryDue tries the parked requests whose time has come: delivered or hopeless ones are dropped, ones still failing
+// wait longer, until an hour after the event.
+func (d *Dispatcher) RetryDue(ctx context.Context) error {
+	due, err := d.Pending.Due(ctx, d.Now(), 50)
+	if err != nil {
+		return err
+	}
+	for _, p := range due {
+		req, err := decodeRequest(p.Request)
+		if err == nil {
+			err = d.deliver(ctx, req)
+		}
+		var r errRetry
+		switch {
+		case errors.As(err, &r) && d.Now().Sub(p.OccurredAt) < GiveUpAfter:
+			err = d.Pending.Reschedule(ctx, p.ID, d.Now().Add(retryDelay(p.Attempts+1)))
+		case errors.As(err, &r):
+			slog.WarnContext(ctx, "notification given up", "notification", p.ID, "after", GiveUpAfter, "err", err)
+			err = d.Pending.Drop(ctx, p.ID)
+		case err == nil || errors.As(err, new(kafkaconsume.Skip)):
+			err = d.Pending.Drop(ctx, p.ID)
+		}
+		if err != nil {
+			return err // the database: next round
+		}
+	}
+	return nil
+}
+
+// RunRetries calls RetryDue every interval until ctx ends.
+func (d *Dispatcher) RunRetries(ctx context.Context, every time.Duration) {
+	for {
+		if err := d.RetryDue(ctx); err != nil && ctx.Err() == nil {
+			slog.WarnContext(ctx, "notification retries failed; trying again", "err", err)
+		}
+		if Sleep(ctx, every) != nil {
+			return
+		}
+	}
+}
+
+// retryDelay is 30 s doubling with each attempt, at most 10 minutes.
+func retryDelay(attempts int) time.Duration {
+	return min(30*time.Second<<min(attempts, 5), 10*time.Minute)
+}
+
+func decodeRequest(value []byte) (*notifyv1.NotificationRequested, error) {
+	payload, err := kafkaconsume.StripConfluentHeader(value)
+	if err != nil {
+		return nil, err
+	}
 	var req notifyv1.NotificationRequested
 	if err := proto.Unmarshal(payload, &req); err != nil {
-		return kafkaconsume.Skip{Err: fmt.Errorf("decode request: %w", err)}
+		return nil, fmt.Errorf("decode request: %w", err)
 	}
-	if req.GetNotificationId() == "" || req.GetUserId() == "" || req.GetOccurredAt() == nil {
-		return kafkaconsume.Skip{Err: errors.New("request without notification id, user id or time")}
+	if !uuidPattern.MatchString(req.GetNotificationId()) || !uuidPattern.MatchString(req.GetUserId()) || req.GetOccurredAt() == nil {
+		return nil, errors.New("request without a valid notification id, user id or time")
 	}
+	return &req, nil
+}
 
+// deliver sends a request on each channel its person has on and hasn't had it on yet. errRetry: a provider failed
+// for now. Skip: never deliverable. Other errors: the database.
+func (d *Dispatcher) deliver(ctx context.Context, req *notifyv1.NotificationRequested) error {
 	settings, err := d.settings(ctx, req.GetUserId())
 	if err != nil {
 		return err
@@ -88,20 +172,9 @@ func (d *Dispatcher) Handle(ctx context.Context, value []byte) error {
 		retry = append(retry, d.once(ctx, id, ChannelEmail, func() error { return d.mail(ctx, settings.Email, m) }))
 	}
 	err = errors.Join(retry...)
-	if err == nil {
-		return nil
-	}
 	var r errRetry
-	if !errors.As(err, &r) {
-		return err // the database: retry until it's back, however long
-	}
-	elapsed := d.Now().Sub(req.GetOccurredAt().AsTime())
-	if elapsed >= GiveUpAfter {
-		return kafkaconsume.Skip{Err: fmt.Errorf("gave up after %s: %w", GiveUpAfter, err)}
-	}
-	// Back off as the failure drags on: a quarter of the time so far, at most five minutes.
-	if err := d.Wait(ctx, min(max(elapsed/4, 0), 5*time.Minute)); err != nil {
-		return err
+	if err != nil && !errors.As(err, &r) {
+		return recurring.RejectedAsSkip(err) // data the database will never take: skip; otherwise retry
 	}
 	return err
 }
@@ -178,11 +251,22 @@ func (d *Dispatcher) mail(ctx context.Context, to string, m Message) error {
 	if err == nil {
 		return nil
 	}
+	err = mailError(err)
 	if IsTransient(err) {
 		return errRetry{err}
 	}
 	slog.WarnContext(ctx, "email refused", "err", err)
 	return nil
+}
+
+// mailError keeps an SMTP reply's code and drops its text, which often echoes the recipient's address (logs must not
+// hold email addresses). Other errors (network) don't name the recipient and pass through.
+func mailError(err error) error {
+	var tp *textproto.Error
+	if errors.As(err, &tp) {
+		return &textproto.Error{Code: tp.Code, Msg: fmt.Sprintf("smtp reply %d", tp.Code)}
+	}
+	return err
 }
 
 // Sleep waits d, or until ctx ends.

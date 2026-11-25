@@ -109,6 +109,39 @@ func TestDeliveries_MarkThenDelivered(t *testing.T) {
 	}
 }
 
+func TestPending_DeferDueRescheduleDrop(t *testing.T) {
+	s := openStore(t)
+	ctx := context.Background()
+	id := "f0000000-0000-0000-0000-000000000001"
+	at := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+	if err := s.Defer(ctx, id, []byte("req"), at, at.Add(30*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if due, _ := s.Due(ctx, at.Add(10*time.Second), 10); len(due) != 0 {
+		t.Fatalf("due too early: %+v", due)
+	}
+	due, err := s.Due(ctx, at.Add(time.Minute), 10)
+	if err != nil || len(due) != 1 || due[0].ID != id || string(due[0].Request) != "req" || due[0].Attempts != 0 || !due[0].OccurredAt.Equal(at) {
+		t.Fatalf("due=%+v err=%v", due, err)
+	}
+	if err := s.Reschedule(ctx, id, at.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if due, _ := s.Due(ctx, at.Add(time.Minute), 10); len(due) != 0 {
+		t.Fatalf("rescheduled but still due: %+v", due)
+	}
+	due, _ = s.Due(ctx, at.Add(2*time.Hour), 10)
+	if len(due) != 1 || due[0].Attempts != 1 {
+		t.Fatalf("due=%+v", due)
+	}
+	if err := s.Drop(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if due, _ := s.Due(ctx, at.Add(2*time.Hour), 10); len(due) != 0 {
+		t.Fatalf("dropped but still due: %+v", due)
+	}
+}
+
 func TestDecodeSettings_FromTheLedgersMessage(t *testing.T) {
 	b, _ := proto.Marshal(&notifyv1.NotifySettingsChanged{UserId: userA, Email: "x@example.com", ExpensePush: true, PushTokens: []string{"t"}, Version: 3})
 	got, err := DecodeSettings(append([]byte{0, 0, 0, 0, 4, 0}, b...))
