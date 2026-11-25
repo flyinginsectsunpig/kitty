@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -75,10 +76,12 @@ func (f *fcm) Push(ctx context.Context, token string, m Message) (PushResult, er
 		return PushSent, nil
 	}
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 64<<10))
-	code := fcmErrorCode(raw)
+	code, message := fcmError(raw)
 	err = fmt.Errorf("fcm: %s %s", res.Status, code)
 	switch {
-	case code == "UNREGISTERED" || code == "INVALID_ARGUMENT" || res.StatusCode == http.StatusNotFound:
+	// Only a token Firebase names as unknown or malformed is dead. A 404 or INVALID_ARGUMENT for anything else (a wrong
+	// project, a bad payload) is pulse's problem, and forgetting tokens over it would silence push for everyone.
+	case code == "UNREGISTERED" || code == "INVALID_ARGUMENT" && strings.Contains(strings.ToLower(message), "registration token"):
 		return PushDeadToken, err
 	case res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= 500 || code == "UNAVAILABLE" || code == "QUOTA_EXCEEDED":
 		return PushRetry, err
@@ -87,10 +90,12 @@ func (f *fcm) Push(ctx context.Context, token string, m Message) (PushResult, er
 	}
 }
 
-// fcmErrorCode is FCM's own error code (UNREGISTERED, …) from an error body, or its status when there's none.
-func fcmErrorCode(body []byte) string {
+// fcmError is FCM's own error code (UNREGISTERED, …) from an error body, or its status when there's none, and the
+// error's message.
+func fcmError(body []byte) (code, message string) {
 	var e struct {
 		Error struct {
+			Message string `json:"message"`
 			Status  string `json:"status"`
 			Details []struct {
 				ErrorCode string `json:"errorCode"`
@@ -98,12 +103,12 @@ func fcmErrorCode(body []byte) string {
 		} `json:"error"`
 	}
 	if json.Unmarshal(body, &e) != nil {
-		return ""
+		return "", ""
 	}
 	for _, d := range e.Error.Details {
 		if d.ErrorCode != "" {
-			return d.ErrorCode
+			return d.ErrorCode, e.Error.Message
 		}
 	}
-	return e.Error.Status
+	return e.Error.Status, e.Error.Message
 }

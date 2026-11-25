@@ -105,10 +105,29 @@ func TestFCM_UnregisteredIsDeadToken(t *testing.T) {
 func TestFCM_InvalidTokenIsDeadToken(t *testing.T) {
 	f := newFakeFirebase(t)
 	f.status = http.StatusBadRequest
-	f.reply = `{"error":{"code":400,"status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"INVALID_ARGUMENT"}]}}`
+	f.reply = `{"error":{"code":400,"message":"The registration token is not a valid FCM registration token","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"INVALID_ARGUMENT"}]}}`
 
 	if res, _ := f.pusher(t).Push(context.Background(), "garbage", msg); res != PushDeadToken {
 		t.Fatalf("res=%v", res)
+	}
+}
+
+// A bad message, a wrong project or a deleted Firebase project would otherwise forget every phone pulse tries.
+func TestFCM_OtherRejectionsKeepTheToken(t *testing.T) {
+	for name, c := range map[string]struct {
+		status int
+		reply  string
+	}{
+		"bad payload":   {http.StatusBadRequest, `{"error":{"code":400,"message":"Invalid value at 'message.data[0].value'","status":"INVALID_ARGUMENT","details":[{"errorCode":"INVALID_ARGUMENT"}]}}`},
+		"wrong project": {http.StatusNotFound, `{"error":{"code":404,"message":"Requested entity was not found.","status":"NOT_FOUND"}}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFakeFirebase(t)
+			f.status, f.reply = c.status, c.reply
+			if res, _ := f.pusher(t).Push(context.Background(), "phone-token", msg); res != PushFailed {
+				t.Fatalf("res=%v, want PushFailed", res)
+			}
+		})
 	}
 }
 
