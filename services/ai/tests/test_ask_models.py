@@ -67,10 +67,27 @@ def test_gemini_sends_tools_with_auto_calling_off():
     assert (result_part.function_response.name, result_part.function_response.response) == ("what_i_owe", OWING)
 
 
-def test_gemini_without_tools_sends_none():
+def test_gemini_forced_answer_keeps_the_tools_but_turns_calling_off():
+    # The documented way to force text: the history has function calls, so the tools stay declared.
     models = FakeModels(response(types.Part(text="Answer")))
-    gemini(models).turn("SYSTEM", STEPS[:1], None)
-    assert models.calls[0]["config"].tools is None
+    gemini(models).turn("SYSTEM", STEPS, None)
+    config = models.calls[0]["config"]
+    assert [d.name for d in config.tools[0].function_declarations] == [t.name for t in TOOLS]
+    assert config.tool_config.function_calling_config.mode == types.FunctionCallingConfigMode.NONE
+
+
+def test_gemini_lets_the_model_call_when_tools_are_offered():
+    models = FakeModels(response(types.Part(text="Answer")))
+    gemini(models).turn("SYSTEM", STEPS[:1], TOOLS)
+    assert models.calls[0]["config"].tool_config is None
+
+
+def test_gemini_merges_consecutive_messages_of_one_role():
+    models = FakeModels(response(types.Part(text="Answer")))
+    steps = [Message("person", "petrol R600"), Message("person", "how much do I owe?")]
+    gemini(models).turn("SYSTEM", steps, TOOLS)
+    [content] = models.calls[0]["contents"]
+    assert (content.role, [p.text for p in content.parts]) == ("user", ["petrol R600", "how much do I owe?"])
 
 
 def test_gemini_maps_function_calls_and_text():

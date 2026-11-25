@@ -9,7 +9,7 @@ from google import genai
 from google.genai import errors, types
 
 from kitty_ai.ask.agent import Called, ChatModel, Message, ModelTurn, Result, Step, ToolCall
-from kitty_ai.ask.tools import ToolSpec
+from kitty_ai.ask.tools import TOOLS, ToolSpec
 from kitty_ai.receipts.extract import ModelUnavailable, RateLimited
 from kitty_ai.settings import DEFAULT_GEMINI_MODEL, Settings
 
@@ -27,7 +27,8 @@ def _gemini_contents(steps: list[Step]) -> list[types.Content]:
     for step in steps:
         match step:
             case Message(role=role, text=text):
-                add("user" if role == "person" else "model", types.Part(text=text), merge=False)
+                # Two lines in a row from one side (a retried question) become one content, as Gemini expects.
+                add("user" if role == "person" else "model", types.Part(text=text), merge=previous is Message)
             case Called(call=c):
                 part = types.Part(
                     function_call=types.FunctionCall(name=c.name, args=c.args, id=c.id), thought_signature=c.signature
@@ -49,18 +50,23 @@ class GeminiChat:
         self._model = model
 
     def turn(self, system: str, steps: list[Step], tools: list[ToolSpec] | None) -> ModelTurn:
-        declared = (
-            [
-                types.Tool(
-                    function_declarations=[
-                        types.FunctionDeclaration(
-                            name=t.name, description=t.description, parameters_json_schema=t.parameters
-                        )
-                        for t in tools
-                    ]
-                )
-            ]
-            if tools
+        # tools=None means "answer now". The history may hold function calls, so the tools stay declared and calling
+        # is switched off (Gemini's documented way to force text), rather than leaving the tools out.
+        declared = [
+            types.Tool(
+                function_declarations=[
+                    types.FunctionDeclaration(
+                        name=t.name, description=t.description, parameters_json_schema=t.parameters
+                    )
+                    for t in tools or TOOLS
+                ]
+            )
+        ]
+        forced = (
+            types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(mode=types.FunctionCallingConfigMode.NONE)
+            )
+            if tools is None
             else None
         )
         try:
@@ -70,6 +76,7 @@ class GeminiChat:
                 config=types.GenerateContentConfig(
                     system_instruction=system,
                     tools=declared,
+                    tool_config=forced,
                     automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                     temperature=0,
                 ),
