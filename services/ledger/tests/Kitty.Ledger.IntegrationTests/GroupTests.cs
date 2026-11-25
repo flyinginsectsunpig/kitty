@@ -70,6 +70,7 @@ public class GroupTests(LedgerApiFactory factory)
         var list = (await a.GetFromJsonAsync<List<GroupSummaryDto>>("/groups", Ct))!;
         Assert.Equal([mine.Id], list.Select(g => g.Id));
         Assert.Equal(1, list[0].MemberCount);
+        Assert.InRange(list[0].CreatedAt, DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddMinutes(1));
     }
 
     [Fact]
