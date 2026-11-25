@@ -5,7 +5,7 @@ the ledger's `kitty.ledger.v1.RecurringService` with its own Keycloak service to
 `contracts/proto/kitty/fx/v1/rates.proto`): ECB rates from [Frankfurter](https://frankfurter.dev), kept in its own
 `pulse` schema in the shared Postgres. It also delivers notifications: the ledger decides who is told what (on the
 `notifications.requested` topic) and publishes each person's settings (`ledger.notify-settings`); pulse sends each one
-by Firebase push and/or email, once per channel, and asks the ledger for the weekly summaries on Mondays at 06:00 UTC.
+by Firebase push and/or email, once per channel, and asks the ledger for each week's summaries from Monday 06:00 UTC (later that week if it was down then).
 
 ## Run
 
@@ -26,7 +26,8 @@ PULSE_DATABASE_URL=postgres://user:pass@localhost:5432/ledger go run ./cmd/pulse
 | `PULSE_CLIENT_SECRET` | (required) | that client's secret |
 | `PULSE_WEB_URL` | (required) | the site's address; links in emails open it |
 | `PULSE_SMTP_HOST` | (empty: email off) | SMTP server for notification emails |
-| `PULSE_SMTP_PORT` | `587` | `465` implicit TLS, `587` STARTTLS, anything else plain (Mailpit) |
+| `PULSE_SMTP_PORT` | `587` | |
+| `PULSE_SMTP_SSL`, `PULSE_SMTP_STARTTLS` | (empty: by port) | `true`/`false`: TLS from the start, or STARTTLS. Unset, the port decides: `465` TLS, `587` STARTTLS, anything else plain (Mailpit) |
 | `PULSE_SMTP_USER`, `PULSE_SMTP_PASSWORD` | (empty: no login) | |
 | `PULSE_SMTP_FROM` | (required with a host) | e.g. `Kitty <kitty@example.com>` |
 | `PULSE_FCM_CREDENTIALS` | (empty: push off) | path to a Firebase service-account key (JSON) |

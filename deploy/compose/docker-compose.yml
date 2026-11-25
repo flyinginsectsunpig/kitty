@@ -188,6 +188,8 @@ services:
       # Notifications. Email goes out through the same SMTP account as Keycloak's; links open the site.
       PULSE_SMTP_HOST: ${SMTP_HOST:-smtp.resend.com}
       PULSE_SMTP_PORT: ${SMTP_PORT:-465}
+      PULSE_SMTP_SSL: ${SMTP_SSL:-true} # the same TLS settings Keycloak uses
+      PULSE_SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
       PULSE_SMTP_USER: ${SMTP_USER:-resend}
       PULSE_SMTP_PASSWORD: ${SMTP_PASSWORD:?set SMTP_PASSWORD}
       PULSE_SMTP_FROM: Kitty <${SMTP_FROM:?set SMTP_FROM}>

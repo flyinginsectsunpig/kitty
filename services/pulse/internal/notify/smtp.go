@@ -19,15 +19,66 @@ type Mailer interface {
 	Send(ctx context.Context, to string, m Message) error
 }
 
+// TLSMode is how the connection to the SMTP server is encrypted.
+type TLSMode int
+
+const (
+	TLSNone     TLSMode = iota // plain (Mailpit locally)
+	TLSImplicit                // TLS from the first byte (usually port 465)
+	TLSStartTLS                // plain, then STARTTLS (usually port 587)
+)
+
+// ParseTLSMode reads the SSL and STARTTLS settings ("true"/"false", as Keycloak's are written). When neither is set,
+// the port decides: 465 implicit TLS, 587 STARTTLS, anything else plain.
+func ParseTLSMode(ssl, starttls string, port int) (TLSMode, error) {
+	if ssl == "" && starttls == "" {
+		switch port {
+		case 465:
+			return TLSImplicit, nil
+		case 587:
+			return TLSStartTLS, nil
+		}
+		return TLSNone, nil
+	}
+	on := func(name, v string) (bool, error) {
+		if v == "" {
+			return false, nil
+		}
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return false, fmt.Errorf("%s must be true or false, not %q", name, v)
+		}
+		return b, nil
+	}
+	implicit, err := on("SSL", ssl)
+	if err != nil {
+		return 0, err
+	}
+	explicit, err := on("STARTTLS", starttls)
+	if err != nil {
+		return 0, err
+	}
+	switch {
+	case implicit && explicit:
+		return 0, errors.New("SSL and STARTTLS can't both be on")
+	case implicit:
+		return TLSImplicit, nil
+	case explicit:
+		return TLSStartTLS, nil
+	}
+	return TLSNone, nil
+}
+
 type smtpMailer struct {
 	host, user, password, from, webURL string
 	port                               int
+	tls                                TLSMode
 }
 
-// NewSMTP sends plain-text mail: implicit TLS on port 465, STARTTLS on 587, plain otherwise (Mailpit locally).
-// webURL is the app's public address; a message's kitty:// link becomes a link to the same page there.
-func NewSMTP(host string, port int, user, password, from, webURL string) Mailer {
-	return &smtpMailer{host: host, port: port, user: user, password: password, from: from, webURL: strings.TrimRight(webURL, "/")}
+// NewSMTP sends plain-text mail over the given TLS mode. webURL is the app's public address; a message's kitty://
+// link becomes a link to the same page there.
+func NewSMTP(host string, port int, tlsMode TLSMode, user, password, from, webURL string) Mailer {
+	return &smtpMailer{host: host, port: port, tls: tlsMode, user: user, password: password, from: from, webURL: strings.TrimRight(webURL, "/")}
 }
 
 // subject is "{Title}: {Body}", cut at 120 characters.
@@ -48,7 +99,7 @@ func (s *smtpMailer) Send(ctx context.Context, to string, m Message) error {
 	dialer := &net.Dialer{Timeout: 15 * time.Second}
 	var conn net.Conn
 	var err error
-	if s.port == 465 {
+	if s.tls == TLSImplicit {
 		conn, err = tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: s.host, MinVersion: tls.VersionTLS12})
 	} else {
 		conn, err = dialer.DialContext(ctx, "tcp", addr)
@@ -68,7 +119,7 @@ func (s *smtpMailer) Send(ctx context.Context, to string, m Message) error {
 	}
 	defer c.Close()
 
-	if s.port == 587 {
+	if s.tls == TLSStartTLS {
 		if err := c.StartTLS(&tls.Config{ServerName: s.host, MinVersion: tls.VersionTLS12}); err != nil {
 			return fmt.Errorf("smtp: starttls: %w", err)
 		}

@@ -14,7 +14,7 @@ func TestSMTP_SendsToMailpit(t *testing.T) {
 		t.Skip("needs Docker")
 	}
 	to := "friend-" + time.Now().Format("150405.000") + "@example.test"
-	mailer := NewSMTP(testSMTPHost, testSMTPPort, "", "", "Kitty <kitty@example.test>", "https://kitty.example")
+	mailer := NewSMTP(testSMTPHost, testSMTPPort, TLSNone, "", "", "Kitty <kitty@example.test>", "https://kitty.example")
 
 	if err := mailer.Send(context.Background(), to, msg); err != nil {
 		t.Fatal(err)
@@ -38,6 +38,32 @@ func TestSMTP_SendsToMailpit(t *testing.T) {
 	getJSON(t, testMailpitAPI+"/api/v1/message/"+list.Messages[0].ID, &full)
 	if !strings.Contains(full.Text, "Sam added Groceries") || !strings.Contains(full.Text, "Open Kitty: https://kitty.example/groups/g1") {
 		t.Fatalf("text = %q", full.Text)
+	}
+}
+
+func TestTLSMode_ExplicitSettingsWinOverThePort(t *testing.T) {
+	for _, c := range []struct {
+		ssl, starttls string
+		port          int
+		want          TLSMode
+	}{
+		{"", "", 465, TLSImplicit},
+		{"", "", 587, TLSStartTLS},
+		{"", "", 1025, TLSNone},
+		{"true", "false", 2465, TLSImplicit}, // Resend's alternative ports
+		{"false", "true", 2587, TLSStartTLS},
+		{"false", "false", 587, TLSNone},
+	} {
+		got, err := ParseTLSMode(c.ssl, c.starttls, c.port)
+		if err != nil || got != c.want {
+			t.Errorf("ParseTLSMode(%q, %q, %d) = %v, %v; want %v", c.ssl, c.starttls, c.port, got, err, c.want)
+		}
+	}
+	if _, err := ParseTLSMode("true", "true", 465); err == nil {
+		t.Error("both on: want an error")
+	}
+	if _, err := ParseTLSMode("yes", "", 465); err == nil {
+		t.Error("not a boolean: want an error")
 	}
 }
 
