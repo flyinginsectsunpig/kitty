@@ -432,6 +432,40 @@
         }
       }
     },
+    "/groups/{groupId}/reminders": {
+      "post": {
+        "tags": [
+          "Reminders"
+        ],
+        "operationId": "CreateReminder",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderWriteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/groups/{groupId}/fx-rate": {
       "get": {
         "tags": [
@@ -2791,6 +2825,8 @@
           "paymentEmail",
           "weeklyPush",
           "weeklyEmail",
+          "reminderPush",
+          "reminderEmail",
           "emailAvailable"
         ],
         "type": "object",
@@ -2813,6 +2849,12 @@
           "weeklyEmail": {
             "type": "boolean"
           },
+          "reminderPush": {
+            "type": "boolean"
+          },
+          "reminderEmail": {
+            "type": "boolean"
+          },
           "emailAvailable": {
             "type": "boolean"
           }
@@ -2825,7 +2867,9 @@
           "paymentPush",
           "paymentEmail",
           "weeklyPush",
-          "weeklyEmail"
+          "weeklyEmail",
+          "reminderPush",
+          "reminderEmail"
         ],
         "type": "object",
         "properties": {
@@ -2845,6 +2889,12 @@
             "type": "boolean"
           },
           "weeklyEmail": {
+            "type": "boolean"
+          },
+          "reminderPush": {
+            "type": "boolean"
+          },
+          "reminderEmail": {
             "type": "boolean"
           }
         }
@@ -3060,6 +3110,18 @@
               "integer"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "ReminderWriteDto": {
+        "required": [
+          "memberId"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -3605,6 +3667,9 @@
     },
     {
       "name": "Balances"
+    },
+    {
+      "name": "Reminders"
     },
     {
       "name": "Exchange rates"

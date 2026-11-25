@@ -5,17 +5,17 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { GroupNav } from "@/components/GroupNav";
 import { loadGroup } from "@/lib/group-context";
 import { unwrap } from "@/lib/ledger";
-import { fetchRate, recordSettlement } from "../actions";
+import { fetchRate, recordSettlement, remindMember } from "../actions";
 
 export default async function SettlePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; settled?: string }>;
+  searchParams: Promise<{ error?: string; settled?: string; reminded?: string }>;
 }) {
   const { id } = await params;
-  const { error, settled } = await searchParams;
+  const { error, settled, reminded } = await searchParams;
   const { ledger, group, me, nameOf } = await loadGroup(id);
   const balances = unwrap(await ledger.GET("/groups/{groupId}/balances", { params: { path: { groupId: id } } }));
   const detailsOf = new Map(group.members.map((m) => [m.id, m.paymentDetails]));
@@ -24,6 +24,8 @@ export default async function SettlePage({
     .flatMap((c) => c.transfers.map((t) => ({ ...t, currency: c.currency })))
     // Your own payments first, then ones you are owed, then everyone else's.
     .sort((a, b) => rank(a) - rank(b));
+  const firstOwedTo = new Map<string, (typeof transfers)[number]>();
+  for (const t of transfers) if (t.toMemberId === me.id && !firstOwedTo.has(t.fromMemberId)) firstOwedTo.set(t.fromMemberId, t);
   function rank(t: { fromMemberId: string; toMemberId: string }) {
     return t.fromMemberId === me.id ? 0 : t.toMemberId === me.id ? 1 : 2;
   }
@@ -33,6 +35,7 @@ export default async function SettlePage({
       <GroupNav groupId={id} groupName={group.name} active="/settle" />
       <ErrorBanner code={error} />
       {settled && <p className="rounded-xl bg-green-50 p-3 text-sm text-owed dark:bg-green-950">Payment recorded.</p>}
+      {reminded && <p className="rounded-xl bg-green-50 p-3 text-sm text-owed dark:bg-green-950">Reminder sent.</p>}
 
       {transfers.length === 0 ? (
         <p className="card text-center text-stone-600 dark:text-stone-400">Everyone is settled up. 🎉</p>
@@ -77,6 +80,15 @@ export default async function SettlePage({
                     )}
                     <button className="btn-primary w-full">Mark as paid</button>
                   </form>
+                  {/* Someone who owes you: one Remind per person (their first payment to you in the list). */}
+                  {t.toMemberId === me.id && firstOwedTo.get(t.fromMemberId) === t && (
+                    <form action={remindMember}>
+                      <input type="hidden" name="groupId" value={id} />
+                      <input type="hidden" name="memberId" value={t.fromMemberId} />
+                      <input type="hidden" name="idempotencyKey" value={crypto.randomUUID()} />
+                      <button className="btn-secondary w-full">Remind {nameOf(t.fromMemberId)}</button>
+                    </form>
+                  )}
                 </li>
               );
             })}

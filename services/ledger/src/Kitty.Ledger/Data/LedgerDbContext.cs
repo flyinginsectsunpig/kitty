@@ -29,6 +29,7 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
     public DbSet<NotificationSettings> NotificationSettings => Set<NotificationSettings>();
     public DbSet<PushDevice> PushDevices => Set<PushDevice>();
     public DbSet<WeeklySummary> WeeklySummaries => Set<WeeklySummary>();
+    public DbSet<Reminder> Reminders => Set<Reminder>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -109,6 +110,12 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
         {
             e.HasKey(x => new { x.UserId, x.Week });
             e.Property(x => x.Week).HasMaxLength(8);
+        });
+
+        b.Entity<Reminder>(e =>
+        {
+            e.HasKey(x => new { x.GroupId, x.FromMemberId, x.ToMemberId, x.Day });
+            e.HasOne<Group>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<PushDevice>(e =>

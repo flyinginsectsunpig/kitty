@@ -16,7 +16,19 @@ uv run python evals/fetch_cord.py --out .evals/cord --limit 50
 AI_GEMINI_API_KEY=... uv run python evals/run_receipts.py --data .evals/cord
 ```
 
+## Plain-language sentences
+
+`nl/phrases.jsonl` holds 34 labelled sentences (the owner's five scenarios among them); `nl/run.py` runs the
+configured model over them and prints intent, amount and people accuracy. Not in CI.
+
+```bash
+AI_GEMINI_API_KEY=... uv run python evals/nl/run.py --verbose
+```
+
 ## Results
 
 No run recorded yet: it needs a Gemini API key (or a local Ollama), which this repository doesn't have.
 Record each run here: date, model, data set, receipts, total accuracy, item F1.
+
+Plain-language sentences: not run yet (2026-11-25): no Gemini key or Ollama on the development machine. Record each
+run here: date, model, intent / amount / people accuracy.

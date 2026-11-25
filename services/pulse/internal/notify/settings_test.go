@@ -75,12 +75,12 @@ func TestSettings_TokensAndEmailRoundTrip(t *testing.T) {
 	s := openStore(t)
 	ctx := context.Background()
 	id := "d0000000-0000-0000-0000-000000000002"
-	in := Settings{UserID: id, Email: "a@example.com", PaymentEmail: true, WeeklyPush: true, Tokens: []string{"t1", "t2"}, Version: 1}
+	in := Settings{UserID: id, Email: "a@example.com", PaymentEmail: true, WeeklyPush: true, ReminderEmail: true, Tokens: []string{"t1", "t2"}, Version: 1}
 	if err := s.Upsert(ctx, in); err != nil {
 		t.Fatal(err)
 	}
 	got, ok, err := s.Get(ctx, id)
-	if err != nil || !ok || got.Email != "a@example.com" || !got.PaymentEmail || !got.WeeklyPush || !slices.Equal(got.Tokens, []string{"t1", "t2"}) {
+	if err != nil || !ok || got.Email != "a@example.com" || !got.PaymentEmail || !got.WeeklyPush || !got.ReminderEmail || got.ReminderPush || !slices.Equal(got.Tokens, []string{"t1", "t2"}) {
 		t.Fatalf("got %+v ok=%v err=%v", got, ok, err)
 	}
 	if _, ok, _ := s.Get(ctx, "d0000000-0000-0000-0000-00000000ffff"); ok {

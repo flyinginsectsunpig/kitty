@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AI_")
 
     kafka_bootstrap: str = ""
+    # Plain-language entry: the ledger's internal address, and the Keycloak realm whose tokens (for audience kitty-ai)
+    # the /parse and /resolve endpoints accept. Without an issuer those endpoints are off.
+    ledger_url: str = ""
+    auth_issuer: str = ""
+    auth_audience: str = "kitty-ai"
     schema_registry_url: str = ""
     blob_connection_string: str = ""
     postgres_dsn: str = ""

@@ -24,6 +24,7 @@ jobs:
       EXPO_PUBLIC_WEB_URL: ${{ vars.EXPO_PUBLIC_WEB_URL || 'https://kitty-split.duckdns.org' }}
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || 'https://kitty-split.duckdns.org/api' }}
       EXPO_PUBLIC_AUTH_ISSUER: ${{ vars.EXPO_PUBLIC_AUTH_ISSUER || 'https://kitty-split.duckdns.org/auth/realms/kitty' }}
+      EXPO_PUBLIC_AI_URL: ${{ vars.EXPO_PUBLIC_AI_URL || 'https://kitty-split.duckdns.org/ai' }}
     steps:
       - name: Signing secrets are set
         id: signing

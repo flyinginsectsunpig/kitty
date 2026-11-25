@@ -6,7 +6,7 @@
   "scripts": {
     "start": "expo start --dev-client",
     "android": "expo run:android",
-    "android:reverse": "adb reverse tcp:8180 tcp:8180 && adb reverse tcp:5080 tcp:5080 && adb reverse tcp:10000 tcp:10000 && adb reverse tcp:3000 tcp:3000",
+    "android:reverse": "adb reverse tcp:8180 tcp:8180 && adb reverse tcp:5080 tcp:5080 && adb reverse tcp:10000 tcp:10000 && adb reverse tcp:3000 tcp:3000 && adb reverse tcp:5085 tcp:5085",
     "export": "expo export --platform android --output-dir dist",
     "test": "jest",
     "typecheck": "tsc --noEmit"

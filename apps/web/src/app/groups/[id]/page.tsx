@@ -2,6 +2,7 @@ import { describeSchedule, expenseAmounts } from "@kitty/core";
 import { formatMoney } from "@kitty/money";
 import Link from "next/link";
 import { GroupNav } from "@/components/GroupNav";
+import { PlainEntry } from "@/components/PlainEntry";
 import { loadGroup } from "@/lib/group-context";
 import { unwrap } from "@/lib/ledger";
 
@@ -25,6 +26,8 @@ export default async function GroupPage({
   return (
     <section className="space-y-6">
       <GroupNav groupId={id} groupName={group.name} active="" />
+
+      <PlainEntry groupId={id} />
 
       <div className="grid grid-cols-2 gap-2">
         <Link href={`/groups/${id}/expenses/new`} className="btn-primary text-base">

@@ -324,3 +324,17 @@ func TestDispatch_PushOffWhenNotConfigured(t *testing.T) {
 		t.Fatalf("mail=%v", r.mail.sent)
 	}
 }
+
+func TestDispatch_ReminderUsesReminderSettings(t *testing.T) {
+	r := newRig()
+	s := r.settings.byUser[userA]
+	s.ReminderPush, s.ReminderEmail = false, true
+	r.settings.byUser[userA] = s
+
+	if err := r.d.Handle(context.Background(), request("n1", notifyv1.NotificationRequested_KIND_REMINDER)); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.push.sent) != 0 || len(r.mail.sent) != 1 {
+		t.Fatalf("push=%v mail=%v", r.push.sent, r.mail.sent)
+	}
+}

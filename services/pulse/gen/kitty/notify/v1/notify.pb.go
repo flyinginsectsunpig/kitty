@@ -29,6 +29,8 @@ const (
 	NotificationRequested_KIND_EXPENSE_ADDED  NotificationRequested_Kind = 1
 	NotificationRequested_KIND_PAYMENT        NotificationRequested_Kind = 2
 	NotificationRequested_KIND_WEEKLY_SUMMARY NotificationRequested_Kind = 3
+	// Someone in the group reminded this person what they owe them.
+	NotificationRequested_KIND_REMINDER NotificationRequested_Kind = 4
 )
 
 // Enum value maps for NotificationRequested_Kind.
@@ -38,12 +40,14 @@ var (
 		1: "KIND_EXPENSE_ADDED",
 		2: "KIND_PAYMENT",
 		3: "KIND_WEEKLY_SUMMARY",
+		4: "KIND_REMINDER",
 	}
 	NotificationRequested_Kind_value = map[string]int32{
 		"KIND_UNSPECIFIED":    0,
 		"KIND_EXPENSE_ADDED":  1,
 		"KIND_PAYMENT":        2,
 		"KIND_WEEKLY_SUMMARY": 3,
+		"KIND_REMINDER":       4,
 	}
 )
 
@@ -194,6 +198,8 @@ type NotifySettingsChanged struct {
 	PushTokens   []string `protobuf:"bytes,9,rep,name=push_tokens,json=pushTokens,proto3" json:"push_tokens,omitempty"`
 	// Higher wins.
 	Version       int64 `protobuf:"varint,10,opt,name=version,proto3" json:"version,omitempty"`
+	ReminderPush  bool  `protobuf:"varint,11,opt,name=reminder_push,json=reminderPush,proto3" json:"reminder_push,omitempty"`
+	ReminderEmail bool  `protobuf:"varint,12,opt,name=reminder_email,json=reminderEmail,proto3" json:"reminder_email,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -298,11 +304,25 @@ func (x *NotifySettingsChanged) GetVersion() int64 {
 	return 0
 }
 
+func (x *NotifySettingsChanged) GetReminderPush() bool {
+	if x != nil {
+		return x.ReminderPush
+	}
+	return false
+}
+
+func (x *NotifySettingsChanged) GetReminderEmail() bool {
+	if x != nil {
+		return x.ReminderEmail
+	}
+	return false
+}
+
 var File_kitty_notify_v1_notify_proto protoreflect.FileDescriptor
 
 const file_kitty_notify_v1_notify_proto_rawDesc = "" +
 	"\n" +
-	"\x1ckitty/notify/v1/notify.proto\x12\x0fkitty.notify.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x91\x03\n" +
+	"\x1ckitty/notify/v1/notify.proto\x12\x0fkitty.notify.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa4\x03\n" +
 	"\x15NotificationRequested\x12'\n" +
 	"\x0fnotification_id\x18\x01 \x01(\tR\x0enotificationId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12?\n" +
@@ -312,12 +332,13 @@ const file_kitty_notify_v1_notify_proto_rawDesc = "" +
 	"\x04link\x18\x06 \x01(\tR\x04link\x12\x19\n" +
 	"\bgroup_id\x18\a \x01(\tR\agroupId\x12;\n" +
 	"\voccurred_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"occurredAt\"_\n" +
+	"occurredAt\"r\n" +
 	"\x04Kind\x12\x14\n" +
 	"\x10KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12KIND_EXPENSE_ADDED\x10\x01\x12\x10\n" +
 	"\fKIND_PAYMENT\x10\x02\x12\x17\n" +
-	"\x13KIND_WEEKLY_SUMMARY\x10\x03\"\xd5\x02\n" +
+	"\x13KIND_WEEKLY_SUMMARY\x10\x03\x12\x11\n" +
+	"\rKIND_REMINDER\x10\x04\"\xa1\x03\n" +
 	"\x15NotifySettingsChanged\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12!\n" +
@@ -331,7 +352,9 @@ const file_kitty_notify_v1_notify_proto_rawDesc = "" +
 	"\vpush_tokens\x18\t \x03(\tR\n" +
 	"pushTokens\x12\x18\n" +
 	"\aversion\x18\n" +
-	" \x01(\x03R\aversionBmZOgithub.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/notify/v1;notifyv1\xaa\x02\x19Kitty.Contracts.Notify.V1b\x06proto3"
+	" \x01(\x03R\aversion\x12#\n" +
+	"\rreminder_push\x18\v \x01(\bR\freminderPush\x12%\n" +
+	"\x0ereminder_email\x18\f \x01(\bR\rreminderEmailBmZOgithub.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/notify/v1;notifyv1\xaa\x02\x19Kitty.Contracts.Notify.V1b\x06proto3"
 
 var (
 	file_kitty_notify_v1_notify_proto_rawDescOnce sync.Once

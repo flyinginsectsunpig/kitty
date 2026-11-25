@@ -4,12 +4,14 @@ import { convertMinor, formatMoney, parseMoney, parseRate, previewSplit, support
 import { useEffect, useMemo, useState } from "react";
 import {
   CATEGORIES,
+  draftToForm,
   describeRate,
   describeRule,
   splitProblemMessage,
   toExpenseWriteDto,
   toRecurringWriteDto,
   type ExpenseFormState,
+  type PlainDraft,
   type Repeat,
 } from "@kitty/core";
 
@@ -41,6 +43,7 @@ export function ExpenseForm({
   fetchRate,
   saved,
   repeat: repeatOptions,
+  fromDraft = false,
 }: {
   groupId: string;
   members: Member[];
@@ -52,8 +55,21 @@ export function ExpenseForm({
   fetchRate: (groupId: string, currency: string, date: string) => Promise<{ rate: string; rateDate: string } | null>;
   saved?: SavedRate;
   repeat?: RepeatOptions;
+  /** Fill in from the draft a typed sentence handed over (read once from session storage, never from the URL). */
+  fromDraft?: boolean;
 }) {
   const [state, setState] = useState<ExpenseFormState>(initial);
+  useEffect(() => {
+    if (!fromDraft) return;
+    try {
+      const raw = sessionStorage.getItem("kitty.draft");
+      sessionStorage.removeItem("kitty.draft");
+      const draft = raw ? (JSON.parse(raw) as PlainDraft) : null;
+      if (draft?.groupId === groupId && draft.expense) setState(draftToForm(draft, { id: initial.id }));
+    } catch {
+      // No storage (private mode) or an unreadable draft: the form stays empty.
+    }
+  }, [fromDraft, groupId, initial.id]);
   const [repeat, setRepeat] = useState<Repeat>(repeatOptions?.initial ?? "none");
   const [endsOn, setEndsOn] = useState(repeatOptions?.endsOn ?? "");
   const [quote, setQuote] = useState<Quote>(null);

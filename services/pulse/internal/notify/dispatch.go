@@ -203,6 +203,8 @@ func wants(s Settings, kind notifyv1.NotificationRequested_Kind) (push, email bo
 		return s.PaymentPush, s.PaymentEmail
 	case notifyv1.NotificationRequested_KIND_WEEKLY_SUMMARY:
 		return s.WeeklyPush, s.WeeklyEmail
+	case notifyv1.NotificationRequested_KIND_REMINDER:
+		return s.ReminderPush, s.ReminderEmail
 	}
 	return false, false
 }

@@ -1,5 +1,6 @@
 import { formatMoney } from "@kitty/money";
 import Link from "next/link";
+import { PlainEntry } from "@/components/PlainEntry";
 import { getLedger, unwrap } from "@/lib/ledger";
 
 export default async function GroupsPage() {
@@ -15,6 +16,8 @@ export default async function GroupsPage() {
           <Link href="/groups/new" className="btn-primary">New group</Link>
         </div>
       </div>
+
+      {groups.length > 0 && <PlainEntry />}
 
       {groups.length === 0 ? (
         <div className="card text-center text-stone-600 dark:text-stone-400">
