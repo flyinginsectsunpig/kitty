@@ -1,11 +1,12 @@
 import { exponent, formatMoney, previewSplit, toDecimalString } from "@kitty/money";
+import type { Schemas } from "@kitty/api-client";
 import type { ExpenseFormState } from "./expense-form";
 
 /** Something the person has to settle on the card before Save: a name that matched nobody or several people, a
  * missing amount or group, or a total that doesn't match the amounts. */
 export type DraftIssue = {
   field: string; // "group", "payer", "amount", "people[1]", "people[1].amount", "reminder.member"
-  kind: "no_match" | "ambiguous" | "missing" | "mismatch";
+  kind: "no_match" | "ambiguous" | "missing" | "mismatch" | "other_currency";
   text: string;
   candidates: string[];
 };
@@ -32,12 +33,29 @@ export type ReminderDraft = {
   statedCurrency: string;
 };
 
+/** An expense the other person still owes on, as the payment card lists it. */
+export type OpenItem = { expenseId: string; description: string; date: string; openMinor: number };
+
+export type PaymentCover = { expenseId: string; amountMinor: number };
+
+/** A payment that crosses off expenses. amountMinor is null while the sentence's amount couldn't be read. */
+export type PaymentDraft = {
+  fromMemberId: string | null;
+  toMemberId: string | null;
+  currency: string;
+  amountMinor: number | null;
+  statedAmountMinor: number | null;
+  openItems: OpenItem[]; // oldest first
+  covers: PaymentCover[];
+};
+
 /** What the ai service's /parse and /resolve return: one sentence, read and matched to a group. Nothing is saved. */
 export type PlainDraft = {
-  intent: "expense" | "reminder" | "question" | "unclear";
+  intent: "expense" | "reminder" | "payment" | "question" | "unclear";
   groupId: string | null;
   expense?: ExpenseDraft;
   reminder?: ReminderDraft;
+  payment?: PaymentDraft;
   issues: DraftIssue[];
   members: { id: string; displayName: string }[];
   groups: { id: string; name: string }[];
@@ -70,6 +88,50 @@ export function draftToForm(draft: PlainDraft, o: { id: string }): ExpenseFormSt
   };
 }
 
+/**
+ * Spreads a payment over the ticked items, oldest first (by date, then id). With no amount each gets its open
+ * amount and the amount is their sum; with one, each gets up to its open amount until it runs out, and the amount
+ * stays as given.
+ */
+export function allocateCovers(
+  items: OpenItem[],
+  ticked: string[],
+  amountMinor: number | null,
+): { covers: PaymentCover[]; amountMinor: number } {
+  const chosen = items
+    .filter((i) => ticked.includes(i.expenseId))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.expenseId < b.expenseId ? -1 : a.expenseId > b.expenseId ? 1 : 0));
+  let left = amountMinor;
+  const covers: PaymentCover[] = [];
+  for (const item of chosen) {
+    const take = left === null ? item.openMinor : Math.min(item.openMinor, left);
+    if (take <= 0) break;
+    covers.push({ expenseId: item.expenseId, amountMinor: take });
+    if (left !== null) left -= take;
+  }
+  return { covers, amountMinor: amountMinor ?? covers.reduce((sum, c) => sum + c.amountMinor, 0) };
+}
+
+function withTicked(draft: PlainDraft, ticked: string[]): PlainDraft {
+  const p = draft.payment;
+  if (!p) return draft;
+  const { covers, amountMinor } = allocateCovers(p.openItems, ticked, p.statedAmountMinor);
+  return { ...draft, payment: { ...p, covers, amountMinor } };
+}
+
+/** Ticks or unticks one open item, then spreads the amount again. */
+export function toggleCover(draft: PlainDraft, expenseId: string): PlainDraft {
+  const p = draft.payment;
+  if (!p) return draft;
+  const ticked = p.covers.map((c) => c.expenseId);
+  return withTicked(draft, ticked.includes(expenseId) ? ticked.filter((id) => id !== expenseId) : [...ticked, expenseId]);
+}
+
+/** A copy of the model's reading with the counterpart replaced, to send back to /resolve. */
+export function withCounterpart(parsed: unknown, displayName: string): unknown {
+  return { ...(parsed as Record<string, unknown>), counterpart: displayName };
+}
+
 const PERSON = /^people\[(\d+)\]$/;
 
 /**
@@ -87,6 +149,12 @@ export function applyPick(draft: PlainDraft, issueIndex: number, memberId: strin
   if (issue.field === "reminder.member" && draft.reminder && memberId) {
     const name = draft.members.find((m) => m.id === memberId)?.displayName ?? null;
     return { ...draft, issues, reminder: { ...draft.reminder, memberId, name, owedMinorByCurrency: null } };
+  }
+  if (draft.payment && /^payment\.items\[\d+\]$/.test(issue.field)) {
+    const base = { ...draft, issues };
+    if (!memberId) return base;
+    const ticked = draft.payment.covers.map((c) => c.expenseId);
+    return withTicked(base, ticked.includes(memberId) ? ticked : [...ticked, memberId]);
   }
   const person = PERSON.exec(issue.field);
   if (!person || !draft.expense) return draft;
@@ -117,6 +185,12 @@ export function applyPick(draft: PlainDraft, issueIndex: number, memberId: strin
 export function canSave(draft: PlainDraft): boolean {
   if (draft.issues.length > 0 || !draft.groupId) return false;
   if (draft.intent === "reminder") return !!draft.reminder?.memberId;
+  if (draft.intent === "payment") {
+    const p = draft.payment;
+    if (!p || !p.fromMemberId || !p.toMemberId || p.amountMinor === null || p.amountMinor <= 0) return false;
+    const covered = p.covers.reduce((sum, c) => sum + c.amountMinor, 0);
+    return p.covers.length > 0 && covered <= p.amountMinor;
+  }
   if (draft.intent !== "expense" || !draft.expense) return false;
   const e = draft.expense;
   return (
@@ -175,4 +249,37 @@ export function draftMoney(minor: number, currency: string): string {
   } catch {
     return `${currency} ${minor}`;
   }
+}
+
+/** The settlement the payment card saves. Sentences only cross off group-currency items, so no rate is sent. */
+export function toSettlementWriteDto(draft: PlainDraft, id: string): Schemas["SettlementWriteDto"] {
+  const p = draft.payment;
+  if (!p || !p.fromMemberId || !p.toMemberId || p.amountMinor === null) {
+    throw new Error("Only a finished payment draft makes a settlement.");
+  }
+  return {
+    id,
+    fromMemberId: p.fromMemberId,
+    toMemberId: p.toMemberId,
+    currency: p.currency,
+    amountMinor: p.amountMinor,
+    paidInGroupCurrency: false,
+    covers: p.covers.map((c) => ({ expenseId: c.expenseId, amountMinor: c.amountMinor })),
+  };
+}
+
+/**
+ * The line under a payment when both people have open items in its currency: the net of the two sides, so
+ * crossing one off isn't mistaken for the whole story. null unless both sides are open.
+ */
+export function countingBoth(open: Schemas["OpenItemsDto"], currency: string, meMemberId: string, otherName: string): string | null {
+  const c = open.currencies.find((x) => x.currency === currency);
+  if (!c || c.fromOwesTotal.minor <= 0 || c.toOwesTotal.minor <= 0) return null;
+  const meIsFrom = open.fromMemberId === meMemberId;
+  const iOwe = meIsFrom ? c.fromOwesTotal.minor : c.toOwesTotal.minor;
+  const theyOwe = meIsFrom ? c.toOwesTotal.minor : c.fromOwesTotal.minor;
+  const lead = `Counting what ${otherName} owes you,`;
+  if (theyOwe === iOwe) return `${lead} you're even.`;
+  if (theyOwe > iOwe) return `${lead} ${otherName} owes you ${draftMoney(theyOwe - iOwe, currency)}.`;
+  return `${lead} you still owe ${otherName} ${draftMoney(iOwe - theyOwe, currency)}.`;
 }

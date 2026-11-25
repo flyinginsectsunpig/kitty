@@ -1,7 +1,20 @@
 import { describe, expect, test } from "vitest";
 import { toExpenseWriteDto } from "../src/expense-form";
 import { errorMessage } from "../src/errors";
-import { aiErrorCode, applyPick, canSave, draftShares, draftToForm, type PlainDraft } from "../src/plain-entry";
+import {
+  aiErrorCode,
+  allocateCovers,
+  applyPick,
+  canSave,
+  countingBoth,
+  draftShares,
+  draftToForm,
+  toggleCover,
+  toSettlementWriteDto,
+  withCounterpart,
+  type OpenItem,
+  type PlainDraft,
+} from "../src/plain-entry";
 
 const members = [
   { id: "m-me", displayName: "Zakhir" },
@@ -175,5 +188,126 @@ describe("draftShares", () => {
     expect(draftShares(expense())).toEqual([5000, 10000, 7000]);
     const unknown = expense({ split: "equal", participants: [{ memberId: null, name: "Thabo", amountMinor: null }, { memberId: "m-me", name: "me", amountMinor: null }] });
     expect(draftShares(unknown)).toEqual([null, null]);
+  });
+});
+
+const pizza: OpenItem = { expenseId: "e-pizza", description: "Pizza", date: "2026-11-01", openMinor: 2500 };
+const uber: OpenItem = { expenseId: "e-uber", description: "Uber", date: "2026-11-10", openMinor: 9500 };
+
+function payment(overrides: Partial<NonNullable<PlainDraft["payment"]>> = {}, issues: PlainDraft["issues"] = []): PlainDraft {
+  return {
+    intent: "payment",
+    groupId: "g-flat",
+    issues,
+    members,
+    groups: [{ id: "g-flat", name: "Flat 4B" }],
+    parsed: { counterpart: "Joe", kind: "payment" },
+    payment: {
+      fromMemberId: "m-joe",
+      toMemberId: "m-me",
+      currency: "ZAR",
+      amountMinor: 2500,
+      statedAmountMinor: null,
+      openItems: [pizza, uber],
+      covers: [{ expenseId: "e-pizza", amountMinor: 2500 }],
+      ...overrides,
+    },
+  };
+}
+
+describe("allocateCovers", () => {
+  test("oldest first, whole amounts", () => {
+    expect(allocateCovers([uber, pizza], ["e-uber", "e-pizza"], null)).toEqual({
+      covers: [
+        { expenseId: "e-pizza", amountMinor: 2500 },
+        { expenseId: "e-uber", amountMinor: 9500 },
+      ],
+      amountMinor: 12000,
+    });
+  });
+
+  test("a stated amount stops part-way", () => {
+    expect(allocateCovers([pizza, uber], ["e-pizza", "e-uber"], 3000)).toEqual({
+      covers: [
+        { expenseId: "e-pizza", amountMinor: 2500 },
+        { expenseId: "e-uber", amountMinor: 500 },
+      ],
+      amountMinor: 3000,
+    });
+  });
+
+  test("an amount below the first item covers part of it", () => {
+    expect(allocateCovers([pizza, uber], ["e-pizza", "e-uber"], 1000)).toEqual({
+      covers: [{ expenseId: "e-pizza", amountMinor: 1000 }],
+      amountMinor: 1000,
+    });
+  });
+});
+
+describe("payment drafts", () => {
+  test("toggleCover re-totals", () => {
+    const both = toggleCover(payment(), "e-uber");
+    expect(both.payment?.covers).toEqual([
+      { expenseId: "e-pizza", amountMinor: 2500 },
+      { expenseId: "e-uber", amountMinor: 9500 },
+    ]);
+    expect(both.payment?.amountMinor).toBe(12000);
+    const back = toggleCover(both, "e-uber");
+    expect(back.payment?.amountMinor).toBe(2500);
+  });
+
+  test("picking an ambiguous item ticks it and clears the issue", () => {
+    const d = payment(
+      { covers: [], amountMinor: null },
+      [{ field: "payment.items[0]", kind: "ambiguous", text: "Which one?", candidates: ["e-pizza", "e-uber"] }],
+    );
+    const next = applyPick(d, 0, "e-uber");
+    expect(next.issues).toEqual([]);
+    expect(next.payment?.covers).toEqual([{ expenseId: "e-uber", amountMinor: 9500 }]);
+    const skipped = applyPick(d, 0, null);
+    expect(skipped.issues).toEqual([]);
+    expect(skipped.payment?.covers).toEqual([]);
+  });
+
+  test("withCounterpart replaces only the counterpart", () => {
+    expect(withCounterpart({ counterpart: "Jo", kind: "payment" }, "Joe Bloggs")).toEqual({ counterpart: "Joe Bloggs", kind: "payment" });
+  });
+
+  test("canSave refuses a payment with no covers", () => {
+    expect(canSave(payment())).toBe(true);
+    expect(canSave(payment({ covers: [] }))).toBe(false);
+    expect(canSave(payment({ amountMinor: 1000 }))).toBe(false); // covers sum 2500 > 1000
+  });
+
+  test("toSettlementWriteDto sends the covers", () => {
+    expect(toSettlementWriteDto(payment(), "s-1")).toEqual({
+      id: "s-1",
+      fromMemberId: "m-joe",
+      toMemberId: "m-me",
+      currency: "ZAR",
+      amountMinor: 2500,
+      paidInGroupCurrency: false,
+      covers: [{ expenseId: "e-pizza", amountMinor: 2500 }],
+    });
+  });
+});
+
+describe("countingBoth", () => {
+  const money = (minor: number) => ({ currency: "ZAR", minor, text: "" });
+  const open = (fromOwes: number, toOwes: number) => ({
+    fromMemberId: "m-joe",
+    toMemberId: "m-me",
+    currencies: [{ currency: "ZAR", fromOwes: [], fromOwesTotal: money(fromOwes), toOwes: [], toOwesTotal: money(toOwes) }],
+  });
+
+  test("says who owes whom net", () => {
+    expect(countingBoth(open(3000, 2500), "ZAR", "m-me", "Joe")).toBe("Counting what Joe owes you, Joe owes you R 5,00.");
+    expect(countingBoth(open(2500, 3000), "ZAR", "m-me", "Joe")).toBe("Counting what Joe owes you, you still owe Joe R 5,00.");
+    expect(countingBoth(open(2500, 2500), "ZAR", "m-me", "Joe")).toBe("Counting what Joe owes you, you're even.");
+  });
+
+  test("is null when only one side is open", () => {
+    expect(countingBoth(open(3000, 0), "ZAR", "m-me", "Joe")).toBeNull();
+    expect(countingBoth(open(0, 3000), "ZAR", "m-me", "Joe")).toBeNull();
   });
 });
