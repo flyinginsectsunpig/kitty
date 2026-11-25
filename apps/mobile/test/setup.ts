@@ -14,4 +14,5 @@ jest.mock("expo-notifications", () => ({
   getDevicePushTokenAsync: jest.fn(async () => Promise.reject(new Error("no Firebase config"))),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: () => {} })),
   getLastNotificationResponseAsync: jest.fn(async () => null),
+  unregisterForNotificationsAsync: jest.fn(async () => {}),
 }));

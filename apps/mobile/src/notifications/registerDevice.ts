@@ -3,7 +3,12 @@ import * as ExpoNotifications from "expo-notifications";
 
 type NotificationsApi = Pick<
   typeof ExpoNotifications,
-  "AndroidImportance" | "setNotificationChannelAsync" | "getPermissionsAsync" | "requestPermissionsAsync" | "getDevicePushTokenAsync"
+  | "AndroidImportance"
+  | "setNotificationChannelAsync"
+  | "getPermissionsAsync"
+  | "requestPermissionsAsync"
+  | "getDevicePushTokenAsync"
+  | "unregisterForNotificationsAsync"
 >;
 
 /** The Android channel Kitty's notifications arrive on (also the manifest's default, in app.config.ts). */
@@ -30,12 +35,18 @@ export async function registerDevice(
   return "registered";
 }
 
-/** Stops this phone getting the signed-in person's notifications. Does nothing without permission or a token. */
+/**
+ * Stops this phone getting the signed-in person's notifications: tells the ledger, then deletes the phone's token, so
+ * even when the ledger can't be reached (offline) pulse forgets it at the next push. The next sign-in gets a new one.
+ */
 export async function forgetDevice(ledger: LedgerClient, n: NotificationsApi = ExpoNotifications): Promise<void> {
-  if (!(await n.getPermissionsAsync()).granted) return;
-  const token = await phoneToken(n);
+  const token = await phoneToken(n); // with or without permission: it may have been switched off since
   if (!token) return;
-  await ledger.POST("/me/devices/forget", { body: { token } });
+  try {
+    await ledger.POST("/me/devices/forget", { body: { token } });
+  } finally {
+    await n.unregisterForNotificationsAsync().catch(() => {});
+  }
 }
 
 async function phoneToken(n: NotificationsApi): Promise<string | null> {

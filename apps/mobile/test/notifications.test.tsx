@@ -70,6 +70,25 @@ test("sign-out forgets the device", async () => {
   await waitFor(() => expect(store.data.has("kitty.tokens")).toBe(false));
   const forget = calls.find((c) => c.path === "/me/devices/forget");
   expect(forget?.body).toEqual({ token: "fcm-2" });
+  expect(n.unregisterForNotificationsAsync).toHaveBeenCalled();
+});
+
+test("signing out offline, or with notifications switched off, still stops this phone's notifications", async () => {
+  n.getPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: false } as any); // revoked in Android settings
+  n.getDevicePushTokenAsync.mockResolvedValue({ type: "android", data: "fcm-3" } as any);
+  const { client, calls } = fakeLedger({
+    "GET /groups": () => json(200, []),
+    "POST /me/devices/forget": () => {
+      throw new TypeError("Network request failed");
+    },
+  });
+  const { store } = await renderApp({ "(app)/groups/index": GroupsIndex }, client, "/groups");
+  await fireEvent.press(await screen.findByText("Sign out"));
+
+  await waitFor(() => expect(store.data.has("kitty.tokens")).toBe(false));
+  expect(calls.find((c) => c.path === "/me/devices/forget")?.body).toEqual({ token: "fcm-3" });
+  // The token itself is deleted: pulse forgets it the next time a push to it fails.
+  expect(n.unregisterForNotificationsAsync).toHaveBeenCalled();
 });
 
 test("tapping a notification opens its group", async () => {
