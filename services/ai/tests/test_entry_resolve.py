@@ -370,5 +370,12 @@ def test_a_missing_or_unknown_counterpart_is_an_issue_and_the_ledger_isnt_asked(
     assert (d["payment"]["fromMemberId"], d["payment"]["toMemberId"]) == (None, ME.id)
 
 
+def test_unreadable_amount_is_an_issue():
+    d = payment(direction="i_paid", amount="2 000")
+    issue = next(i for i in d["issues"] if i["field"] == "payment.amount")
+    assert (issue["kind"], issue["text"]) == ("missing", "2 000")
+    assert (d["payment"]["amountMinor"], d["payment"]["statedAmountMinor"]) == (None, None)
+
+
 def test_payment_draft_lists_the_groups_members():
     assert payment(items=["Uber"])["members"][0] == {"id": ME.id, "displayName": "Zakhir McKinnon"}

@@ -113,6 +113,9 @@ def _payment(
     if currency != base:
         issues.append(_issue("payment.amount", "other_currency", parsed.currency or ""))
     stated = to_minor(parsed.amount, currency) if parsed.amount else None
+    unreadable = bool(parsed.amount) and stated is None  # never read as "pay everything open"
+    if unreadable:
+        issues.append(_issue("payment.amount", "missing", parsed.amount or ""))
 
     owed: list[dict] = []
     if other_id is not None:
@@ -159,7 +162,12 @@ def _payment(
             covers.append({"expenseId": i["expenseId"], "amountMinor": amount})
         if left is not None:
             left -= amount
-    total = stated if currency == base and stated is not None else (sum(c["amountMinor"] for c in covers) or None)
+    if unreadable:
+        total = None
+    elif currency == base and stated is not None:
+        total = stated
+    else:
+        total = sum(c["amountMinor"] for c in covers) or None
     return {
         "fromMemberId": from_id,
         "toMemberId": to_id,
