@@ -58,3 +58,12 @@ Between the runs:
 - The groceries case no longer requires an item name.
 - Crossing off is ruled out of `not_a_question`, first in the prompt and then in the tool's own description. The
   second run shows the prompt alone wasn't enough.
+
+Phase 4c changed this set, so later runs aren't comparable with the three above:
+- Crossing off is now an entry again. Case 6 expects `not_a_question`, and the app turns the sentence into a payment
+  card.
+- The world has one linked payment: R 25,00 of the R 50,00 payment to Joe covers the Uber. So "how much do I owe Joe"
+  lists only the groceries (case 2 now expects no "Uber").
+- `/me/owing` lists only what's still open, and each payment has its part not tied to an item.
+
+The plain-language set gained eight payment sentences (intent `payment`).
