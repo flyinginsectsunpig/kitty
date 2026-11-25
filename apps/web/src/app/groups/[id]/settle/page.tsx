@@ -1,23 +1,30 @@
+import type { OpenItem } from "@kitty/core";
 import { formatMoney } from "@kitty/money";
+import { ConfirmButton } from "@/components/ConfirmButton";
 import { CopyButton } from "@/components/CopyButton";
+import { CoversPicker } from "@/components/CoversPicker";
 import { ForeignSettleFields } from "@/components/ForeignSettleFields";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { GroupNav } from "@/components/GroupNav";
+import { dayMonth } from "@/lib/day-month";
 import { loadGroup } from "@/lib/group-context";
 import { unwrap } from "@/lib/ledger";
-import { fetchRate, recordSettlement, remindMember } from "../actions";
+import { deleteSettlement, fetchRate, recordSettlement, remindMember } from "../actions";
 
 export default async function SettlePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; settled?: string; reminded?: string }>;
+  searchParams: Promise<{ error?: string; settled?: string; reminded?: string; deleted?: string }>;
 }) {
   const { id } = await params;
-  const { error, settled, reminded } = await searchParams;
+  const { error, settled, reminded, deleted } = await searchParams;
   const { ledger, group, me, nameOf } = await loadGroup(id);
-  const balances = unwrap(await ledger.GET("/groups/{groupId}/balances", { params: { path: { groupId: id } } }));
+  const [balances, recent] = await Promise.all([
+    ledger.GET("/groups/{groupId}/balances", { params: { path: { groupId: id } } }).then(unwrap),
+    ledger.GET("/groups/{groupId}/settlements", { params: { path: { groupId: id }, query: { limit: 20 } } }).then(unwrap),
+  ]);
   const detailsOf = new Map(group.members.map((m) => [m.id, m.paymentDetails]));
 
   const transfers = balances.currencies
@@ -30,12 +37,29 @@ export default async function SettlePage({
     return t.fromMemberId === me.id ? 0 : t.toMemberId === me.id ? 1 : 2;
   }
 
+  // What each payer still owes each receiver item by item, in the transfer's currency, for the ticks. The ticks are
+  // optional: if the ledger can't list the items, the transfer is marked as paid without them, as before.
+  const openFor = await Promise.all(
+    transfers.map(async (t): Promise<OpenItem[]> => {
+      const { data: open } = await ledger.GET("/groups/{groupId}/open-items", {
+        params: { path: { groupId: id }, query: { from: t.fromMemberId, to: t.toMemberId } },
+      });
+      return (open?.currencies.find((c) => c.currency === t.currency)?.fromOwes ?? []).map((o) => ({
+        expenseId: o.item.expenseId,
+        description: o.item.description,
+        date: o.item.date,
+        openMinor: o.open.minor,
+      }));
+    }),
+  );
+
   return (
     <section className="space-y-6">
       <GroupNav groupId={id} groupName={group.name} active="/settle" />
       <ErrorBanner code={error} />
       {settled && <p className="rounded-xl bg-green-50 p-3 text-sm text-owed dark:bg-green-950">Payment recorded.</p>}
       {reminded && <p className="rounded-xl bg-green-50 p-3 text-sm text-owed dark:bg-green-950">Reminder sent.</p>}
+      {deleted && <p className="rounded-xl bg-green-50 p-3 text-sm text-owed dark:bg-green-950">Payment deleted.</p>}
 
       {transfers.length === 0 ? (
         <p className="card text-center text-stone-600 dark:text-stone-400">Everyone is settled up. 🎉</p>
@@ -45,7 +69,8 @@ export default async function SettlePage({
             The fewest payments that settle everyone. Pay outside Kitty, then mark it as paid.
           </p>
           <ul className="space-y-3">
-            {transfers.map((t) => {
+            {transfers.map((t, n) => {
+              const items = openFor[n] ?? [];
               const from = t.fromMemberId === me.id ? "You" : nameOf(t.fromMemberId);
               const to = t.toMemberId === me.id ? "you" : nameOf(t.toMemberId);
               const details = detailsOf.get(t.toMemberId);
@@ -78,6 +103,11 @@ export default async function SettlePage({
                           amountMinor={t.amountMinor} fetchRate={fetchRate} />
                       </div>
                     )}
+                    {items.length > 0 && (
+                      <div className="mb-3">
+                        <CoversPicker items={items} amountMinor={t.amountMinor} currency={t.currency} />
+                      </div>
+                    )}
                     <button className="btn-primary w-full">Mark as paid</button>
                   </form>
                   {/* Someone who owes you: one Remind per person (their first payment to you in the list). */}
@@ -94,6 +124,37 @@ export default async function SettlePage({
             })}
           </ul>
         </>
+      )}
+
+      {recent.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="font-semibold">Recent payments</h2>
+          <ul className="space-y-2">
+            {recent.map((r) => {
+              const p = r.payment;
+              const from = p.fromMemberId === me.id ? "You" : r.from;
+              const to = p.toMemberId === me.id ? "you" : r.to;
+              const what = r.covers.map((c) => c.description).join(", ");
+              return (
+                <li key={p.id} className="card flex items-center justify-between gap-3">
+                  <p className="text-sm">
+                    {from} paid {to} <span className="tabular-nums">{formatMoney(p.amountMinor, p.currency)}</span> ·{" "}
+                    {dayMonth(r.date)}
+                    {what && ` · for: ${what}`}
+                  </p>
+                  <form action={deleteSettlement}>
+                    <input type="hidden" name="groupId" value={id} />
+                    <input type="hidden" name="settlementId" value={p.id} />
+                    <input type="hidden" name="idempotencyKey" value={crypto.randomUUID()} />
+                    <ConfirmButton className="btn-secondary shrink-0 text-xs" question="Delete this payment? Its items go back on the list.">
+                      Delete
+                    </ConfirmButton>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </section>
   );

@@ -140,8 +140,19 @@ export async function updateMyDetails(form: FormData) {
   redirect(`/groups/${groupId}/members?saved=1`);
 }
 
+/** Settle up's ticked items: repeated "cover" fields, each "expenseId:amountMinor". */
+function covers(form: FormData): { expenseId: string; amountMinor: number }[] {
+  return form.getAll("cover").map((value) => {
+    const [expenseId, amount] = typeof value === "string" ? value.split(":") : [];
+    const amountMinor = Number(amount);
+    if (!expenseId || !Number.isSafeInteger(amountMinor) || amountMinor <= 0) throw new Error(`Bad cover field '${String(value)}'.`);
+    return { expenseId, amountMinor };
+  });
+}
+
 export async function recordSettlement(form: FormData) {
   const groupId = field(form, "groupId");
+  const covered = covers(form);
   const ledger = await getLedger();
   const { error } = await ledger.POST("/groups/{groupId}/settlements", {
     params: { path: { groupId } },
@@ -154,11 +165,26 @@ export async function recordSettlement(form: FormData) {
       // Present only when the person typed a rate; otherwise the ledger uses today's ECB rate.
       fxRate: optional(form, "fxRate"),
       paidInGroupCurrency: form.get("paidInGroupCurrency") === "on",
+      // Nothing ticked: a payment not tied to an item, as before.
+      covers: covered.length > 0 ? covered : undefined,
     },
     ...keyed(form),
   });
   if (error) withError(`/groups/${groupId}/settle`, error);
   redirect(`/groups/${groupId}/settle?settled=1`);
+}
+
+/** Deletes a payment from Settle up's Recent payments; the items it covered are open again. */
+export async function deleteSettlement(form: FormData) {
+  const groupId = field(form, "groupId");
+  const settlementId = field(form, "settlementId");
+  const ledger = await getLedger();
+  const { error } = await ledger.DELETE("/groups/{groupId}/settlements/{settlementId}", {
+    params: { path: { groupId, settlementId } },
+    ...keyed(form),
+  });
+  if (error) withError(`/groups/${groupId}/settle`, error);
+  redirect(`/groups/${groupId}/settle?deleted=1`);
 }
 
 /** Reminds someone what they owe the signed-in person (the ledger works out the amount; once a day each). */
