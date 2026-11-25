@@ -8,13 +8,18 @@ public static class Topics
     public const string LedgerEvents = "ledger.events";
     /// <summary>Each recurring schedule's latest state, keyed by schedule id; log-compacted.</summary>
     public const string LedgerRecurring = "ledger.recurring";
+    /// <summary>Each person's notification delivery state, keyed by user id; log-compacted.</summary>
+    public const string NotifySettings = "ledger.notify-settings";
+    /// <summary>One person should be told something, keyed by user id.</summary>
+    public const string NotificationsRequested = "notifications.requested";
     public const string ReceiptUploaded = "receipt.uploaded";
     public const string ReceiptUploadedRetry = "receipt.uploaded.retry";
     public const string ReceiptParsed = "receipt.parsed";
 
-    public static readonly string[] All = [LedgerEvents, LedgerRecurring, ReceiptUploaded, ReceiptUploadedRetry, ReceiptParsed];
+    public static readonly string[] All =
+        [LedgerEvents, LedgerRecurring, NotifySettings, NotificationsRequested, ReceiptUploaded, ReceiptUploadedRetry, ReceiptParsed];
 
-    private static readonly HashSet<string> Compacted = [LedgerRecurring];
+    private static readonly HashSet<string> Compacted = [LedgerRecurring, NotifySettings];
 
     /// <summary>Creates any missing topic (3 partitions, replication 1: one broker).</summary>
     public static async Task EnsureAsync(IAdminClient admin)

@@ -26,6 +26,9 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
     public DbSet<ReceiptScan> ReceiptScans => Set<ReceiptScan>();
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
     public DbSet<RecurringSchedule> RecurringSchedules => Set<RecurringSchedule>();
+    public DbSet<NotificationSettings> NotificationSettings => Set<NotificationSettings>();
+    public DbSet<PushDevice> PushDevices => Set<PushDevice>();
+    public DbSet<WeeklySummary> WeeklySummaries => Set<WeeklySummary>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -92,6 +95,29 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
                 s.HasKey("ExpenseId", nameof(ExpenseShare.MemberId));
                 s.HasOne<Member>().WithMany().HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Restrict);
             });
+        });
+
+        b.Entity<NotificationSettings>(e =>
+        {
+            e.HasKey(x => x.UserId);
+            // Every publish bumps it: two changes racing from the same version can't both publish (pulse keeps the higher).
+            e.Property(x => x.Version).IsConcurrencyToken();
+            e.HasOne<User>().WithOne().HasForeignKey<NotificationSettings>(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<WeeklySummary>(e =>
+        {
+            e.HasKey(x => new { x.UserId, x.Week });
+            e.Property(x => x.Week).HasMaxLength(8);
+        });
+
+        b.Entity<PushDevice>(e =>
+        {
+            e.HasKey(x => x.Token);
+            e.Property(x => x.Token).HasMaxLength(4096);
+            e.Property(x => x.Platform).HasMaxLength(10);
+            e.HasIndex(x => x.UserId);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<RecurringSchedule>(e =>

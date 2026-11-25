@@ -22,6 +22,9 @@ See [the design](docs/superpowers/specs/2026-11-15-kitty-design.md).
   come from [pulse](services/pulse/README.md), a small Go service the ledger calls over gRPC.
 - **Repeating expenses:** rent on the 1st, a weekly subscription: set it up once and it lands on balances by itself
   each time (pulse follows the schedules over Kafka and adds each period through the ledger with its own service login).
+- **Notifications:** a push on the Android app or an email when you're added to an expense or a payment with you is
+  recorded, and on Mondays what you owe. Each is a switch in Settings → Notifications. The ledger decides who to tell;
+  pulse sends it (Firebase push, SMTP email), once.
 
 ## Local dev
 

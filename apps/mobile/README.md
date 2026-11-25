@@ -59,6 +59,17 @@ pnpm --filter mobile typecheck
 pnpm --filter mobile export      # proves the JavaScript bundle builds (CI runs this)
 ```
 
+## Push notifications
+
+Push needs the Firebase app's `google-services.json` (RUNBOOK.md, "Notifications", step 1). Without it the app
+builds and runs with push off.
+
+- **Locally:** put the file at `apps/mobile/google-services.json` (git ignores it) and build with
+  `GOOGLE_SERVICES_JSON=./google-services.json pnpm --filter mobile android`. For pulse under Aspire to send, give
+  it the service-account key: `dotnet user-secrets set Parameters:fcm-credentials-path <path> --project aspire/Kitty.AppHost`.
+- **Release APK:** `base64 -w0 google-services.json | gh secret set GOOGLE_SERVICES_JSON_BASE64`. The workflow
+  writes it before building; without the secret it warns and builds with push off.
+
 ## Release APK
 
 `.github/workflows/android.yml` builds a signed release APK with Gradle on GitHub's runners (no Expo account). Run

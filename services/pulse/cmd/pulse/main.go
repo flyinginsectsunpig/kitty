@@ -10,12 +10,15 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	fxv1 "github.com/flyinginsectsunpig/kitty/services/pulse/gen/kitty/fx/v1"
 	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/fx"
+	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/kafkaconsume"
+	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/notify"
 	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/recurring"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -38,7 +41,8 @@ func main() {
 }
 
 func run(port string) error {
-	cfg, err := requiredEnv("PULSE_DATABASE_URL", "PULSE_KAFKA_BOOTSTRAP", "PULSE_LEDGER_GRPC", "PULSE_TOKEN_URL", "PULSE_CLIENT_SECRET")
+	cfg, err := requiredEnv("PULSE_DATABASE_URL", "PULSE_KAFKA_BOOTSTRAP", "PULSE_LEDGER_GRPC", "PULSE_TOKEN_URL", "PULSE_CLIENT_SECRET",
+		"PULSE_WEB_URL")
 	if err != nil {
 		return err
 	}
@@ -76,12 +80,17 @@ func run(port string) error {
 			slog.Error("schedule consumer stopped", "err", err)
 		}
 	}()
-	ledger, err := recurring.NewLedgerClient(cfg["PULSE_LEDGER_GRPC"], cfg["PULSE_TOKEN_URL"], cfg["PULSE_CLIENT_SECRET"])
+	ledgerConn, err := recurring.NewLedgerConn(cfg["PULSE_LEDGER_GRPC"], cfg["PULSE_TOKEN_URL"], cfg["PULSE_CLIENT_SECRET"])
 	if err != nil {
 		return err
 	}
-	scheduler := &recurring.Scheduler{Store: schedules, Ledger: ledger, Now: time.Now}
+	defer ledgerConn.Close()
+	scheduler := &recurring.Scheduler{Store: schedules, Ledger: recurring.NewLedgerClient(ledgerConn), Now: time.Now}
 	go scheduler.Run(ctx, time.Minute)
+
+	if err := startNotifications(ctx, cfg, dbURL, notify.NewLedger(ledgerConn)); err != nil {
+		return err
+	}
 
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
@@ -97,6 +106,69 @@ func run(port string) error {
 	}()
 	slog.Info("pulse listening", "port", port)
 	return srv.Serve(lis)
+}
+
+// startNotifications follows everyone's settings, delivers what the ledger asks for, and asks for the weekly
+// summaries. Push needs PULSE_FCM_CREDENTIALS (a service-account key file) and email PULSE_SMTP_HOST; each is off,
+// said once at startup, without its setting.
+func startNotifications(ctx context.Context, cfg map[string]string, dbURL string, ledger notify.Ledger) error {
+	store, err := notify.OpenStore(ctx, dbURL)
+	if err != nil {
+		return err
+	}
+	context.AfterFunc(ctx, store.Close)
+
+	d := &notify.Dispatcher{Deliveries: store, Settings: store, Pending: store, Ledger: ledger, Now: time.Now, Wait: notify.Sleep}
+	if path := os.Getenv("PULSE_FCM_CREDENTIALS"); path != "" {
+		key, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("PULSE_FCM_CREDENTIALS: %w", err)
+		}
+		if d.Push, err = notify.NewFCM(key, notify.FCMBaseURL); err != nil {
+			return err
+		}
+	} else {
+		slog.Info("push notifications are off: PULSE_FCM_CREDENTIALS isn't set")
+	}
+	if host := os.Getenv("PULSE_SMTP_HOST"); host != "" {
+		port, err := strconv.Atoi(env("PULSE_SMTP_PORT", "587"))
+		if err != nil {
+			return fmt.Errorf("PULSE_SMTP_PORT: %w", err)
+		}
+		from := os.Getenv("PULSE_SMTP_FROM")
+		if from == "" {
+			return fmt.Errorf("PULSE_SMTP_FROM is required when PULSE_SMTP_HOST is set")
+		}
+		d.Mail = notify.NewSMTP(host, port, os.Getenv("PULSE_SMTP_USER"), os.Getenv("PULSE_SMTP_PASSWORD"), from, cfg["PULSE_WEB_URL"])
+	} else {
+		slog.Info("email notifications are off: PULSE_SMTP_HOST isn't set")
+	}
+
+	brokers := cfg["PULSE_KAFKA_BOOTSTRAP"]
+	settings, err := kafkaconsume.NewClient(brokers, notify.SettingsTopic, "pulse-notify-settings")
+	if err != nil {
+		return err
+	}
+	requests, err := kafkaconsume.NewClient(brokers, notify.RequestsTopic, "pulse-notify")
+	if err != nil {
+		settings.Close()
+		return err
+	}
+	context.AfterFunc(ctx, settings.Close)
+	context.AfterFunc(ctx, requests.Close)
+	go func() {
+		if err := notify.ConsumeSettings(ctx, settings, store); err != nil && ctx.Err() == nil {
+			slog.Error("notify settings consumer stopped", "err", err)
+		}
+	}()
+	go func() {
+		if err := kafkaconsume.Run(ctx, requests, "notification", d.Handle); err != nil && ctx.Err() == nil {
+			slog.Error("notification consumer stopped", "err", err)
+		}
+	}()
+	go d.RunRetries(ctx, 15*time.Second) // requests a provider failed for now: off the topic, so they hold nothing up
+	go notify.RunWeekly(ctx, ledger, time.Now)
+	return nil
 }
 
 func checkHealth(port string) int {

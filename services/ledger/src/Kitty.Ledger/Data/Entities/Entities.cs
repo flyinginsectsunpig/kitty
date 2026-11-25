@@ -9,6 +9,8 @@ public sealed class User
     public required string KeycloakSub { get; set; }
     public required string DisplayName { get; set; }
     public string? Email { get; set; }
+    /// <summary>Keycloak verified <see cref="Email"/>; only a verified address gets notification email.</summary>
+    public bool EmailVerified { get; set; }
 }
 
 public sealed class Group

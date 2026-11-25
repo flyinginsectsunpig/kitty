@@ -42,6 +42,9 @@ export default function GroupsScreen() {
           )
         }
       </LoadState>
+      <Link href="/notifications" style={styles.footerLink}>
+        Notification settings
+      </Link>
     </Screen>
   );
 }
@@ -86,4 +89,5 @@ const styles = StyleSheet.create({
   owed: { fontSize: font.sm, color: colors.owed },
   owes: { fontSize: font.sm, color: colors.owes },
   headerLink: { color: colors.brand600, fontSize: font.base, fontWeight: "600" },
+  footerLink: { color: colors.brand600, fontSize: font.sm, textAlign: "center", paddingVertical: space.md },
 });

@@ -8,7 +8,7 @@ var ledgerDb = postgres.AddDatabase("ledger-db", databaseName: "ledger");
 // SignalR backplane for live table updates (correct across ledger replicas).
 var redis = builder.AddRedis("redis");
 
-// Catches Keycloak's verification emails locally (UI on the "ui" endpoint).
+// Catches Keycloak's verification emails and pulse's notification emails locally (UI on the "ui" endpoint).
 var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.33.1")
     .WithHttpEndpoint(targetPort: 8025, name: "ui")
     .WithEndpoint(targetPort: 1025, name: "smtp");
@@ -47,6 +47,11 @@ var blobs = storage.AddBlobs("blobs");
 // Only wired in when set: Aspire 17 treats an empty parameter as missing and holds the ai service until one is entered.
 var hasGeminiKey = !string.IsNullOrWhiteSpace(builder.Configuration["Parameters:gemini-api-key"]);
 
+// Optional: push notifications need a Firebase service-account key file (see deploy/compose/RUNBOOK.md, "Notifications"):
+// dotnet user-secrets set Parameters:fcm-credentials-path <path to the key file>. Without it pulse logs that push is off.
+var fcmCredentialsPath = builder.Configuration["Parameters:fcm-credentials-path"];
+var mailpitSmtp = mailpit.GetEndpoint("smtp");
+
 // Exchange rates over gRPC (Go, run from source with `go run`). It creates its own "pulse" schema in the ledger database.
 // No developer-certificate trust: Aspire would set SSL_CERT_DIR to its dev certificate alone, and Go then trusts only
 // that, so pulse couldn't reach Frankfurter over HTTPS. pulse calls nothing that uses the dev certificate.
@@ -63,8 +68,15 @@ var pulse = builder.AddExecutable("pulse", "go", "../../services/pulse", "run", 
     .WithEnvironment("PULSE_LEDGER_GRPC", "localhost:" + LedgerGrpcPort.ToString(System.Globalization.CultureInfo.InvariantCulture))
     .WithEnvironment("PULSE_TOKEN_URL", ReferenceExpression.Create($"{keycloak.GetEndpoint("http")}/realms/kitty/protocol/openid-connect/token"))
     .WithEnvironment("PULSE_CLIENT_SECRET", "dev-only-kitty-pulse-secret")
+    // Notifications: emails go to Mailpit (plain SMTP, no login); links in them open the local web app.
+    .WithEnvironment("PULSE_SMTP_HOST", ReferenceExpression.Create($"{mailpitSmtp.Property(EndpointProperty.Host)}"))
+    .WithEnvironment("PULSE_SMTP_PORT", ReferenceExpression.Create($"{mailpitSmtp.Property(EndpointProperty.Port)}"))
+    .WithEnvironment("PULSE_SMTP_FROM", "Kitty <kitty@localhost>")
+    .WithEnvironment("PULSE_WEB_URL", "http://localhost:3000")
+    .WaitFor(mailpit)
     .WaitFor(redpanda)
     .WaitFor(keycloak);
+if (!string.IsNullOrWhiteSpace(fcmCredentialsPath)) pulse.WithEnvironment("PULSE_FCM_CREDENTIALS", fcmCredentialsPath);
 
 var ledger = builder.AddDotnetProject("ledger", "../../services/ledger/src/Kitty.Ledger/Kitty.Ledger.csproj")
     // pulse's gRPC port: plain HTTP/2, fixed and unproxied so the Host header carries the port the ledger checks.

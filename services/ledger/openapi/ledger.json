@@ -95,6 +95,100 @@
         }
       }
     },
+    "/me/notifications": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "operationId": "GetNotificationSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSettingsDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Notifications"
+        ],
+        "operationId": "UpdateNotificationSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationSettingsWriteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSettingsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/devices": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "operationId": "RegisterDevice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/me/devices/forget": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "operationId": "ForgetDevice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgetDeviceDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/groups": {
       "post": {
         "tags": [
@@ -2176,6 +2270,21 @@
           }
         }
       },
+      "DeviceDto": {
+        "required": [
+          "token",
+          "platform"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          }
+        }
+      },
       "ExpenseDto": {
         "required": [
           "id",
@@ -2355,6 +2464,17 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "ForgetDeviceDto": {
+        "required": [
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
           }
         }
       },
@@ -2660,6 +2780,72 @@
           "netMinor": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "NotificationSettingsDto": {
+        "required": [
+          "expensePush",
+          "expenseEmail",
+          "paymentPush",
+          "paymentEmail",
+          "weeklyPush",
+          "weeklyEmail",
+          "emailAvailable"
+        ],
+        "type": "object",
+        "properties": {
+          "expensePush": {
+            "type": "boolean"
+          },
+          "expenseEmail": {
+            "type": "boolean"
+          },
+          "paymentPush": {
+            "type": "boolean"
+          },
+          "paymentEmail": {
+            "type": "boolean"
+          },
+          "weeklyPush": {
+            "type": "boolean"
+          },
+          "weeklyEmail": {
+            "type": "boolean"
+          },
+          "emailAvailable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NotificationSettingsWriteDto": {
+        "required": [
+          "expensePush",
+          "expenseEmail",
+          "paymentPush",
+          "paymentEmail",
+          "weeklyPush",
+          "weeklyEmail"
+        ],
+        "type": "object",
+        "properties": {
+          "expensePush": {
+            "type": "boolean"
+          },
+          "expenseEmail": {
+            "type": "boolean"
+          },
+          "paymentPush": {
+            "type": "boolean"
+          },
+          "paymentEmail": {
+            "type": "boolean"
+          },
+          "weeklyPush": {
+            "type": "boolean"
+          },
+          "weeklyEmail": {
+            "type": "boolean"
           }
         }
       },
@@ -3407,6 +3593,9 @@
     },
     {
       "name": "Me"
+    },
+    {
+      "name": "Notifications"
     },
     {
       "name": "Groups"

@@ -8,6 +8,7 @@ using Kitty.Ledger.Data.Entities;
 using Kitty.Ledger.Domain.Recurring;
 using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Fx;
+using Kitty.Ledger.Features.Notifications;
 using Kitty.Ledger.Infrastructure;
 using Kitty.Ledger.Infrastructure.Audit;
 using Kitty.Ledger.Infrastructure.Messaging;
@@ -20,7 +21,8 @@ namespace Kitty.Ledger.Features.Recurring;
 /// pulse adds a due period of a schedule. Only pulse may call this (policy "pulse", internal port), and the ledger
 /// still checks everything: the schedule is live, the period is a real occurrence in range, and it isn't due later.
 /// </summary>
-public sealed class RecurringGrpcService(LedgerDbContext db, ExpenseRates rates, AuditWriter audit, Outbox outbox, TimeProvider clock)
+public sealed class RecurringGrpcService(LedgerDbContext db, ExpenseRates rates, AuditWriter audit, Outbox outbox, Notifier notifier,
+    TimeProvider clock)
     : RecurringService.RecurringServiceBase
 {
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web)
@@ -68,6 +70,7 @@ public sealed class RecurringGrpcService(LedgerDbContext db, ExpenseRates rates,
         snapshot["recurringScheduleId"] = scheduleId.ToString();
         audit.Record(schedule.CreatedByUserId, schedule.GroupId, ExpenseEndpoints.EntityType, expense.Id, AuditActions.Created, null, snapshot);
         outbox.ExpenseChanged(schedule.GroupId, expense.Id, ExpenseChanged.Types.Change.Created);
+        await notifier.ExpenseAddedAsync(expense, actorUserId: null, ct); // nobody added it just now: everyone involved hears
         try
         {
             await db.SaveChangesAsync(ct);

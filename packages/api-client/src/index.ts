@@ -17,6 +17,8 @@ export type RecurringDto = Schemas["RecurringDto"];
 export type RecurringWriteDto = Schemas["RecurringWriteDto"];
 export type ActivityDto = Schemas["ActivityDto"];
 export type InvitePreviewDto = Schemas["InvitePreviewDto"];
+export type NotificationSettingsDto = Schemas["NotificationSettingsDto"];
+export type NotificationSettingsWriteDto = Schemas["NotificationSettingsWriteDto"];
 export type LedgerClient = Client<paths>;
 
 /** Problem-details error body from the ledger; `code` is stable and safe to switch on. */

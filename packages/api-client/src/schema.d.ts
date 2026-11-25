@@ -36,6 +36,54 @@ export interface paths {
         patch: operations["UpdateMe"];
         trace?: never;
     };
+    "/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetNotificationSettings"];
+        put: operations["UpdateNotificationSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RegisterDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/devices/forget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ForgetDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/groups": {
         parameters: {
             query?: never;
@@ -670,6 +718,10 @@ export interface components {
             members: components["schemas"]["MemberNetDto"][];
             transfers: components["schemas"]["TransferDto"][];
         };
+        DeviceDto: {
+            token: string;
+            platform: string;
+        };
         ExpenseDto: {
             /** Format: uuid */
             id: string;
@@ -717,6 +769,9 @@ export interface components {
             /** Format: int32 */
             version: null | number;
             fxRate?: null | string;
+        };
+        ForgetDeviceDto: {
+            token: string;
         };
         /** @enum {unknown} */
         Frequency: "weekly" | "monthly";
@@ -807,6 +862,23 @@ export interface components {
             currency: string;
             /** Format: int64 */
             netMinor: number;
+        };
+        NotificationSettingsDto: {
+            expensePush: boolean;
+            expenseEmail: boolean;
+            paymentPush: boolean;
+            paymentEmail: boolean;
+            weeklyPush: boolean;
+            weeklyEmail: boolean;
+            emailAvailable: boolean;
+        };
+        NotificationSettingsWriteDto: {
+            expensePush: boolean;
+            expenseEmail: boolean;
+            paymentPush: boolean;
+            paymentEmail: boolean;
+            weeklyPush: boolean;
+            weeklyEmail: boolean;
         };
         ParticipantDto: {
             /** Format: uuid */
@@ -1091,6 +1163,94 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MeDto"];
                 };
+            };
+        };
+    };
+    GetNotificationSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSettingsDto"];
+                };
+            };
+        };
+    };
+    UpdateNotificationSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationSettingsWriteDto"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSettingsDto"];
+                };
+            };
+        };
+    };
+    RegisterDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceDto"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ForgetDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForgetDeviceDto"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

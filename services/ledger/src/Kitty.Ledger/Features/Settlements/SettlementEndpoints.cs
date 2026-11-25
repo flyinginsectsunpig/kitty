@@ -5,6 +5,7 @@ using Kitty.Ledger.Domain.Fx;
 using Kitty.Ledger.Domain.Splits;
 using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Fx;
+using Kitty.Ledger.Features.Notifications;
 using Kitty.Ledger.Infrastructure.Fx;
 using Kitty.Ledger.Features.Groups;
 using Kitty.Ledger.Infrastructure;
@@ -35,7 +36,7 @@ public static class SettlementEndpoints
     }
 
     private static async Task<IResult> CreateAsync(Guid groupId, SettlementWriteDto body, HttpContext http, LedgerDbContext db,
-        AuditWriter audit, ExpenseRates rates, IFxRates fx, TimeProvider clock, CancellationToken ct)
+        AuditWriter audit, ExpenseRates rates, IFxRates fx, Notifier notifier, TimeProvider clock, CancellationToken ct)
     {
         if (body.Id == Guid.Empty) return ApiError.Validation("id must be a client-generated UUID.");
         if (body.FromMemberId == body.ToMemberId) return ApiError.Validation("A member cannot settle with themselves.");
@@ -82,6 +83,7 @@ public static class SettlementEndpoints
             PaidInGroupCurrency = body.PaidInGroupCurrency,
         };
         db.Settlements.Add(settlement);
+        await notifier.PaymentAsync(settlement, caller.User.Id, ct);
 
         var dto = ToDto(settlement);
         audit.Record(caller.User.Id, groupId, EntityType, settlement.Id, AuditActions.Created, null, dto);

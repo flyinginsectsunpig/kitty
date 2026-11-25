@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AuthClient } from "./client";
 import { createTokenKeeper, SignedOut, type TokenStore } from "./tokens";
 
@@ -13,7 +13,14 @@ type AuthValue = {
   signOut(): Promise<void>;
   /** A valid access token. Throws SignedOut (and flips status) when the session is gone. */
   getAccessToken(): Promise<string>;
+  /**
+   * Runs `hook` at each sign-out while the session still works (to forget this phone's push token). A failed or slow
+   * hook can't stop the sign-out. Returns the unsubscribe.
+   */
+  beforeSignOut(hook: () => Promise<void>): () => void;
 };
+
+const SIGN_OUT_HOOK_WAIT_MS = 5000;
 
 export const SIGNED_OUT_NOTICE = "You've been signed out. Sign in again.";
 
@@ -56,7 +63,20 @@ export function AuthProvider({ client, store, children }: { client: AuthClient; 
     return true;
   }, [client, keeper]);
 
+  const signOutHooks = useRef(new Set<() => Promise<void>>());
+  const beforeSignOut = useCallback((hook: () => Promise<void>) => {
+    signOutHooks.current.add(hook);
+    return () => void signOutHooks.current.delete(hook);
+  }, []);
+
   const signOut = useCallback(async () => {
+    await Promise.allSettled(
+      [...signOutHooks.current].map((hook) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const giveUp = new Promise<void>((resolve) => (timer = setTimeout(resolve, SIGN_OUT_HOOK_WAIT_MS)));
+        return Promise.race([hook(), giveUp]).finally(() => clearTimeout(timer));
+      }),
+    );
     const tokens = await keeper.load();
     await keeper.clear();
     setStatus("signedOut");
@@ -64,7 +84,10 @@ export function AuthProvider({ client, store, children }: { client: AuthClient; 
     await client.signOut(tokens?.idToken).catch(() => {});
   }, [client, keeper]);
 
-  const value = useMemo(() => ({ status, notice, signIn, signOut, getAccessToken }), [status, notice, signIn, signOut, getAccessToken]);
+  const value = useMemo(
+    () => ({ status, notice, signIn, signOut, getAccessToken, beforeSignOut }),
+    [status, notice, signIn, signOut, getAccessToken, beforeSignOut],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

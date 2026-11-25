@@ -28,6 +28,8 @@
     <Protobuf Include="..\..\..\..\contracts\proto\kitty\fx\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="Client" />
     <!-- Recurring schedules: the change event the ledger publishes, and the gRPC service pulse calls. -->
     <Protobuf Include="..\..\..\..\contracts\proto\kitty\recurring\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="None" />
+    <!-- Notifications: the requests and settings the ledger publishes for pulse to deliver. -->
+    <Protobuf Include="..\..\..\..\contracts\proto\kitty\notify\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="None" />
     <Protobuf Include="..\..\..\..\contracts\proto\kitty\ledger\**\*.proto" ProtoRoot="..\..\..\..\contracts\proto" GrpcServices="Both" />
   </ItemGroup>
   <ItemGroup>

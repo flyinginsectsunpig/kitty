@@ -1,0 +1,192 @@
+[
+  {
+    "minor": 15000,
+    "currency": "ZAR",
+    "expected": "R 150,00"
+  },
+  {
+    "minor": 123456,
+    "currency": "ZAR",
+    "expected": "R 1 234,56"
+  },
+  {
+    "minor": 100000000,
+    "currency": "ZAR",
+    "expected": "R 1 000 000,00"
+  },
+  {
+    "minor": -500,
+    "currency": "ZAR",
+    "expected": "-R 5,00"
+  },
+  {
+    "minor": 0,
+    "currency": "ZAR",
+    "expected": "R 0,00"
+  },
+  {
+    "minor": 123456789,
+    "currency": "GBP",
+    "expected": "£1 234 567,89"
+  },
+  {
+    "minor": 1000,
+    "currency": "JPY",
+    "expected": "JP¥1 000"
+  },
+  {
+    "minor": -123456,
+    "currency": "EUR",
+    "expected": "-€1 234,56"
+  },
+  {
+    "minor": 1234567,
+    "currency": "AUD",
+    "expected": "A$12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "BRL",
+    "expected": "R$12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "CAD",
+    "expected": "CA$12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "CHF",
+    "expected": "CHF 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "CNY",
+    "expected": "CN¥12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "CZK",
+    "expected": "CZK 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "DKK",
+    "expected": "DKK 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "EUR",
+    "expected": "€12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "GBP",
+    "expected": "£12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "HKD",
+    "expected": "HK$12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "HUF",
+    "expected": "HUF 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "IDR",
+    "expected": "IDR 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "ILS",
+    "expected": "₪12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "INR",
+    "expected": "₹12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "ISK",
+    "expected": "ISK 1 234 567"
+  },
+  {
+    "minor": 1234567,
+    "currency": "JPY",
+    "expected": "JP¥1 234 567"
+  },
+  {
+    "minor": 1234567,
+    "currency": "KRW",
+    "expected": "₩1 234 567"
+  },
+  {
+    "minor": 1234567,
+    "currency": "MXN",
+    "expected": "MX$12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "MYR",
+    "expected": "MYR 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "NOK",
+    "expected": "NOK 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "NZD",
+    "expected": "NZ$12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "PHP",
+    "expected": "₱12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "PLN",
+    "expected": "PLN 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "RON",
+    "expected": "RON 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "SEK",
+    "expected": "SEK 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "SGD",
+    "expected": "SGD 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "THB",
+    "expected": "THB 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "TRY",
+    "expected": "TRY 12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "USD",
+    "expected": "US$12 345,67"
+  },
+  {
+    "minor": 1234567,
+    "currency": "ZAR",
+    "expected": "R 12 345,67"
+  }
+]
