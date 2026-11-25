@@ -108,4 +108,64 @@ public class CoverTests(LedgerApiFactory factory)
         Assert.Equal(HttpStatusCode.Created, r.StatusCode);
         Assert.Empty((await r.ReadAsync<CoveringSettlementDto>()).Covers);
     }
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    private static async Task<List<SettlementLineDto>> RecentAsync(HttpClient c, Guid g) =>
+        await (await c.GetAsync($"/groups/{g}/settlements", Ct)).ReadAsync<List<SettlementLineDto>>();
+
+    [Fact]
+    public async Task Recent_payments_are_newest_first_with_covers()
+    {
+        var (c, g, me, joe) = await FlatAsync();
+        var uber = await c.SpendAsync(g, 5000, joe, [me, joe], "Uber", On);
+        var first = await (await c.SettleCoveringAsync(g, me, joe, 2500, (uber, 2500))).ReadAsync<CoveringSettlementDto>();
+        var second = await (await c.SettleAsync(g, me, joe, 1000)).ReadAsync<CoveringSettlementDto>();
+
+        var list = await RecentAsync(c, g);
+
+        Assert.Equal([second.Id, first.Id], list.Select(l => l.Payment.Id));
+        Assert.Equal(("Owner", "Joe"), (list[1].From, list[1].To));
+        Assert.Equal([new CoverLineDto(uber, "Uber", MoneyDto.Of(2500))], list[1].Covers);
+        Assert.Empty(list[0].Covers);
+    }
+
+    [Fact]
+    public async Task Deleted_payments_are_not_listed()
+    {
+        var (c, g, me, joe) = await FlatAsync();
+        await c.SpendAsync(g, 5000, joe, [me, joe], "Uber", On);
+        var paid = await (await c.SettleAsync(g, me, joe, 1000)).ReadAsync<CoveringSettlementDto>();
+        (await c.DeleteAsync($"/groups/{g}/settlements/{paid.Id}", key: null)).EnsureSuccessStatusCode();
+
+        Assert.Empty(await RecentAsync(c, g));
+    }
+
+    [Fact]
+    public async Task A_deleted_expense_shows_as_deleted()
+    {
+        var (c, g, me, joe) = await FlatAsync();
+        var uber = await c.SpendAsync(g, 5000, joe, [me, joe], "Uber", On);
+        (await c.SettleCoveringAsync(g, me, joe, 2500, (uber, 2500))).EnsureSuccessStatusCode();
+        (await c.DeleteAsync($"/groups/{g}/expenses/{uber}", key: null)).EnsureSuccessStatusCode();
+
+        var line = Assert.Single(await RecentAsync(c, g));
+
+        Assert.Equal([new CoverLineDto(uber, "(deleted expense)", MoneyDto.Of(2500))], line.Covers);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(51)]
+    public async Task Limit_out_of_range_is_rejected(int limit)
+    {
+        var (c, g, _, _) = await FlatAsync();
+
+        var r = await c.GetAsync($"/groups/{g}/settlements?limit={limit}", Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+    }
 }
+
+public sealed record CoverLineDto(Guid ExpenseId, string Description, MoneyDto Amount);
+public sealed record SettlementLineDto(CoveringSettlementDto Payment, string From, string To, DateOnly Date, List<CoverLineDto> Covers);

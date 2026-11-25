@@ -331,7 +331,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["ListSettlements"];
         put?: never;
         post: operations["CreateSettlement"];
         delete?: never;
@@ -774,6 +774,12 @@ export interface components {
             /** Format: int64 */
             amountMinor: number;
         };
+        CoverLineDto: {
+            /** Format: uuid */
+            expenseId: string;
+            description: string;
+            amount: components["schemas"]["MoneyDto"];
+        };
         CreateGroupDto: {
             /** Format: uuid */
             id: string;
@@ -1166,6 +1172,14 @@ export interface components {
             convertedAmountMinor: null | number;
             paidInGroupCurrency: boolean;
             covers: components["schemas"]["CoverDto"][];
+        };
+        SettlementLineDto: {
+            payment: components["schemas"]["SettlementDto"];
+            from: string;
+            to: string;
+            /** Format: date */
+            date: string;
+            covers: components["schemas"]["CoverLineDto"][];
         };
         SettlementWriteDto: {
             /** Format: uuid */
@@ -1948,6 +1962,30 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ListSettlements: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementLineDto"][];
+                };
             };
         };
     };

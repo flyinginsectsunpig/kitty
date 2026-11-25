@@ -3,6 +3,7 @@ using Kitty.Ledger.Data.Entities;
 using Kitty.Ledger.Domain;
 using Kitty.Ledger.Domain.Fx;
 using Kitty.Ledger.Domain.Splits;
+using Kitty.Ledger.Features.Common;
 using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Fx;
 using Kitty.Ledger.Features.Notifications;
@@ -28,14 +29,23 @@ public sealed record SettlementDto(Guid Id, Guid FromMemberId, Guid ToMemberId, 
     Guid CreatedBy, DateTimeOffset CreatedAt, string? FxRate, DateOnly? FxRateDate, string? FxRateSource,
     long? ConvertedAmountMinor, bool PaidInGroupCurrency, IReadOnlyList<CoverDto> Covers);
 
+public sealed record CoverLineDto(Guid ExpenseId, string Description, MoneyDto Amount);
+
+public sealed record SettlementLineDto(SettlementDto Payment, string From, string To, DateOnly Date, IReadOnlyList<CoverLineDto> Covers);
+
 /// <summary>"From paid To back" — recorded by either party (or anyone in the group) when money changed hands outside Kitty.</summary>
 public static class SettlementEndpoints
 {
     public const string EntityType = "settlement";
+    private const int DefaultLimit = 20;
+    private const int MaxLimit = 50;
+    private const string DeletedExpense = "(deleted expense)";
+    private static readonly TimeSpan SouthAfrica = TimeSpan.FromHours(2);
 
     public static void MapSettlements(this RouteGroupBuilder group)
     {
         var settlements = group.MapGroup("/settlements").WithTags("Settlements");
+        settlements.MapGet("/", ListAsync).WithName("ListSettlements").Produces<IReadOnlyList<SettlementLineDto>>();
         settlements.MapPost("/", CreateAsync).WithName("CreateSettlement").Produces<SettlementDto>(StatusCodes.Status201Created);
         settlements.MapDelete("/{settlementId:guid}", DeleteAsync).WithName("DeleteSettlement").Produces(StatusCodes.Status204NoContent);
     }
@@ -150,8 +160,32 @@ public static class SettlementEndpoints
         return null;
     }
 
+    /// <summary>The group's live payments, newest first, each with the expenses it covered (a deleted expense is named as such).</summary>
+    private static async Task<IResult> ListAsync(Guid groupId, LedgerDbContext db, CancellationToken ct, int limit = DefaultLimit)
+    {
+        if (limit is < 1 or > MaxLimit) return ApiError.Validation($"limit must be between 1 and {MaxLimit}.");
+
+        var payments = await db.Settlements.AsNoTracking().Where(s => s.GroupId == groupId && s.DeletedAt == null)
+            .OrderByDescending(s => s.CreatedAt).ThenByDescending(s => s.Id).Take(limit).ToListAsync(ct);
+        var names = await db.Members.AsNoTracking().Where(m => m.GroupId == groupId).ToDictionaryAsync(m => m.Id, m => m.DisplayName, ct);
+        var expenseIds = payments.SelectMany(p => p.Covers).Select(c => c.ExpenseId).Distinct().ToList();
+        var descriptions = await db.Expenses.AsNoTracking().Where(e => e.GroupId == groupId && expenseIds.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, e => e.DeletedAt == null ? e.Description : DeletedExpense, ct);
+
+        var lines = payments.Select(p =>
+        {
+            var currency = p.Currency.Trim();
+            var covers = p.Covers
+                .Select(c => new CoverLineDto(c.ExpenseId, descriptions.GetValueOrDefault(c.ExpenseId, DeletedExpense), MoneyDto.Of(c.AmountMinor, currency)))
+                .OrderBy(c => c.Description, StringComparer.Ordinal).ThenBy(c => c.ExpenseId).ToList();
+            return new SettlementLineDto(ToDto(p), names[p.FromMemberId], names[p.ToMemberId],
+                DateOnly.FromDateTime(p.CreatedAt.ToOffset(SouthAfrica).DateTime), covers);
+        }).ToList();
+        return Results.Ok(lines);
+    }
+
     private static SettlementDto ToDto(Settlement s) =>
         new(s.Id, s.FromMemberId, s.ToMemberId, s.Currency.Trim(), s.AmountMinor, s.CreatedByUserId, s.CreatedAt,
             s.FxRate is { } rate ? Domain.Fx.FxRate.Format(rate) : null, s.FxRateDate, s.FxRateSource, s.ConvertedAmountMinor,
-            s.PaidInGroupCurrency, s.Covers.Select(c => new CoverDto(c.ExpenseId, c.AmountMinor)).ToList());
+            s.PaidInGroupCurrency, s.Covers.OrderBy(c => c.ExpenseId).Select(c => new CoverDto(c.ExpenseId, c.AmountMinor)).ToList());
 }

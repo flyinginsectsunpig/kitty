@@ -980,6 +980,47 @@
       }
     },
     "/groups/{groupId}/settlements": {
+      "get": {
+        "tags": [
+          "Settlements"
+        ],
+        "operationId": "ListSettlements",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SettlementLineDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "Settlements"
@@ -2394,6 +2435,26 @@
           "amountMinor": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "CoverLineDto": {
+        "required": [
+          "expenseId",
+          "description",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "expenseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyDto"
           }
         }
       },
@@ -3830,6 +3891,37 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CoverDto"
+            }
+          }
+        }
+      },
+      "SettlementLineDto": {
+        "required": [
+          "payment",
+          "from",
+          "to",
+          "date",
+          "covers"
+        ],
+        "type": "object",
+        "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/SettlementDto"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "covers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverLineDto"
             }
           }
         }
