@@ -45,8 +45,16 @@ Record each run here: date, model, data set, receipts, total accuracy, item F1.
 Plain-language sentences: not run yet (2026-11-25): no Gemini key or Ollama on the development machine. Record each
 run here: date, model, intent / amount / people accuracy.
 
-Ask Kitty: not run yet (2026-11-25): no Gemini key or Ollama on the development machine. Record each run here:
+Ask Kitty, run by hand by the owner. Record each run here:
 
 | Date | Model | Calls | Contains | Not contains | Entry | Model calls |
 |---|---|---|---|---|---|---|
-| not run | | | | | | |
+| 2026-11-25 | gemini-3.5-flash-lite | 17/19 | 35/37 | 9/9 | 25/26 | 57 over 26 |
+| 2026-11-25 | gemini-3.5-flash-lite | 19/19 | 36/37 | 9/9 | 25/26 | 57 over 26 |
+| 2026-11-25 | gemini-3.5-flash-lite | 19/19 | 37/37 | 9/9 | 26/26 | 57 over 26 |
+
+Between the runs:
+- `not_a_question` now counts as a lookup.
+- The groceries case no longer requires an item name.
+- Crossing off is ruled out of `not_a_question`, first in the prompt and then in the tool's own description. The
+  second run shows the prompt alone wasn't enough.
