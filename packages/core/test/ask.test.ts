@@ -7,10 +7,15 @@ function draft(intent: PlainDraft["intent"]): PlainDraft {
 }
 
 describe("Ask Kitty conversation", () => {
-  test("first message goes to parse, later ones to ask", () => {
+  test("messages go to parse until Kitty has answered, then to ask", () => {
     expect(routeFirst([])).toBe("parse");
     expect(routeFirst([{ role: "person", text: "how much do I owe?" }, { role: "kitty", text: "R 120,00" }])).toBe("ask");
-    expect(routeFirst([{ role: "draft", draft: draft("expense") }])).toBe("ask");
+  });
+
+  test("entries, cards and errors don't open a conversation", () => {
+    expect(routeFirst([{ role: "person", text: "Uber R50" }, { role: "draft", draft: draft("expense") }])).toBe("parse");
+    expect(routeFirst([{ role: "person", text: "Uber R50" }])).toBe("parse"); // the card was cancelled or saved
+    expect(routeFirst([{ role: "person", text: "how much?" }, { role: "error", code: "ai_unavailable" }])).toBe("parse");
   });
 
   test("askMessages drops drafts and errors and keeps the last 12", () => {

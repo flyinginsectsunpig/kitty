@@ -24,9 +24,12 @@ export function askMessages(turns: Turn[]): { role: "person" | "kitty"; text: st
   return lines.slice(-MAX_ASK_MESSAGES);
 }
 
-/** Where a new message goes: /parse when the box is empty, /ask once a conversation is open. */
+/**
+ * Where a new message goes: /ask once a conversation is open (Kitty has answered a question), else /parse. Entries,
+ * cards and errors don't open one, so adding expenses one after another never costs a question.
+ */
 export function routeFirst(turns: Turn[]): "parse" | "ask" {
-  return turns.length === 0 ? "parse" : "ask";
+  return turns.some((t) => t.role === "kitty") ? "ask" : "parse";
 }
 
 /**

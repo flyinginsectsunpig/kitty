@@ -180,3 +180,9 @@ def test_prompt_has_today_person_group_and_rules():
     ]:
         assert needed in prompt, needed
     assert "Flat 4B" not in system_prompt(date(2026, 11, 25), "Zakhir", None)
+
+
+def test_prompt_lets_new_entries_through():
+    prompt = system_prompt(date(2026, 11, 25), "Zakhir", None)
+    assert "record, pay" not in prompt  # "record petrol R600 with Sam" is an entry, not something to refuse
+    assert "cross off, mark as paid, delete or change an existing expense or payment" in prompt

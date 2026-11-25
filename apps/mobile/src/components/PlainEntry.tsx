@@ -28,8 +28,6 @@ import { Card } from "./Screen";
 export const NOTICE =
   "What you type is sent to an AI model: Google's Gemini, unless this Kitty server runs its own. For questions, so are the details Kitty looks up to answer them: amounts, descriptions and names from your groups.";
 
-const UNCLEAR = "Kitty couldn't tell what to do with that. Try other words, or use the form.";
-
 /**
  * Type an expense or a reminder in one sentence (the keyboard's microphone works too), check the card, then Save
  * or Send: nothing is saved until then. Or ask about your money: a question opens a short conversation, and
@@ -89,7 +87,7 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
       if (r.error || !r.draft) return add({ role: "error", code: r.error ?? "unexpected" });
       const next = afterParse(r.draft, cameFromAsk);
       if (next === "ask") return ask();
-      if (next === "unclear") return add({ role: "kitty", text: UNCLEAR });
+      if (next === "unclear") return add({ role: "error", code: "unclear" });
       add({ role: "draft", draft: r.draft });
     };
 
@@ -166,7 +164,7 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
           value={text}
           maxLength={500}
           onChangeText={setText}
-          placeholder={turns.length > 0 ? "Ask a follow-up" : "petrol R600 with Sam, or: how much do I owe?"}
+          placeholder={routeFirst(turns) === "ask" ? "Ask a follow-up" : "petrol R600 with Sam, or: how much do I owe?"}
           placeholderTextColor={colors.faint}
           returnKeyType="go"
           onSubmitEditing={() => text.trim() && !reading && void say(text.trim())}

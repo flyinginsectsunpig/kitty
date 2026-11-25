@@ -23,3 +23,4 @@
 {"conversation": [{"role": "person", "text": "Does Joe owe me anything?"}], "today": "2026-11-25", "expect": {"calls": ["what_i_owe"], "contains": ["R 70,00"]}}
 {"conversation": [{"role": "person", "text": "What's the weather tomorrow?"}], "today": "2026-11-25", "expect": {"contains": ["owe"]}}
 {"conversation": [{"role": "person", "text": "How much do I owe Joe"}, {"role": "kitty", "text": "You owe Joe R 70,00 in Flat 4B."}, {"role": "person", "text": "And Lee?"}], "today": "2026-11-25", "expect": {"contains": ["R 15,00"]}}
+{"conversation": [{"role": "person", "text": "How much do I owe Sam?"}, {"role": "kitty", "text": "You owe Sam R 725,00 in Family."}, {"role": "person", "text": "record petrol R600 with Sam"}], "today": "2026-11-25", "expect": {"calls": ["not_a_question"], "entry": true}}

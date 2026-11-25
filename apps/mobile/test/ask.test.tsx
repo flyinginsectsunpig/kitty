@@ -121,7 +121,7 @@ test("a question that comes back from ask a second time is unclear", async () =>
   await screen.findByText("R 50,00.");
   await type("hmm");
 
-  expect(await screen.findByText(/Kitty couldn't tell what to do with that/)).toBeTruthy();
+  expect(await screen.findByText(/Kitty couldn.t understand that/)).toBeTruthy();
   expect(ai.asked).toHaveLength(2);
 });
 
@@ -156,4 +156,17 @@ test("the notice says questions send what Kitty looks up", async () => {
       "What you type is sent to an AI model: Google's Gemini, unless this Kitty server runs its own. For questions, so are the details Kitty looks up to answer them: amounts, descriptions and names from your groups.",
     ),
   ).toBeTruthy();
+});
+
+test("after a cancelled card, the next entry goes straight to parse", async () => {
+  const ai = fakeAi([{ draft: petrol }, { draft: petrol }], []);
+  await open(ai.client);
+
+  await type("petrol R600 with Sam");
+  await fireEvent.press(await screen.findByText("Cancel"));
+  await type("petrol R600 with Sam again");
+
+  await screen.findByText(/Petrol · R\s600,00/);
+  expect(ai.parsed).toEqual(["petrol R600 with Sam", "petrol R600 with Sam again"]);
+  expect(ai.asked).toEqual([]);
 });

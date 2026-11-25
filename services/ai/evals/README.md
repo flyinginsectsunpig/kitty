@@ -27,7 +27,7 @@ AI_GEMINI_API_KEY=... uv run python evals/nl/run.py --verbose
 
 ## Ask Kitty
 
-`ask/questions.jsonl` holds 25 labelled conversations (the owner's four questions, a follow-up, a part payment, a
+`ask/questions.jsonl` holds 26 labelled conversations (the owner's four questions, a follow-up, a part payment, a
 group the person isn't in, a crossing-off request, an expense whose description tries to give the model orders, and
 entries that must go back to `/parse`). `ask/run.py` runs the agent with the configured model against `ask/world.json`,
 a fixed fake ledger (Flat 4B, Family, Business trip 2025 and 2026), and prints how often it called the expected

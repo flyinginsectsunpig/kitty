@@ -26,8 +26,6 @@ export const DRAFT_KEY = "kitty.draft";
 export const NOTICE =
   "What you type is sent to an AI model: Google's Gemini, unless this Kitty server runs its own. For questions, so are the details Kitty looks up to answer them: amounts, descriptions and names from your groups.";
 
-const UNCLEAR = "Kitty couldn't tell what to do with that. Try other words, or use the form.";
-
 /**
  * Type an expense or a reminder in one sentence (check the card; Save or Send: nothing is saved until then), or ask
  * about your money. A question opens a short conversation; follow-ups go to Ask Kitty until New conversation.
@@ -85,7 +83,7 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
         if (r.error || !r.draft) return add({ role: "error", code: r.error ?? "unexpected" });
         const next = afterParse(r.draft, cameFromAsk);
         if (next === "ask") return ask();
-        if (next === "unclear") return add({ role: "kitty", text: UNCLEAR });
+        if (next === "unclear") return add({ role: "error", code: "unclear" });
         add({ role: "draft", draft: r.draft });
         setKey(crypto.randomUUID());
       };
@@ -179,7 +177,7 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
           value={text}
           maxLength={500}
           onChange={(e) => setText(e.target.value)}
-          placeholder={turns.length > 0 ? "Ask a follow-up" : "petrol R600 with Sam, or: how much do I owe?"}
+          placeholder={routeFirst(turns) === "ask" ? "Ask a follow-up" : "petrol R600 with Sam, or: how much do I owe?"}
         />
         <button className="btn-primary" disabled={busy || !text.trim()}>
           {busy && !draft ? "Reading…" : "Go"}
