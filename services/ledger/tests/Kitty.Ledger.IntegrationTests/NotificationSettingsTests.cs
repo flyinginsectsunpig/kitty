@@ -100,6 +100,22 @@ public class NotificationSettingsTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Someone_from_before_notifications_opening_settings_twice_at_once_gets_them_both_times()
+    {
+        var c = User($"sub-{Guid.NewGuid()}", "early@example.com");
+        var me = await c.MeAsync();
+        using (var scope = factory.Services.CreateScope()) // as if they signed up before 3c: no settings row yet
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
+            await db.NotificationSettings.Where(s => s.UserId == me.Id).ExecuteDeleteAsync(Ct);
+        }
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => c.GetAsync("/me/notifications", Ct)));
+
+        Assert.All(results, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+    }
+
+    [Fact]
     public async Task A_settings_save_that_lost_a_race_is_a_version_conflict()
     {
         var c = User($"sub-{Guid.NewGuid()}", "race2@example.com");
