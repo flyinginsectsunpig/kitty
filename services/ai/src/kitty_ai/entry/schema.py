@@ -1,6 +1,6 @@
-"""What the model must return for one sentence. Anything that doesn't fit is rejected, never guessed at."""
+"""What the model must return for one sentence. Anything that doesn't fit is rejected, never guessed at. Date and
+currency are plain text (as in the receipt schema the model is known to accept) and checked when the draft is built."""
 
-import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -20,9 +20,9 @@ class ParsedSentence(BaseModel):
     group: str | None = Field(default=None, description='The group as written, e.g. "family", or null.')
     description: str | None = Field(default=None, description='A short title, e.g. "Dinner", "Petrol".')
     category: Category | None = None
-    currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$", description="ISO 4217; R means ZAR.")
+    currency: str | None = Field(default=None, description="ISO 4217 code; R means ZAR.")
     amount: str | None = Field(default=None, description="The total as a plain decimal, when stated.")
-    date: datetime.date | None = None  # a field named date: the type comes from the module
+    date: str | None = Field(default=None, description="YYYY-MM-DD, or empty for today.")
     payer: str | None = Field(default=None, description='Who paid: a name as written, or "me".')
     people: list[Person] = Field(default_factory=list)
     split: Literal["equal", "amounts"] | None = None

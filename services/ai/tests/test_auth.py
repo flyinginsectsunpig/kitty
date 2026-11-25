@@ -34,13 +34,20 @@ def test_garbage_is_401():
         TokenVerifier(ISSUER, "kitty-ai", TestIssuer().jwks).verify("not-a-token")
 
 
-def test_unknown_kid_refetches_keys_once():
+def test_unknown_kid_refetches_keys_at_most_once_a_minute():
     keys = TestIssuer()
-    verifier = TokenVerifier(ISSUER, "kitty-ai", keys.jwks)
+    now = [1000.0]
+    verifier = TokenVerifier(ISSUER, "kitty-ai", keys.jwks, now=lambda: now[0])
     verifier.verify(keys.token())
     assert keys.jwks_fetches == 1
     verifier.verify(keys.token())  # cached
+    with pytest.raises(Unauthorized):
+        verifier.verify(keys.token(kid="random-1"))  # too soon after the last fetch: refused without fetching
     assert keys.jwks_fetches == 1
+    now[0] += 61
     with pytest.raises(Unauthorized):
         verifier.verify(keys.token(kid="rotated-away"))
-    assert keys.jwks_fetches == 2  # one refetch for the unknown key, then refused
+    assert keys.jwks_fetches == 2  # one refetch for an unknown key, then refused
+    with pytest.raises(Unauthorized):
+        verifier.verify(keys.token(kid="random-2"))
+    assert keys.jwks_fetches == 2

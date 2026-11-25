@@ -135,6 +135,14 @@ def test_model_down_is_503(rig):
     assert (r.status_code, r.json()) == (503, {"code": "ai_unavailable"})
 
 
+def test_a_model_failure_is_logged_without_the_sentence(rig, caplog):
+    client, parser, _ = rig
+    parser.error = ModelUnavailable("Gemini said: dinner R300 with Bob is bad")
+    with caplog.at_level(logging.WARNING):
+        client.post("/parse", json={"text": SENTENCE})
+    assert "ModelUnavailable" in caplog.text and "dinner" not in caplog.text.lower()
+
+
 def test_sentence_is_not_logged(rig, caplog):
     client, _, _ = rig
     with caplog.at_level(logging.DEBUG):

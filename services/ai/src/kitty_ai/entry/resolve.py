@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 
+from kitty_ai.currencies import exponent
 from kitty_ai.entry.money import to_minor
 from kitty_ai.entry.schema import ParsedSentence
 from kitty_ai.ledger import Group, GroupSummary, Member
@@ -88,7 +89,12 @@ def build_draft(
 ) -> dict:
     """The draft for one group. owed_for(member_id) is what that member owes the speaker (only asked for reminders)."""
     issues: list[dict] = []
-    currency = parsed.currency or group.base_currency
+    currency = (parsed.currency or group.base_currency).strip().upper()
+    try:
+        exponent(currency)
+    except ValueError:
+        issues.append(_issue("currency", "missing", parsed.currency or ""))
+        currency = group.base_currency  # so the form can still open; Save waits for the person
     draft: dict = {
         "intent": parsed.intent,
         "groupId": group.id,
@@ -132,9 +138,12 @@ def build_draft(
         ]
         named_others = [p for p in parsed.people if _norm(p.name) not in SPEAKER]
         speaker_named = len(named_others) < len(parsed.people)
-        # "Uber R85 with Sam": an equal split the speaker paid, naming one other person, includes the speaker.
-        if split == "equal" and not speaker_named and payer_id == me_member_id and len(named_others) < 2:
-            participants.insert(0, {"memberId": me_member_id, "name": "me", "amountMinor": None})
+        # "Uber R85 with Sam": a split the model called equal, paid by the speaker, naming one other person, includes
+        # the speaker. Only when "equal" was the model's answer: a one-person debt it left unsplit stays whole. The
+        # speaker goes last, so the issues (numbered by the people named) still point at their rows.
+        explicit_equal = parsed.split == "equal"
+        if explicit_equal and not speaker_named and payer_id == me_member_id and len(named_others) < 2:
+            participants.append({"memberId": me_member_id, "name": "me", "amountMinor": None})
 
     total = to_minor(parsed.amount, currency) if parsed.amount else None
     if split == "amounts":
@@ -151,12 +160,19 @@ def build_draft(
     if total is None:
         issues.append(_issue("amount", "missing", parsed.amount or ""))
 
+    occurred = today
+    if parsed.date:
+        try:
+            occurred = date.fromisoformat(parsed.date)
+        except ValueError:
+            issues.append(_issue("date", "missing", parsed.date))
+
     draft["expense"] = {
         "description": (parsed.description or "Expense").strip()[:120],
         "category": parsed.category or "other",
         "currency": currency,
         "amountMinor": total,
-        "occurredOn": (parsed.date or today).isoformat(),
+        "occurredOn": occurred.isoformat(),
         "payerMemberId": payer_id,
         "split": split,
         "participants": participants,

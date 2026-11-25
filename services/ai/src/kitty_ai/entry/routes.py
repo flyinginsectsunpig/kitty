@@ -98,14 +98,15 @@ def make_router(
         groups = reader.groups()
         page = next((g for g in groups if g.id == body.groupId), None)
         only = groups[0] if len(groups) == 1 else None
-        # The model fills in this currency only when the sentence names none; ZAR (Kitty's home currency) when the
-        # person has several groups and isn't on one.
-        default_currency = (page or only).base_currency if (page or only) else "ZAR"
+        # Only when the group is already known: otherwise the draft takes the currency of the group the sentence names.
+        default_currency = (page or only).base_currency if (page or only) else None
         try:
             parsed = parser.parse(text, today(), default_currency)
-        except (ModelUnavailable, RateLimited):
+        except (ModelUnavailable, RateLimited) as e:
+            log.warning("model unavailable: %s status=%s", type(e).__name__, getattr(e.__cause__, "code", None))
             return _error(503, "ai_unavailable")
         except UnusableOutput:
+            log.warning("model answer didn't fit the schema")  # the answer may quote the sentence: not logged
             return _error(422, "unclear")
         match = match_group(parsed.group, body.groupId, groups)
         try:

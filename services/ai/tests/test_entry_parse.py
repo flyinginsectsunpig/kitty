@@ -52,6 +52,12 @@ def test_gemini_parser_sends_only_the_sentence_date_and_currency():
     assert call["config"].temperature == 0
 
 
+def test_no_default_currency_when_the_group_is_unknown():
+    models = FakeModels(SimpleNamespace(parsed=ParsedSentence.model_validate(PARSED), text=None))
+    gemini(models).parse("lunch 30", date(2026, 11, 25), None)
+    assert "Default currency: none" in models.calls[0]["contents"]
+
+
 def test_schema_rejects_an_unknown_category():
     bad = dict(PARSED, category="snacks")
     models = FakeModels(SimpleNamespace(parsed=None, text=__import__("json").dumps(bad)))

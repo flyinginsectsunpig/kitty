@@ -97,7 +97,36 @@ def test_no_payer_means_me():
 
 def test_equal_split_with_one_name_includes_the_speaker():
     d = draft(parsed(amount="85", description="Uber", people=[{"name": "Sam"}], split="equal"))
-    assert [p["memberId"] for p in d["expense"]["participants"]] == [ME.id, SAM.id]
+    assert [p["memberId"] for p in d["expense"]["participants"]] == [SAM.id, ME.id]
+
+
+def test_issue_fields_point_at_the_named_rows_after_the_speaker_is_added():
+    # "Uber R85 with Sa": the speaker is added, and the issue must still name the row "Sa" is on.
+    group = Group("g-x", "X", "ZAR", [ME, SAM, SAMIR])
+    d = draft(parsed(amount="85", description="Uber", people=[{"name": "Sa"}], split="equal"), group=group)
+    participants = d["expense"]["participants"]
+    assert ME.id in [p["memberId"] for p in participants]
+    for issue in d["issues"]:
+        index = int(issue["field"][len("people[") : -1])
+        assert participants[index]["name"] == issue["text"] == "Sa"
+
+
+def test_one_person_without_an_explicit_split_owes_the_whole_amount():
+    # "Lee owes me R150" read without a split: Bob owes it all; the speaker isn't added to halve it.
+    d = draft(parsed(amount="150", description="Concert", people=[{"name": "Bob"}]))
+    assert [p["memberId"] for p in d["expense"]["participants"]] == [BOB.id]
+
+
+def test_a_date_the_model_wrote_badly_is_flagged():
+    d = draft(parsed(amount="10", date="last friday"))
+    assert ("date", "missing") in issues(d) and d["expense"]["occurredOn"] == "2026-11-25"
+
+
+def test_currency_case_is_ignored_and_an_unsupported_one_is_flagged():
+    assert draft(parsed(amount="30", currency="eur"))["expense"]["currency"] == "EUR"
+    d = draft(parsed(amount="30", currency="XYZ"))
+    assert ("currency", "missing") in issues(d)
+    assert d["expense"]["currency"] == "ZAR"  # the group's, so the form can still open
 
 
 def test_amounts_split_totals_the_people():
