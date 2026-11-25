@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { NOTIFICATION_ROWS } from "../src/notifications";
+import { NOTIFICATION_ROWS, notificationWrite } from "../src/notifications";
 
 describe("NOTIFICATION_ROWS", () => {
   test("rows cover every setting once", () => {
@@ -15,5 +15,25 @@ describe("NOTIFICATION_ROWS", () => {
       ["payment", "A payment with you is recorded"],
       ["weekly", "Weekly: what you owe (Mondays)"],
     ]);
+  });
+});
+
+describe("notificationWrite", () => {
+  const current = {
+    expensePush: true, expenseEmail: true, paymentPush: true, paymentEmail: false, weeklyPush: false, weeklyEmail: true,
+    emailAvailable: true,
+  };
+  const ticked = (...fields: string[]) => (f: string) => fields.includes(f);
+
+  test("takes every switch from the form", () => {
+    expect(notificationWrite(ticked("paymentPush", "paymentEmail"), current)).toEqual({
+      expensePush: false, expenseEmail: false, paymentPush: true, paymentEmail: true, weeklyPush: false, weeklyEmail: false,
+    });
+  });
+
+  test("keeps the email choices while email is unavailable (those switches are disabled, so never sent)", () => {
+    expect(notificationWrite(ticked("weeklyPush"), { ...current, emailAvailable: false })).toEqual({
+      expensePush: false, expenseEmail: true, paymentPush: false, paymentEmail: false, weeklyPush: true, weeklyEmail: true,
+    });
   });
 });
