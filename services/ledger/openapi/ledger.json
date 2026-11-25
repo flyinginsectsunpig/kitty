@@ -432,6 +432,40 @@
         }
       }
     },
+    "/groups/{groupId}/reminders": {
+      "post": {
+        "tags": [
+          "Reminders"
+        ],
+        "operationId": "CreateReminder",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderWriteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/groups/{groupId}/fx-rate": {
       "get": {
         "tags": [
@@ -3079,6 +3113,18 @@
           }
         }
       },
+      "ReminderWriteDto": {
+        "required": [
+          "memberId"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "ReplaceChargesDto": {
         "required": [
           "charges"
@@ -3621,6 +3667,9 @@
     },
     {
       "name": "Balances"
+    },
+    {
+      "name": "Reminders"
     },
     {
       "name": "Exchange rates"

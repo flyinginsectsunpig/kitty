@@ -164,6 +164,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/groups/{groupId}/reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateReminder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/groups/{groupId}/fx-rate": {
         parameters: {
             query?: never;
@@ -947,6 +963,10 @@ export interface components {
             /** Format: int32 */
             version: null | number;
         };
+        ReminderWriteDto: {
+            /** Format: uuid */
+            memberId: string;
+        };
         ReplaceChargesDto: {
             charges: components["schemas"]["ChargeWriteDto"][];
         };
@@ -1422,6 +1442,30 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["BalancesDto"];
                 };
+            };
+        };
+    };
+    CreateReminder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReminderWriteDto"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

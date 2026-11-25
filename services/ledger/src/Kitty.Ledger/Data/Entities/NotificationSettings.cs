@@ -26,6 +26,16 @@ public sealed class WeeklySummary
     public DateTimeOffset QueuedAt { get; set; }
 }
 
+/// <summary>Someone reminded a member what they owe them, on this UTC day (one per sender, member and day).</summary>
+public sealed class Reminder
+{
+    public Guid GroupId { get; set; }
+    public Guid FromMemberId { get; set; }
+    public Guid ToMemberId { get; set; }
+    public DateOnly Day { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
 /// <summary>A phone's Firebase push token. A token belongs to one person (the last one signed in on that phone).</summary>
 public sealed class PushDevice
 {

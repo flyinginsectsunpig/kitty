@@ -53,6 +53,15 @@ public sealed class Notifier(LedgerDbContext db, Outbox outbox, TimeProvider clo
         }
     }
 
+    /// <summary>Tells a member with an account what they owe the sender in this group (several currencies joined).</summary>
+    public async Task ReminderAsync(Guid groupId, string senderName, Guid toUserId, IReadOnlyList<(string Currency, long Minor)> owed,
+        CancellationToken ct)
+    {
+        var groupName = await db.Groups.Where(g => g.Id == groupId).Select(g => g.Name).SingleAsync(ct);
+        var amounts = string.Join(" and ", owed.Select(o => MoneyText.Format(o.Minor, o.Currency)));
+        Queue(toUserId, Kind.Reminder, groupName, $"{senderName} reminded you: you owe them {amounts}", groupId);
+    }
+
     /// <summary>Queues one request (also used by the weekly summary, with its own id and no group).</summary>
     public void Queue(Guid userId, Kind kind, string title, string body, Guid? groupId, Guid? notificationId = null) =>
         outbox.Add(Topics.NotificationsRequested, userId.ToString(), new NotificationRequested

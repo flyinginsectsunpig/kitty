@@ -43,6 +43,9 @@ public static class ErrorCodes
     public const string UploadNotImage = "upload_not_image";
     public const string NoSuggestion = "no_suggestion";
     public const string FxRateUnavailable = "fx_rate_unavailable";
+    public const string NothingOwed = "nothing_owed";
+    public const string NoAccount = "no_account";
+    public const string AlreadyReminded = "already_reminded";
     public const string FxRateRequired = "fx_rate_required";
     public const string FxRateInvalid = "fx_rate_invalid";
     public const string ScheduleStarted = "schedule_started";
