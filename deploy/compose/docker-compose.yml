@@ -248,6 +248,8 @@ services:
     <<: *restart
     image: ${KITTY_IMAGE_PREFIX}kitty-web:${KITTY_TAG:-latest}
     environment:
+      # Plain-language entry: the web's server side calls the ai service directly on the compose network.
+      AI_URL: http://ai:8000
       AUTH_URL: https://${KITTY_HOST}
       AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET}
       AUTH_TRUST_HOST: "true"
