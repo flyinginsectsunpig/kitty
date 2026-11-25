@@ -3,7 +3,11 @@ using System.Net.Http.Json;
 
 namespace Kitty.Ledger.IntegrationTests;
 
-public sealed record MoneyDto(string Currency, long Minor, string Text);
+public sealed record MoneyDto(string Currency, long Minor, string Text)
+{
+    /// <summary>MoneyText is pinned by contracts/fixtures/money-format.json, so the tests may use it for expected text.</summary>
+    public static MoneyDto Of(long minor, string currency = "ZAR") => new(currency, minor, Domain.MoneyText.Format(minor, currency));
+}
 public sealed record ExpenseLineDto(Guid ExpenseId, string Description, DateOnly Date, string Category, MoneyDto Total, MoneyDto MyShare,
     string PaidBy);
 public sealed record CategoryTotalDto(string Category, MoneyDto Total);

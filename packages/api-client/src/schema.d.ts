@@ -36,6 +36,22 @@ export interface paths {
         patch: operations["UpdateMe"];
         trace?: never;
     };
+    "/me/owing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetOwing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/notifications": {
         parameters: {
             query?: never;
@@ -944,6 +960,51 @@ export interface components {
             reminderPush: boolean;
             reminderEmail: boolean;
         };
+        OwingCurrencyDto: {
+            currency: string;
+            myNet: components["schemas"]["MoneyDto"];
+            transfers: components["schemas"]["OwingTransferDto"][];
+            since: components["schemas"]["ExpenseLineDto"][];
+            /** Format: int32 */
+            moreSince: number;
+            payments: components["schemas"]["OwingPaymentDto"][];
+        };
+        OwingDto: {
+            iOwe: components["schemas"]["MoneyDto"][];
+            owedToMe: components["schemas"]["MoneyDto"][];
+            people: components["schemas"]["OwingPersonDto"][];
+            groups: components["schemas"]["OwingGroupDto"][];
+        };
+        OwingGroupDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            currencies: components["schemas"]["OwingCurrencyDto"][];
+        };
+        OwingPaymentDto: {
+            from: string;
+            to: string;
+            amount: components["schemas"]["MoneyDto"];
+            /** Format: date */
+            date: string;
+        };
+        OwingPersonDto: {
+            /** Format: uuid */
+            userId: null | string;
+            /** Format: uuid */
+            memberId: null | string;
+            name: string;
+            iOwe: components["schemas"]["MoneyDto"][];
+            owesMe: components["schemas"]["MoneyDto"][];
+            groups: string[];
+        };
+        OwingTransferDto: {
+            direction: string;
+            /** Format: uuid */
+            memberId: string;
+            name: string;
+            amount: components["schemas"]["MoneyDto"];
+        };
         ParticipantDto: {
             /** Format: uuid */
             memberId: string;
@@ -1252,6 +1313,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeDto"];
+                };
+            };
+        };
+    };
+    GetOwing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwingDto"];
                 };
             };
         };

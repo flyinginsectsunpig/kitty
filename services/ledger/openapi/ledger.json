@@ -95,6 +95,26 @@
         }
       }
     },
+    "/me/owing": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "operationId": "GetOwing",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwingDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/me/notifications": {
       "get": {
         "tags": [
@@ -3050,6 +3070,201 @@
           },
           "reminderEmail": {
             "type": "boolean"
+          }
+        }
+      },
+      "OwingCurrencyDto": {
+        "required": [
+          "currency",
+          "myNet",
+          "transfers",
+          "since",
+          "moreSince",
+          "payments"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "myNet": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "transfers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwingTransferDto"
+            }
+          },
+          "since": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseLineDto"
+            }
+          },
+          "moreSince": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwingPaymentDto"
+            }
+          }
+        }
+      },
+      "OwingDto": {
+        "required": [
+          "iOwe",
+          "owedToMe",
+          "people",
+          "groups"
+        ],
+        "type": "object",
+        "properties": {
+          "iOwe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoneyDto"
+            }
+          },
+          "owedToMe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoneyDto"
+            }
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwingPersonDto"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwingGroupDto"
+            }
+          }
+        }
+      },
+      "OwingGroupDto": {
+        "required": [
+          "id",
+          "name",
+          "currencies"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwingCurrencyDto"
+            }
+          }
+        }
+      },
+      "OwingPaymentDto": {
+        "required": [
+          "from",
+          "to",
+          "amount",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "OwingPersonDto": {
+        "required": [
+          "userId",
+          "memberId",
+          "name",
+          "iOwe",
+          "owesMe",
+          "groups"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "memberId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "iOwe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoneyDto"
+            }
+          },
+          "owesMe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoneyDto"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "OwingTransferDto": {
+        "required": [
+          "direction",
+          "memberId",
+          "name",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "direction": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyDto"
           }
         }
       },

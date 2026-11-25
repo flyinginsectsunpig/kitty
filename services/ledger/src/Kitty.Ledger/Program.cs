@@ -7,6 +7,7 @@ using Kitty.Ledger.Features.Balances;
 using Kitty.Ledger.Features.Expenses;
 using Kitty.Ledger.Features.Fx;
 using Kitty.Ledger.Features.Notifications;
+using Kitty.Ledger.Features.Owing;
 using Kitty.Ledger.Features.Recurring;
 using Kitty.Ledger.Features.Reminders;
 using Kitty.Ledger.Features.Settlements;
@@ -120,7 +121,7 @@ app.UseMiddleware<IdempotencyMiddleware>();
 
 app.MapDefaultEndpoints();
 app.MapOpenApi().AllowAnonymous();
-app.MapMe();
+app.MapMe().MapOwing();
 app.MapNotificationSettings();
 var group = app.MapGroups();
 group.MapMembers();
