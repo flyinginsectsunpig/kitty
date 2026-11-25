@@ -63,7 +63,9 @@ TOOLS: list[ToolSpec] = [
     ),
     ToolSpec(
         "not_a_question",
-        "Call this when the latest message is something to add (an expense) or a reminder to send, not a question.",
+        "Call this when the latest message is a new expense to add or a reminder to send, not a question. Never call "
+        "it to cross off, mark as paid, delete or change an existing expense or payment, even when the person says "
+        "they paid someone: answer those yourself.",
         _NO_PARAMETERS,
     ),
 ]
