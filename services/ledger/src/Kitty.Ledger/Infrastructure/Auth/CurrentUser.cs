@@ -37,7 +37,18 @@ public sealed class CurrentUser(IHttpContextAccessor http, LedgerDbContext db, N
             {
                 (existing.Email, existing.EmailVerified) = (email, verified);
                 await notify.QueueAsync(existing, ct);
-                await db.SaveChangesAsync(ct);
+                try
+                {
+                    await db.SaveChangesAsync(ct);
+                }
+                catch (DbUpdateException ex) when (ex is DbUpdateConcurrencyException
+                    || ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+                {
+                    // Another request changed this person's settings (or created them) at the same moment. Serve this one
+                    // as stored; the next request sees the email differ again and refreshes it.
+                    db.ChangeTracker.Clear();
+                    existing = await db.Users.SingleAsync(u => u.KeycloakSub == sub, ct);
+                }
             }
             return _cached = existing;
         }

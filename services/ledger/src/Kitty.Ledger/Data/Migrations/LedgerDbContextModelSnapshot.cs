@@ -376,6 +376,7 @@ namespace Kitty.Ledger.Data.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<long>("Version")
+                        .IsConcurrencyToken()
                         .HasColumnType("bigint");
 
                     b.Property<bool>("WeeklyEmail")

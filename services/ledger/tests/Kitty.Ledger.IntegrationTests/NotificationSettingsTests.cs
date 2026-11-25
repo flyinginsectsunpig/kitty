@@ -77,6 +77,41 @@ public class NotificationSettingsTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task Two_changes_racing_from_the_same_version_cannot_both_publish()
+    {
+        var c = User($"sub-{Guid.NewGuid()}", "race@example.com");
+        var me = await c.MeAsync();
+        using var first = factory.Services.CreateScope();
+        using var second = factory.Services.CreateScope();
+        var db1 = first.ServiceProvider.GetRequiredService<LedgerDbContext>();
+        var db2 = second.ServiceProvider.GetRequiredService<LedgerDbContext>();
+        var user1 = await db1.Users.SingleAsync(u => u.Id == me.Id, Ct);
+        var user2 = await db2.Users.SingleAsync(u => u.Id == me.Id, Ct);
+        // Both read the same version before either saves: a settings change and a new phone at the same moment.
+        (await first.ServiceProvider.GetRequiredService<Kitty.Ledger.Features.Notifications.NotifySettingsPublisher>().SettingsAsync(me.Id, Ct)).ExpensePush = false;
+        await second.ServiceProvider.GetRequiredService<Kitty.Ledger.Features.Notifications.NotifySettingsPublisher>().SettingsAsync(me.Id, Ct);
+        await first.ServiceProvider.GetRequiredService<Kitty.Ledger.Features.Notifications.NotifySettingsPublisher>().QueueAsync(user1, Ct);
+        await db1.SaveChangesAsync(Ct);
+
+        db2.PushDevices.Add(new Kitty.Ledger.Data.Entities.PushDevice { Token = "tok-race", UserId = me.Id, Platform = "android" });
+        await second.ServiceProvider.GetRequiredService<Kitty.Ledger.Features.Notifications.NotifySettingsPublisher>().QueueAsync(user2, Ct);
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => db2.SaveChangesAsync(Ct));
+    }
+
+    [Fact]
+    public async Task A_settings_save_that_lost_a_race_is_a_version_conflict()
+    {
+        var c = User($"sub-{Guid.NewGuid()}", "race2@example.com");
+        await c.GetAsync("/me/notifications", Ct);
+        var body = new { expensePush = false, expenseEmail = false, paymentPush = true, paymentEmail = false, weeklyPush = false, weeklyEmail = false };
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => c.PutJsonAsync("/me/notifications", body)));
+
+        Assert.All(results, r => Assert.Contains(r.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }));
+    }
+
+    [Fact]
     public async Task A_device_registers_once_and_moves_between_users()
     {
         var first = User($"sub-{Guid.NewGuid()}", "c1@example.com");

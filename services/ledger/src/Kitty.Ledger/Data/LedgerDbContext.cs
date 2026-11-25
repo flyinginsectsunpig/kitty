@@ -100,6 +100,8 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
         b.Entity<NotificationSettings>(e =>
         {
             e.HasKey(x => x.UserId);
+            // Every publish bumps it: two changes racing from the same version can't both publish (pulse keeps the higher).
+            e.Property(x => x.Version).IsConcurrencyToken();
             e.HasOne<User>().WithOne().HasForeignKey<NotificationSettings>(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 

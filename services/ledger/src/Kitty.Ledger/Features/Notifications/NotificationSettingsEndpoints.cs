@@ -56,7 +56,7 @@ public static class NotificationSettingsEndpoints
         (s.ExpensePush, s.ExpenseEmail, s.PaymentPush, s.PaymentEmail, s.WeeklyPush, s.WeeklyEmail) =
             (body.ExpensePush, body.ExpenseEmail, body.PaymentPush, body.PaymentEmail, body.WeeklyPush, body.WeeklyEmail);
         await publisher.QueueAsync(user, ct);
-        await db.SaveChangesAsync(ct);
+        if (!await SaveAsync(db, ct)) return Conflict();
         return Results.Ok(ToDto(s, user));
     }
 
@@ -88,7 +88,7 @@ public static class NotificationSettingsEndpoints
             await publisher.QueueAsync(user, ct);
             if (previousOwner is not null) await publisher.QueueAsync(previousOwner, ct);
         }
-        await db.SaveChangesAsync(ct);
+        if (!await SaveAsync(db, ct)) return Conflict();
         return Results.NoContent();
     }
 
@@ -100,7 +100,24 @@ public static class NotificationSettingsEndpoints
         if (device is null) return Results.NoContent();
         db.PushDevices.Remove(device);
         await publisher.QueueAsync(user, ct);
-        await db.SaveChangesAsync(ct);
+        if (!await SaveAsync(db, ct)) return Conflict();
         return Results.NoContent();
     }
+
+    /// <summary>False when another change to the person's settings or phones saved first (the caller may retry).</summary>
+    private static async Task<bool> SaveAsync(LedgerDbContext db, CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return false;
+        }
+    }
+
+    private static IResult Conflict() =>
+        ApiError.Conflict(ErrorCodes.VersionConflict, "Your notification settings changed at the same moment. Try again.");
 }
