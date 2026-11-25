@@ -137,7 +137,19 @@
                   "minor": 12500,
                   "text": "R\u00a0125,00"
                 },
-                "paidBy": "Sam"
+                "paidBy": "Sam",
+                "open": [
+                  {
+                    "memberId": "m-sam",
+                    "name": "Sam",
+                    "direction": "i_pay",
+                    "amount": {
+                      "currency": "ZAR",
+                      "minor": 12500,
+                      "text": "R\u00a0125,00"
+                    }
+                  }
+                ]
               },
               {
                 "expenseId": "e-fridge",
@@ -154,7 +166,19 @@
                   "minor": 150000,
                   "text": "R\u00a01\u00a0500,00"
                 },
-                "paidBy": "Sam"
+                "paidBy": "Sam",
+                "open": [
+                  {
+                    "memberId": "m-sam",
+                    "name": "Sam",
+                    "direction": "i_pay",
+                    "amount": {
+                      "currency": "ZAR",
+                      "minor": 150000,
+                      "text": "R\u00a01\u00a0500,00"
+                    }
+                  }
+                ]
               },
               {
                 "expenseId": "e-elec",
@@ -171,7 +195,19 @@
                   "minor": 90000,
                   "text": "R\u00a0900,00"
                 },
-                "paidBy": "Zakhir"
+                "paidBy": "Zakhir",
+                "open": [
+                  {
+                    "memberId": "m-sam",
+                    "name": "Sam",
+                    "direction": "pays_me",
+                    "amount": {
+                      "currency": "ZAR",
+                      "minor": 90000,
+                      "text": "R\u00a0900,00"
+                    }
+                  }
+                ]
               }
             ],
             "moreSince": 0,
@@ -228,7 +264,19 @@
                   "minor": 1500,
                   "text": "R\u00a015,00"
                 },
-                "paidBy": "Lee"
+                "paidBy": "Lee",
+                "open": [
+                  {
+                    "memberId": "m-lee",
+                    "name": "Lee",
+                    "direction": "i_pay",
+                    "amount": {
+                      "currency": "ZAR",
+                      "minor": 1500,
+                      "text": "R\u00a015,00"
+                    }
+                  }
+                ]
               },
               {
                 "expenseId": "e-groc",
@@ -245,24 +293,19 @@
                   "minor": 9500,
                   "text": "R\u00a095,00"
                 },
-                "paidBy": "Joe"
-              },
-              {
-                "expenseId": "e-uber",
-                "description": "Uber",
-                "date": "2026-11-18",
-                "category": "transport",
-                "total": {
-                  "currency": "ZAR",
-                  "minor": 5000,
-                  "text": "R\u00a050,00"
-                },
-                "myShare": {
-                  "currency": "ZAR",
-                  "minor": 2500,
-                  "text": "R\u00a025,00"
-                },
-                "paidBy": "Joe"
+                "paidBy": "Joe",
+                "open": [
+                  {
+                    "memberId": "m-joe",
+                    "name": "Joe",
+                    "direction": "i_pay",
+                    "amount": {
+                      "currency": "ZAR",
+                      "minor": 9500,
+                      "text": "R\u00a095,00"
+                    }
+                  }
+                ]
               }
             ],
             "moreSince": 0,
@@ -275,7 +318,12 @@
                   "minor": 5000,
                   "text": "R\u00a050,00"
                 },
-                "date": "2026-11-21"
+                "date": "2026-11-21",
+                "unallocated": {
+                  "currency": "ZAR",
+                  "minor": 2500,
+                  "text": "R\u00a025,00"
+                }
               }
             ]
           }
