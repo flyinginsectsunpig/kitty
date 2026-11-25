@@ -43,6 +43,10 @@ def create_app(settings: Settings | None = None, make_worker: Callable[[Settings
                 state["worker"].stop()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # httpx logs every request URL at INFO (and httpcore at DEBUG); /ask lookups carry the question's search text
+    # in the query string, which must never reach the logs.
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     app = FastAPI(title="Kitty AI", lifespan=lifespan)
 
     @app.get("/health")

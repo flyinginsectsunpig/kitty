@@ -192,3 +192,14 @@ def test_parse_says_question(keys):
     assert r.status_code == 200
     body = r.json()
     assert (body["intent"], body["issues"], body["members"]) == ("question", [], [])
+
+
+def test_search_text_in_a_lookup_is_not_logged(keys, caplog):
+    from kitty_ai.main import create_app
+
+    create_app(Settings())  # sets the log levels the running service uses
+    chat = FakeChat(ModelTurn(None, [ToolCall("group_spending", {"group_id": G, "text": "zebra"}, "c1")]))
+    client = app_with(chat, ledger([]), keys)
+    with caplog.at_level(logging.DEBUG):
+        assert client.post("/ask", json=ask("what did we spend on the zebra?")).status_code == 200
+    assert "zebra" not in caplog.text.lower()
