@@ -1,6 +1,4 @@
-import { applyPick, canSave, draftToForm, errorMessage, toExpenseWriteDto, type DraftIssue, type PlainDraft } from "@kitty/core";
-import { formatMoney } from "@kitty/money";
-import { randomUUID } from "expo-crypto";
+import { applyPick, canSave, draftMoney, draftShares, draftToForm, errorMessage, toExpenseWriteDto, type DraftIssue, type PlainDraft } from "@kitty/core";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -40,7 +38,8 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
   const save = useAction(
     useCallback(
       (key: string) => {
-        const body = toExpenseWriteDto(draftToForm(draft!, { id: randomUUID() }));
+        // The expense id is the request's key: a retry sends the same id, so the ledger replays instead of refusing.
+        const body = toExpenseWriteDto(draftToForm(draft!, { id: key }));
         if ("error" in body) throw new Error(body.error); // canSave already checked; a bug if reached
         return ledger.POST("/groups/{groupId}/expenses", {
           params: { path: { groupId: draft!.groupId! } },
@@ -167,10 +166,12 @@ function DraftCard(props: {
 
 function ExpenseSummary({ draft, nameOf }: { draft: PlainDraft; nameOf: (id: string | null) => string }) {
   const e = draft.expense!;
-  const total = e.amountMinor === null ? "amount?" : formatMoney(e.amountMinor, e.currency);
-  const people = e.participants.map((p) => {
+  const total = e.amountMinor === null ? "amount?" : draftMoney(e.amountMinor, e.currency);
+  const shares = draftShares(draft);
+  const people = e.participants.map((p, i) => {
     const who = p.memberId ? nameOf(p.memberId) : p.name;
-    return e.split === "amounts" && p.amountMinor !== null ? `${who} ${formatMoney(p.amountMinor, e.currency)}` : who;
+    const share = shares[i];
+    return share !== null && share !== undefined ? `${who} ${draftMoney(share, e.currency)}` : who;
   });
   return (
     <View style={styles.summary}>
@@ -188,8 +189,8 @@ function ExpenseSummary({ draft, nameOf }: { draft: PlainDraft; nameOf: (id: str
 function ReminderSummary({ draft, groupName }: { draft: PlainDraft; groupName?: string }) {
   const r = draft.reminder!;
   const owed = r.owedMinorByCurrency;
-  const owedText = owed && Object.keys(owed).length > 0 ? Object.entries(owed).map(([c, m]) => formatMoney(m, c)).join(" and ") : null;
-  const stated = r.statedAmountMinor !== null ? formatMoney(r.statedAmountMinor, r.statedCurrency) : null;
+  const owedText = owed && Object.keys(owed).length > 0 ? Object.entries(owed).map(([c, m]) => draftMoney(m, c)).join(" and ") : null;
+  const stated = r.statedAmountMinor !== null ? draftMoney(r.statedAmountMinor, r.statedCurrency) : null;
   const differs = stated && owed && !(Object.keys(owed).length === 1 && owed[r.statedCurrency] === r.statedAmountMinor);
   const where = groupName ? ` in ${groupName}` : "";
   return (

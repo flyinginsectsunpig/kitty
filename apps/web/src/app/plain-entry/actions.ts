@@ -15,7 +15,8 @@ export async function rematchGroup(parsed: unknown, groupId: string): Promise<Ai
 /** Saves a confirmed draft through the ledger's normal expense endpoint. Returns an error code, or null when saved. */
 export async function saveDraft(draft: PlainDraft, idempotencyKey: string): Promise<string | null> {
   if (!canSave(draft) || !draft.groupId) return "validation_failed";
-  const body = toExpenseWriteDto(draftToForm(draft, { id: crypto.randomUUID() }));
+  // The expense id is the request's key: a retry with the same key sends the same body, so the ledger replays it.
+  const body = toExpenseWriteDto(draftToForm(draft, { id: idempotencyKey }));
   if ("error" in body) return "validation_failed";
   const ledger = await getLedger();
   const { error } = await ledger.POST("/groups/{groupId}/expenses", {

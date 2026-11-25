@@ -23,7 +23,13 @@ export default function NewExpenseScreen() {
   const initial = useMemo(() => {
     // Edit on a sentence's card: start from what was read (handed over in memory, once).
     const handed = draft === "1" ? takeDraft(group.id) : null;
-    if (handed?.expense) return draftToForm(handed, { id: randomUUID() });
+    if (handed?.expense) {
+      try {
+        return draftToForm(handed, { id: randomUUID() });
+      } catch {
+        // A currency Kitty doesn't support: start from an empty form rather than crash.
+      }
+    }
     return newExpenseForm({ id: randomUUID(), today: today(), currency: group.baseCurrency, meId: me.id, memberIds: group.members.map((m) => m.id) });
   }, [group, me.id, draft]);
   const members = group.members.map((m) => ({ id: m.id, displayName: m.id === me.id ? "You" : m.displayName }));

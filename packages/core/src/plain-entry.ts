@@ -1,4 +1,4 @@
-import { exponent, toDecimalString } from "@kitty/money";
+import { exponent, formatMoney, previewSplit, toDecimalString } from "@kitty/money";
 import type { ExpenseFormState } from "./expense-form";
 
 /** Something the person has to settle on the card before Save: a name that matched nobody or several people, a
@@ -145,5 +145,34 @@ export function aiErrorCode(status: number): string {
       return "ai_unavailable";
     default:
       return "unexpected";
+  }
+}
+
+/**
+ * Each person's share as the card shows it, in participant order: an equal split shared out exactly as the ledger
+ * will (so "Lee owes R150" shows R150 on Lee, and "you and Sam" R42,50 each), amounts as given. null while a person
+ * or the total isn't known yet.
+ */
+export function draftShares(draft: PlainDraft): (number | null)[] {
+  const e = draft.expense;
+  if (!e) return [];
+  if (e.split === "amounts") return e.participants.map((p) => p.amountMinor);
+  if (e.amountMinor === null || e.participants.some((p) => p.memberId === null)) return e.participants.map(() => null);
+  const shares = previewSplit(
+    e.amountMinor,
+    "equal",
+    e.participants.map((p) => ({ memberId: p.memberId!, value: null })),
+  );
+  if ("error" in shares) return e.participants.map(() => null);
+  const byMember = new Map(shares.map((s) => [s.memberId, s.minor]));
+  return e.participants.map((p) => byMember.get(p.memberId!) ?? null);
+}
+
+/** Money on the card. A currency Kitty doesn't support (the model made one up) shows as its code, never a crash. */
+export function draftMoney(minor: number, currency: string): string {
+  try {
+    return formatMoney(minor, currency);
+  } catch {
+    return `${currency} ${minor}`;
   }
 }

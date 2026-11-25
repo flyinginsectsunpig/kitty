@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { toExpenseWriteDto } from "../src/expense-form";
 import { errorMessage } from "../src/errors";
-import { aiErrorCode, applyPick, canSave, draftToForm, type PlainDraft } from "../src/plain-entry";
+import { aiErrorCode, applyPick, canSave, draftShares, draftToForm, type PlainDraft } from "../src/plain-entry";
 
 const members = [
   { id: "m-me", displayName: "Zakhir" },
@@ -150,5 +150,30 @@ describe("aiErrorCode", () => {
     for (const code of ["ai_signed_out", "unclear", "ai_rate_limited", "ai_unavailable", "sentence_invalid", "nothing_owed", "no_account", "already_reminded"]) {
       expect(errorMessage(code)).not.toBe("Something went wrong. Please try again.");
     }
+  });
+});
+
+describe("draftShares", () => {
+  test("an equal split shows each person's share, as the ledger will split it", () => {
+    const d = expense({
+      split: "equal",
+      amountMinor: 8500,
+      participants: [
+        { memberId: "m-sam", name: "Sam", amountMinor: null },
+        { memberId: "m-me", name: "me", amountMinor: null },
+      ],
+    });
+    expect(draftShares(d)).toEqual([4250, 4250]);
+  });
+
+  test("a one-person debt shows the whole amount on that person", () => {
+    const d = expense({ split: "equal", amountMinor: 15000, participants: [{ memberId: "m-joe", name: "Lee", amountMinor: null }] });
+    expect(draftShares(d)).toEqual([15000]);
+  });
+
+  test("amounts show as given; nothing is guessed while a person or the total is unknown", () => {
+    expect(draftShares(expense())).toEqual([5000, 10000, 7000]);
+    const unknown = expense({ split: "equal", participants: [{ memberId: null, name: "Thabo", amountMinor: null }, { memberId: "m-me", name: "me", amountMinor: null }] });
+    expect(draftShares(unknown)).toEqual([null, null]);
   });
 });

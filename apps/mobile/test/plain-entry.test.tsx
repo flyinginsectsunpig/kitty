@@ -78,6 +78,52 @@ test("a sentence shows the card and Save posts the expense", async () => {
   await waitFor(() => expect(app.getPathname()).toBe(`/groups/${G}`));
 });
 
+test("the card shows each person's share", async () => {
+  const { client } = fakeLedger(groupRoutes(groupsList));
+  await renderApp(routes, client, "/groups", fakeAi({ draft: dinner }));
+
+  await type("dinner R300 with Sam");
+
+  expect(await screen.findByText(/^Zee R\s150,00 · Sam R\s150,00$/)).toBeTruthy();
+});
+
+test("a retried Save keeps its key and its expense id", async () => {
+  let attempts = 0;
+  const { client, calls } = fakeLedger(
+    groupRoutes({
+      ...groupsList,
+      [`POST /groups/${G}/expenses`]: () => {
+        attempts++;
+        if (attempts === 1) throw new TypeError("Network request failed");
+        return json(201, {});
+      },
+    }),
+  );
+  await renderApp(routes, client, "/groups", fakeAi({ draft: dinner }));
+
+  await type("dinner R300 with Sam");
+  await fireEvent.press(await screen.findByText("Save"));
+  expect(await screen.findByText("Couldn't reach Kitty. Check your connection and try again.")).toBeTruthy();
+  await fireEvent.press(screen.getByText("Save"));
+
+  await waitFor(() => expect(attempts).toBe(2));
+  const posts = calls.filter((c) => c.path === `/groups/${G}/expenses`);
+  expect(posts[1]!.headers.get("Idempotency-Key")).toBe(posts[0]!.headers.get("Idempotency-Key"));
+  expect(posts[1]!.body.id).toBe(posts[0]!.body.id);
+});
+
+test("Edit with a currency Kitty doesn't know opens an empty form instead of crashing", async () => {
+  const { client } = fakeLedger(groupRoutes(groupsList));
+  const odd: PlainDraft = { ...dinner, expense: { ...dinner.expense!, currency: "XYZ" } };
+  const { app } = await renderApp(routes, client, "/groups", fakeAi({ draft: odd }));
+
+  await type("dinner 300 xyz");
+  await fireEvent.press(await screen.findByText("Edit"));
+
+  await waitFor(() => expect(app.getPathname()).toBe(`/groups/${G}/expenses/new`));
+  expect((await screen.findByLabelText("What was it for?")).props.value).toBe("");
+});
+
 test("an ambiguous name blocks Save until picked", async () => {
   const { client } = fakeLedger(groupRoutes(groupsList));
   const unsure: PlainDraft = {

@@ -1,11 +1,13 @@
 "use client";
 
-import { applyPick, canSave, type DraftIssue, type PlainDraft } from "@kitty/core";
-import { formatMoney } from "@kitty/money";
+import { applyPick, canSave, draftMoney, draftShares, type DraftIssue, type PlainDraft } from "@kitty/core";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { readSentence, rematchGroup, saveDraft, sendReminder } from "@/app/plain-entry/actions";
 import { ErrorBanner } from "./ErrorBanner";
+
+/** Errors after which a retry should replay the same request (same key): it may not have finished, or never arrived. */
+const KEEP_KEY = new Set(["request_in_progress", "unexpected", "network"]);
 
 /** The key the expense form reads a handed-over draft from (once), so the sentence never goes into a URL. */
 export const DRAFT_KEY = "kitty.draft";
@@ -48,13 +50,17 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
       const r = await rematchGroup(draft.parsed, id);
       if (r.error) return setError(r.error);
       setDraft(r.draft ?? null);
+      setKey(crypto.randomUUID());
     });
 
   const save = () =>
     run(async () => {
       if (!draft?.groupId) return;
       const code = await saveDraft(draft, key);
-      if (code) return setError(code);
+      if (code) {
+        if (!KEEP_KEY.has(code)) setKey(crypto.randomUUID());
+        return setError(code);
+      }
       setDraft(null);
       setText("");
       router.push(`/groups/${draft.groupId}`);
@@ -65,7 +71,10 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
     run(async () => {
       if (!draft?.groupId || !draft.reminder?.memberId) return;
       const code = await sendReminder(draft.groupId, draft.reminder.memberId, key);
-      if (code) return setError(code);
+      if (code) {
+        if (!KEEP_KEY.has(code)) setKey(crypto.randomUUID());
+        return setError(code);
+      }
       setDone(`Reminder sent to ${draft.reminder.name ?? "them"}.`);
       setDraft(null);
       setText("");
@@ -112,7 +121,10 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
         <DraftCard
           draft={draft}
           busy={busy}
-          onPick={(i, memberId) => setDraft(applyPick(draft, i, memberId))}
+          onPick={(i, memberId) => {
+            setDraft(applyPick(draft, i, memberId));
+            setKey(crypto.randomUUID()); // a changed draft is a different request
+          }}
           onPickGroup={pickGroup}
           onSave={save}
           onSend={send}
@@ -229,10 +241,12 @@ function DraftCard({
 
 function ExpenseSummary({ draft, nameOf }: { draft: PlainDraft; nameOf: (id: string | null) => string }) {
   const e = draft.expense!;
-  const total = e.amountMinor === null ? "amount?" : formatMoney(e.amountMinor, e.currency);
-  const people = e.participants.map((p) => {
-    const who = p.memberId ? (p.memberId === e.payerMemberId && p.name === "me" ? "You" : nameOf(p.memberId)) : p.name;
-    return e.split === "amounts" && p.amountMinor !== null ? `${who} ${formatMoney(p.amountMinor, e.currency)}` : who;
+  const total = e.amountMinor === null ? "amount?" : draftMoney(e.amountMinor, e.currency);
+  const shares = draftShares(draft);
+  const people = e.participants.map((p, i) => {
+    const who = p.memberId ? nameOf(p.memberId) : p.name;
+    const share = shares[i];
+    return share !== null && share !== undefined ? `${who} ${draftMoney(share, e.currency)}` : who;
   });
   return (
     <div className="space-y-1">
@@ -251,9 +265,9 @@ function ReminderSummary({ draft, groupName }: { draft: PlainDraft; groupName?: 
   const r = draft.reminder!;
   const owed = r.owedMinorByCurrency;
   const owedText = owed && Object.keys(owed).length > 0
-    ? Object.entries(owed).map(([c, m]) => formatMoney(m, c)).join(" and ")
+    ? Object.entries(owed).map(([c, m]) => draftMoney(m, c)).join(" and ")
     : null;
-  const stated = r.statedAmountMinor !== null ? formatMoney(r.statedAmountMinor, r.statedCurrency) : null;
+  const stated = r.statedAmountMinor !== null ? draftMoney(r.statedAmountMinor, r.statedCurrency) : null;
   const differs = stated && owed && !(Object.keys(owed).length === 1 && owed[r.statedCurrency] === r.statedAmountMinor);
   return (
     <div className="space-y-1">
