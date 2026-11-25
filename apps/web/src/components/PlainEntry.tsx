@@ -114,7 +114,7 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
           {busy && !draft ? "Reading…" : "Go"}
         </button>
       </form>
-      <p className="text-xs text-stone-500">Your sentence is sent to Google&apos;s Gemini to read it.</p>
+      <p className="text-xs text-stone-500">Your sentence is sent to an AI model to read it: Google&apos;s Gemini, unless this Kitty server runs its own.</p>
       <ErrorBanner code={error} />
       {done && <p className="rounded-xl bg-green-50 p-3 text-sm text-owed dark:bg-green-950">{done}</p>}
       {draft && (

@@ -84,7 +84,7 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
         />
         <Button title="Go" busy={reading} disabled={!text.trim()} onPress={() => void read(() => ai.parse(text.trim(), groupId))} />
       </View>
-      <Text style={styles.note}>Your sentence is sent to Google&apos;s Gemini to read it.</Text>
+      <Text style={styles.note}>Your sentence is sent to an AI model to read it: Google&apos;s Gemini, unless this Kitty server runs its own.</Text>
       <ErrorBanner message={readError ?? save.error ?? send.error} />
       {done && <Text style={styles.success}>{done}</Text>}
       {draft && (
