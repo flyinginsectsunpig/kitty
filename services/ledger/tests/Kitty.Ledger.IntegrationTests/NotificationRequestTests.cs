@@ -92,6 +92,21 @@ public class NotificationRequestTests(LedgerApiFactory factory)
     }
 
     [Fact]
+    public async Task A_debt_paid_back_in_the_groups_currency_says_what_was_actually_paid()
+    {
+        var x = await GroupAsync();
+        // The friend pays a €20,00 debt in rands at 19.5: R 390,00 changed hands.
+        (await x.Friend.PostJsonAsync($"/groups/{x.G.Id}/settlements", new
+        {
+            id = Guid.NewGuid(), fromMemberId = x.FriendM, toMemberId = x.OwnerM, currency = "EUR", amountMinor = 2000,
+            fxRate = "19.5", paidInGroupCurrency = true,
+        })).EnsureSuccessStatusCode();
+
+        var r = Assert.Single(await RequestsForAsync(x.G.Id));
+        Assert.Equal("Friend marked R 390,00 (€20,00) paid to you", r.Body);
+    }
+
+    [Fact]
     public async Task A_payment_recorded_by_a_third_person_tells_both_sides()
     {
         var x = await GroupAsync();
