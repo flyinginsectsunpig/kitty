@@ -169,4 +169,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")  # a Windows pipe defaults to cp1252, which has no ✗
     sys.exit(main())
