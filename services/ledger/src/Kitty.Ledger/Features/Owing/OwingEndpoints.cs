@@ -54,7 +54,7 @@ public static class OwingEndpoints
                 foreach (var t in transfers)
                     PersonFor(people, members[t.MemberId]).Add(t.Direction, currency, t.Amount.Minor, g.Name);
 
-                var since = LastSquare.Since(RecordedOrder(expenses, settlements, currency, me));
+                var since = LastSquare.Since(RecordedRows.Order(expenses, settlements, currency, me));
                 var items = since.OfType<Expense>().OrderByDescending(e => e.OccurredOn).ThenByDescending(e => e.CreatedAt)
                     .ThenBy(e => e.Id).Select(e => ExpenseLineDto.Of(e, me, names)).ToList();
                 var payments = since.OfType<Settlement>().OrderByDescending(s => s.CreatedAt)
@@ -84,26 +84,6 @@ public static class OwingEndpoints
             foreach (var (c, v) in p.OwesMe) owedToMe[c] = owedToMe.GetValueOrDefault(c) + v;
         }
         return Results.Ok(new OwingDto(Money(iOwe), Money(owedToMe), personDtos, result));
-    }
-
-    /// <summary>The rows involving me in one currency, in the order they were recorded, with what each did to my net.</summary>
-    private static List<(object Row, long MyDelta)> RecordedOrder(List<Expense> expenses, List<Settlement> settlements, string currency,
-        Guid me)
-    {
-        var rows = new List<(object Row, DateTimeOffset At, Guid Id, long MyDelta)>();
-        foreach (var e in expenses.Where(e => e.Currency.Trim() == currency))
-        {
-            if (!e.Payers.Any(p => p.MemberId == me) && !e.Shares.Any(s => s.MemberId == me)) continue;
-            var paid = e.Payers.Where(p => p.MemberId == me).Sum(p => p.AmountMinor);
-            var share = e.Shares.Where(s => s.MemberId == me).Sum(s => s.AmountMinor);
-            rows.Add((e, e.CreatedAt, e.Id, paid - share));
-        }
-        foreach (var s in settlements.Where(s => s.Currency.Trim() == currency))
-        {
-            if (s.FromMemberId == me) rows.Add((s, s.CreatedAt, s.Id, s.AmountMinor));
-            else if (s.ToMemberId == me) rows.Add((s, s.CreatedAt, s.Id, -s.AmountMinor));
-        }
-        return rows.OrderBy(r => r.At).ThenBy(r => r.Id).Select(r => (r.Row, r.MyDelta)).ToList();
     }
 
     private static Person PersonFor(Dictionary<string, Person> people, Member m)

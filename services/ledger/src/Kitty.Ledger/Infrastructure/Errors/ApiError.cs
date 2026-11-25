@@ -21,6 +21,7 @@ public static class ErrorCodes
     public const string ValidationFailed = "validation_failed";
     public const string CurrencyUnsupported = "currency_unsupported";
     public const string MemberNotInGroup = "member_not_in_group";
+    public const string CoverInvalid = "cover_invalid";
     public const string PayersSumMismatch = "payers_sum_mismatch";
     public const string IdempotencyKeyRequired = "idempotency_key_required";
     public const string NotFound = "not_found";

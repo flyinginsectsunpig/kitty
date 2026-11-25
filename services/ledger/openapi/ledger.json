@@ -2331,6 +2331,23 @@
           }
         }
       },
+      "CoverDto": {
+        "required": [
+          "expenseId",
+          "amountMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "expenseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "CreateGroupDto": {
         "required": [
           "id",
@@ -3555,7 +3572,8 @@
           "fxRateDate",
           "fxRateSource",
           "convertedAmountMinor",
-          "paidInGroupCurrency"
+          "paidInGroupCurrency",
+          "covers"
         ],
         "type": "object",
         "properties": {
@@ -3614,6 +3632,12 @@
           },
           "paidInGroupCurrency": {
             "type": "boolean"
+          },
+          "covers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverDto"
+            }
           }
         }
       },
@@ -3655,6 +3679,15 @@
           "paidInGroupCurrency": {
             "type": "boolean",
             "default": false
+          },
+          "covers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CoverDto"
+            }
           }
         }
       },

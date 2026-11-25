@@ -752,6 +752,12 @@ export interface components {
             /** Format: int32 */
             excludedCount: number;
         };
+        CoverDto: {
+            /** Format: uuid */
+            expenseId: string;
+            /** Format: int64 */
+            amountMinor: number;
+        };
         CreateGroupDto: {
             /** Format: uuid */
             id: string;
@@ -1105,6 +1111,7 @@ export interface components {
             /** Format: int64 */
             convertedAmountMinor: null | number;
             paidInGroupCurrency: boolean;
+            covers: components["schemas"]["CoverDto"][];
         };
         SettlementWriteDto: {
             /** Format: uuid */
@@ -1119,6 +1126,7 @@ export interface components {
             fxRate?: null | string;
             /** @default false */
             paidInGroupCurrency: boolean;
+            covers?: null | components["schemas"]["CoverDto"][];
         };
         ShareDto: {
             /** Format: uuid */

@@ -1042,6 +1042,35 @@ namespace Kitty.Ledger.Data.Migrations
                         .HasForeignKey("ToMemberId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.OwnsMany("Kitty.Ledger.Data.Entities.SettlementCover", "Covers", b1 =>
+                        {
+                            b1.Property<Guid>("SettlementId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid>("ExpenseId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<long>("AmountMinor")
+                                .HasColumnType("bigint");
+
+                            b1.HasKey("SettlementId", "ExpenseId");
+
+                            b1.HasIndex("ExpenseId");
+
+                            b1.ToTable("SettlementCovers", (string)null);
+
+                            b1.HasOne("Kitty.Ledger.Data.Entities.Expense", null)
+                                .WithMany()
+                                .HasForeignKey("ExpenseId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired();
+
+                            b1.WithOwner()
+                                .HasForeignKey("SettlementId");
+                        });
+
+                    b.Navigation("Covers");
                 });
 
             modelBuilder.Entity("Kitty.Ledger.Data.Entities.Group", b =>

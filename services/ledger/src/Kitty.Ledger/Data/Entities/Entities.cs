@@ -118,6 +118,15 @@ public sealed class Settlement
     public long? ConvertedAmountMinor { get; set; }
     /// <summary>The money changed hands in the group's currency (ConvertedAmountMinor of it), settling this much of the debt's currency.</summary>
     public bool PaidInGroupCurrency { get; set; }
+    /// <summary>The expenses this payment says it pays for, and how much of each; empty for a plain payment.</summary>
+    public List<SettlementCover> Covers { get; set; } = [];
+}
+
+/// <summary>Part of a payment tied to one expense: this much of what From owed To on it.</summary>
+public sealed class SettlementCover
+{
+    public Guid ExpenseId { get; set; }
+    public long AmountMinor { get; set; }
 }
 
 public sealed class AuditEntry
