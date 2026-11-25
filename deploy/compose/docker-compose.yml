@@ -144,6 +144,10 @@ services:
       AI_POSTGRES_DSN: host=postgres port=5432 dbname=ledger user=ai password=${AI_DB_PASSWORD}
       # Empty: scans fail fast with "type the items" and everything else keeps working.
       AI_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Plain-language entry (/ai/* through Caddy): checks Keycloak tokens for audience kitty-ai, reads the ledger as
+      # the person.
+      AI_LEDGER_URL: http://ledger:8080
+      AI_AUTH_ISSUER: https://${KITTY_HOST}/auth/realms/kitty
     healthcheck:
       # 503 when a receipt reader has stopped.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]

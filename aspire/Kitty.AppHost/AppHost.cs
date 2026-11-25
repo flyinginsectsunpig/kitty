@@ -100,10 +100,14 @@ var ledger = builder.AddDotnetProject("ledger", "../../services/ledger/src/Kitty
     .WithEnvironment("Fx__Url", pulse.GetEndpoint("grpc"))
     .WaitFor(pulse);
 
-// Reads receipt photos (local OCR, redaction, Gemini). Uses the ai service's own uv environment.
+// Reads receipt photos (local OCR, redaction, Gemini) and plain-language sentences. Uses the ai service's own uv
+// environment. A fixed, unproxied port, so the phone (through `adb reverse`) reaches it at the same address as the web.
 var ai = builder.AddUvicornApp("ai", "../../services/ai", "kitty_ai.main:create_app")
     .WithUv()
     .WithArgs("--factory")
+    .WithEndpoint("http", e => { e.Port = AiPort; e.IsProxied = false; })
+    .WithEnvironment("AI_LEDGER_URL", ledger.GetEndpoint("http"))
+    .WithEnvironment("AI_AUTH_ISSUER", realmUrl)
     .WithHttpHealthCheck("/health")
     .WithEnvironment("AI_KAFKA_BOOTSTRAP", kafkaBootstrap)
     .WithEnvironment("AI_SCHEMA_REGISTRY_URL", schemaRegistry)
@@ -130,11 +134,13 @@ builder.AddJavaScriptApp("web", "../../apps/web", "dev")
     .WithEnvironment("AUTH_SECRET", authSecret)
     .WithEnvironment("AUTH_KEYCLOAK_ID", "kitty-web")
     .WithEnvironment("AUTH_KEYCLOAK_SECRET", "dev-only-kitty-web-secret")
-    .WithEnvironment("AUTH_KEYCLOAK_ISSUER", realmUrl);
+    .WithEnvironment("AUTH_KEYCLOAK_ISSUER", realmUrl)
+    .WithEnvironment("AI_URL", ai.GetEndpoint("http")); // plain-language entry, called from the server side
 
 builder.Build().Run();
 
 internal static partial class Program
 {
     private const int LedgerGrpcPort = 5082;
+    private const int AiPort = 5085;
 }

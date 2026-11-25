@@ -59,6 +59,16 @@
             "access.token.claim": "true",
             "id.token.claim": "false"
           }
+        },
+        {
+          "name": "kitty-ai-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "kitty-ai",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
         }
       ]
     },
@@ -85,6 +95,16 @@
           "protocolMapper": "oidc-audience-mapper",
           "config": {
             "included.custom.audience": "kitty-ledger",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "kitty-ai-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "kitty-ai",
             "access.token.claim": "true",
             "id.token.claim": "false"
           }

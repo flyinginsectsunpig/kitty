@@ -129,6 +129,12 @@ it once in the admin console (see below): Clients → Import client → pick the
 (public client, standard flow, PKCE S256, redirect `kitty://auth/callback`, the `kitty-ledger` audience mapper).
 A fresh server gets it automatically.
 
+**Upgrading to plain-language entry (phase 4a):** the apps' tokens now need a second audience, `kitty-ai`, so the ai
+service accepts them. A fresh server gets it from the realm file. On an existing one, once, in the admin console
+(see below): Clients → `kitty-web` → Client scopes → `kitty-web-dedicated` → Add mapper → By configuration →
+Audience, named `kitty-ai-audience`, Included Custom Audience `kitty-ai`, Add to access token on. Do the same for
+`kitty-mobile`. Until then, typing a sentence answers "sign in again" (401), and everything else works.
+
 ## 5a. The Android app
 
 Download the APK from the repository's GitHub Releases (`mobile-v*` tags) or from the latest `android` workflow run,

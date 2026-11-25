@@ -45,6 +45,11 @@
 		respond 404
 	}
 
+	# Plain-language entry (phase 4a): /ai/parse → ai /parse. The ai service checks the Keycloak token itself.
+	handle_path /ai/* {
+		reverse_proxy ai:8000
+	}
+
 	# Public ledger API (used by the mobile app from phase 2): /api/health → ledger /health.
 	handle_path /api/* {
 		reverse_proxy ledger:8080
