@@ -1,4 +1,18 @@
-import { applyPick, canSave, draftMoney, draftShares, draftToForm, errorMessage, toExpenseWriteDto, type DraftIssue, type PlainDraft } from "@kitty/core";
+import {
+  afterParse,
+  applyPick,
+  askMessages,
+  canSave,
+  draftMoney,
+  draftShares,
+  draftToForm,
+  errorMessage,
+  routeFirst,
+  toExpenseWriteDto,
+  type DraftIssue,
+  type PlainDraft,
+  type Turn,
+} from "@kitty/core";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -11,19 +25,34 @@ import { Button } from "./Button";
 import { ErrorBanner } from "./ErrorBanner";
 import { Card } from "./Screen";
 
+export const NOTICE =
+  "What you type is sent to an AI model: Google's Gemini, unless this Kitty server runs its own. For questions, so are the details Kitty looks up to answer them: amounts, descriptions and names from your groups.";
+
+const UNCLEAR = "Kitty couldn't tell what to do with that. Try other words, or use the form.";
+
 /**
  * Type an expense or a reminder in one sentence (the keyboard's microphone works too), check the card, then Save
- * or Send. Nothing is saved until then. groupId: the group screen it's on, if any.
+ * or Send: nothing is saved until then. Or ask about your money: a question opens a short conversation, and
+ * follow-ups go to Ask Kitty until New conversation. groupId: the group screen it's on, if any.
  */
 export function PlainEntry({ groupId }: { groupId?: string }) {
   const ai = useAi();
   const ledger = useLedger();
   const router = useRouter();
   const [text, setText] = useState("");
-  const [draft, setDraft] = useState<PlainDraft | null>(null);
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+
+  // The card being checked is the last turn, when it's a draft.
+  const last = turns.at(-1);
+  const draft = last?.role === "draft" ? last.draft : null;
+  const setDraft = (next: PlainDraft | null) =>
+    setTurns((ts) => {
+      const rest = ts.at(-1)?.role === "draft" ? ts.slice(0, -1) : ts;
+      return next ? [...rest, { role: "draft", draft: next }] : rest;
+    });
 
   const read = async (work: () => ReturnType<typeof ai.parse>) => {
     setReading(true);
@@ -33,6 +62,49 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
     setReading(false);
     if (r.error) return setReadError(errorMessage(r.error));
     setDraft(r.draft ?? null);
+  };
+
+  const say = async (message: string) => {
+    setReading(true);
+    setReadError(null);
+    setDone(null);
+    // An unsaved card is dropped when the person moves on.
+    const before = turns.filter((t) => t.role !== "draft");
+    let convo: Turn[] = [...before, { role: "person", text: message }];
+    const add = (t: Turn) => {
+      convo = [...convo, t];
+      setTurns(convo);
+    };
+    setTurns(convo);
+    setText("");
+
+    const ask = async (): Promise<void> => {
+      const r = await ai.ask(askMessages(convo), groupId);
+      if ("error" in r) return add({ role: "error", code: r.error });
+      if ("entry" in r) return parse(true);
+      add({ role: "kitty", text: r.answer });
+    };
+    const parse = async (cameFromAsk: boolean): Promise<void> => {
+      const r = await ai.parse(message, groupId);
+      if (r.error || !r.draft) return add({ role: "error", code: r.error ?? "unexpected" });
+      const next = afterParse(r.draft, cameFromAsk);
+      if (next === "ask") return ask();
+      if (next === "unclear") return add({ role: "kitty", text: UNCLEAR });
+      add({ role: "draft", draft: r.draft });
+    };
+
+    try {
+      await (routeFirst(before) === "parse" ? parse(false) : ask());
+    } finally {
+      setReading(false);
+    }
+  };
+
+  const startOver = () => {
+    setTurns([]);
+    setText("");
+    setReadError(null);
+    setDone(null);
   };
 
   const save = useAction(
@@ -70,6 +142,23 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
 
   return (
     <Card>
+      {turns.some((t) => t.role !== "draft") && (
+        <View style={styles.conversation} accessibilityLabel="Conversation with Kitty" accessibilityLiveRegion="polite">
+          {turns.map((t, i) =>
+            t.role === "person" ? (
+              <Text key={i} style={styles.mine}>
+                {t.text}
+              </Text>
+            ) : t.role === "kitty" ? (
+              <Text key={i} style={styles.kitty}>
+                {t.text}
+              </Text>
+            ) : t.role === "error" ? (
+              <ErrorBanner key={i} message={errorMessage(t.code)} />
+            ) : null,
+          )}
+        </View>
+      )}
       <View style={styles.row}>
         <TextInput
           accessibilityLabel="Add an expense or a reminder in a sentence"
@@ -77,14 +166,15 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
           value={text}
           maxLength={500}
           onChangeText={setText}
-          placeholder="petrol R600, split with Sam and Ana"
+          placeholder={turns.length > 0 ? "Ask a follow-up" : "petrol R600 with Sam, or: how much do I owe?"}
           placeholderTextColor={colors.faint}
           returnKeyType="go"
-          onSubmitEditing={() => text.trim() && void read(() => ai.parse(text.trim(), groupId))}
+          onSubmitEditing={() => text.trim() && !reading && void say(text.trim())}
         />
-        <Button title="Go" busy={reading} disabled={!text.trim()} onPress={() => void read(() => ai.parse(text.trim(), groupId))} />
+        <Button title="Go" busy={reading} disabled={!text.trim()} onPress={() => void say(text.trim())} />
       </View>
-      <Text style={styles.note}>Your sentence is sent to an AI model to read it: Google&apos;s Gemini, unless this Kitty server runs its own.</Text>
+      <Text style={styles.note}>{NOTICE}</Text>
+      {turns.length > 0 && <Button title="New conversation" variant="secondary" disabled={reading} onPress={startOver} />}
       <ErrorBanner message={readError ?? save.error ?? send.error} />
       {done && <Text style={styles.success}>{done}</Text>}
       {draft && (
@@ -254,6 +344,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   note: { fontSize: font.sm, color: colors.muted },
+  conversation: { gap: space.sm },
+  mine: {
+    alignSelf: "flex-end",
+    maxWidth: "85%",
+    padding: space.sm,
+    borderRadius: radius.field,
+    backgroundColor: colors.border,
+    fontSize: font.base,
+    color: colors.text,
+  },
+  kitty: {
+    alignSelf: "flex-start",
+    maxWidth: "85%",
+    padding: space.sm,
+    borderRadius: radius.field,
+    borderWidth: 1,
+    borderColor: colors.border,
+    fontSize: font.base,
+    color: colors.text,
+  },
   success: { fontSize: font.sm, color: colors.owed },
   card: { gap: space.md, paddingTop: space.sm },
   summary: { gap: space.xs },
