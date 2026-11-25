@@ -1,9 +1,20 @@
 "use client";
 
-import { applyPick, canSave, draftMoney, draftShares, type DraftIssue, type PlainDraft } from "@kitty/core";
+import {
+  afterParse,
+  applyPick,
+  askMessages,
+  canSave,
+  draftMoney,
+  draftShares,
+  routeFirst,
+  type DraftIssue,
+  type PlainDraft,
+  type Turn,
+} from "@kitty/core";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { readSentence, rematchGroup, saveDraft, sendReminder } from "@/app/plain-entry/actions";
+import { askQuestion, readSentence, rematchGroup, saveDraft, sendReminder } from "@/app/plain-entry/actions";
 import { ErrorBanner } from "./ErrorBanner";
 
 /** Errors after which a retry should replay the same request (same key): it may not have finished, or never arrived. */
@@ -12,14 +23,20 @@ const KEEP_KEY = new Set(["request_in_progress", "unexpected", "network"]);
 /** The key the expense form reads a handed-over draft from (once), so the sentence never goes into a URL. */
 export const DRAFT_KEY = "kitty.draft";
 
+export const NOTICE =
+  "What you type is sent to an AI model: Google's Gemini, unless this Kitty server runs its own. For questions, so are the details Kitty looks up to answer them: amounts, descriptions and names from your groups.";
+
+const UNCLEAR = "Kitty couldn't tell what to do with that. Try other words, or use the form.";
+
 /**
- * Type an expense or a reminder in one sentence; check the card; Save or Send. Nothing is saved until then.
+ * Type an expense or a reminder in one sentence (check the card; Save or Send: nothing is saved until then), or ask
+ * about your money. A question opens a short conversation; follow-ups go to Ask Kitty until New conversation.
  * groupId: the group page it's on, if any (a group named in the sentence wins).
  */
 export function PlainEntry({ groupId }: { groupId?: string }) {
   const router = useRouter();
   const [text, setText] = useState("");
-  const [draft, setDraft] = useState<PlainDraft | null>(null);
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [error, setError] = useState<string | undefined>();
   const [done, setDone] = useState<string | null>(null);
   const [key, setKey] = useState(() => crypto.randomUUID());
@@ -36,13 +53,52 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
       }
     });
 
-  const read = () =>
-    run(async () => {
-      const r = await readSentence(text, groupId);
-      if (r.error) return setError(r.error);
-      setDraft(r.draft ?? null);
-      setKey(crypto.randomUUID());
+  // The card being checked is the last turn, when it's a draft.
+  const last = turns.at(-1);
+  const draft = last?.role === "draft" ? last.draft : null;
+  const setDraft = (next: PlainDraft | null) =>
+    setTurns((ts) => {
+      const rest = ts.at(-1)?.role === "draft" ? ts.slice(0, -1) : ts;
+      return next ? [...rest, { role: "draft", draft: next }] : rest;
     });
+
+  const say = (message: string) =>
+    run(async () => {
+      // An unsaved card is dropped when the person moves on.
+      const before = turns.filter((t) => t.role !== "draft");
+      let convo: Turn[] = [...before, { role: "person", text: message }];
+      const add = (t: Turn) => {
+        convo = [...convo, t];
+        setTurns(convo);
+      };
+      setTurns(convo);
+      setText("");
+
+      const ask = async (): Promise<void> => {
+        const r = await askQuestion(askMessages(convo), groupId);
+        if ("error" in r) return add({ role: "error", code: r.error });
+        if ("entry" in r) return parse(true);
+        add({ role: "kitty", text: r.answer });
+      };
+      const parse = async (cameFromAsk: boolean): Promise<void> => {
+        const r = await readSentence(message, groupId);
+        if (r.error || !r.draft) return add({ role: "error", code: r.error ?? "unexpected" });
+        const next = afterParse(r.draft, cameFromAsk);
+        if (next === "ask") return ask();
+        if (next === "unclear") return add({ role: "kitty", text: UNCLEAR });
+        add({ role: "draft", draft: r.draft });
+        setKey(crypto.randomUUID());
+      };
+
+      await (routeFirst(before) === "parse" ? parse(false) : ask());
+    });
+
+  const startOver = () => {
+    setTurns([]);
+    setText("");
+    setError(undefined);
+    setDone(null);
+  };
 
   const pickGroup = (id: string) =>
     run(async () => {
@@ -62,7 +118,6 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
         return setError(code);
       }
       setDraft(null);
-      setText("");
       router.push(`/groups/${draft.groupId}`);
       router.refresh();
     });
@@ -77,7 +132,6 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
       }
       setDone(`Reminder sent to ${draft.reminder.name ?? "them"}.`);
       setDraft(null);
-      setText("");
     });
 
   const edit = () => {
@@ -92,15 +146,32 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
 
   return (
     <div className="card space-y-3">
+      {turns.some((t) => t.role !== "draft") && (
+        <div className="space-y-2" aria-live="polite" aria-label="Conversation with Kitty">
+          {turns.map((t, i) =>
+            t.role === "person" ? (
+              <p key={i} className="ml-8 rounded-xl bg-stone-100 p-2 text-sm dark:bg-stone-800">
+                {t.text}
+              </p>
+            ) : t.role === "kitty" ? (
+              <p key={i} className="mr-8 whitespace-pre-line rounded-xl border border-stone-200 p-2 text-sm dark:border-stone-700">
+                {t.text}
+              </p>
+            ) : t.role === "error" ? (
+              <ErrorBanner key={i} code={t.code} />
+            ) : null,
+          )}
+        </div>
+      )}
       <form
         className="flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (text.trim()) read();
+          if (text.trim()) say(text.trim());
         }}
       >
         <label htmlFor="plain-entry" className="sr-only">
-          Add an expense or a reminder in a sentence
+          Add an expense or a reminder in a sentence, or ask about your money
         </label>
         <input
           id="plain-entry"
@@ -108,13 +179,20 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
           value={text}
           maxLength={500}
           onChange={(e) => setText(e.target.value)}
-          placeholder="petrol R600, split with Sam and Ana"
+          placeholder={turns.length > 0 ? "Ask a follow-up" : "petrol R600 with Sam, or: how much do I owe?"}
         />
         <button className="btn-primary" disabled={busy || !text.trim()}>
           {busy && !draft ? "Reading…" : "Go"}
         </button>
       </form>
-      <p className="text-xs text-stone-500">Your sentence is sent to an AI model to read it: Google&apos;s Gemini, unless this Kitty server runs its own.</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs text-stone-500">{NOTICE}</p>
+        {turns.length > 0 && (
+          <button type="button" className="btn-secondary shrink-0 text-xs" disabled={busy} onClick={startOver}>
+            New conversation
+          </button>
+        )}
+      </div>
       <ErrorBanner code={error} />
       {done && <p className="rounded-xl bg-green-50 p-3 text-sm text-owed dark:bg-green-950">{done}</p>}
       {draft && (
