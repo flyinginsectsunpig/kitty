@@ -23,7 +23,11 @@ export default async function SettlePage({
   const { ledger, group, me, nameOf } = await loadGroup(id);
   const [balances, recent] = await Promise.all([
     ledger.GET("/groups/{groupId}/balances", { params: { path: { groupId: id } } }).then(unwrap),
-    ledger.GET("/groups/{groupId}/settlements", { params: { path: { groupId: id }, query: { limit: 20 } } }).then(unwrap),
+    // Recent payments are extra: if they can't be loaded, the section is left out and the transfers still show.
+    ledger
+      .GET("/groups/{groupId}/settlements", { params: { path: { groupId: id }, query: { limit: 20 } } })
+      .then((r) => r.data ?? [])
+      .catch(() => []),
   ]);
   const detailsOf = new Map(group.members.map((m) => [m.id, m.paymentDetails]));
 
@@ -41,9 +45,12 @@ export default async function SettlePage({
   // optional: if the ledger can't list the items, the transfer is marked as paid without them, as before.
   const openFor = await Promise.all(
     transfers.map(async (t): Promise<OpenItem[]> => {
-      const { data: open } = await ledger.GET("/groups/{groupId}/open-items", {
-        params: { path: { groupId: id }, query: { from: t.fromMemberId, to: t.toMemberId } },
-      });
+      const open = await ledger
+        .GET("/groups/{groupId}/open-items", {
+          params: { path: { groupId: id }, query: { from: t.fromMemberId, to: t.toMemberId } },
+        })
+        .then((r) => r.data)
+        .catch(() => undefined);
       return (open?.currencies.find((c) => c.currency === t.currency)?.fromOwes ?? []).map((o) => ({
         expenseId: o.item.expenseId,
         description: o.item.description,
@@ -135,10 +142,11 @@ export default async function SettlePage({
               const from = p.fromMemberId === me.id ? "You" : r.from;
               const to = p.toMemberId === me.id ? "you" : r.to;
               const what = r.covers.map((c) => c.description).join(", ");
+              const money = formatMoney(p.amountMinor, p.currency);
               return (
                 <li key={p.id} className="card flex items-center justify-between gap-3">
                   <p className="text-sm">
-                    {from} paid {to} <span className="tabular-nums">{formatMoney(p.amountMinor, p.currency)}</span> ·{" "}
+                    {from} paid {to} <span className="tabular-nums">{money}</span> ·{" "}
                     {dayMonth(r.date)}
                     {what && ` · for: ${what}`}
                   </p>
@@ -146,7 +154,11 @@ export default async function SettlePage({
                     <input type="hidden" name="groupId" value={id} />
                     <input type="hidden" name="settlementId" value={p.id} />
                     <input type="hidden" name="idempotencyKey" value={crypto.randomUUID()} />
-                    <ConfirmButton className="btn-secondary shrink-0 text-xs" question="Delete this payment? Its items go back on the list.">
+                    <ConfirmButton
+                      className="btn-secondary shrink-0 text-xs"
+                      label={`Delete payment: ${from} paid ${to} ${money}`}
+                      question="Delete this payment? Its items go back on the list."
+                    >
                       Delete
                     </ConfirmButton>
                   </form>
