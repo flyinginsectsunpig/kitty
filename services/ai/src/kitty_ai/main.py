@@ -10,6 +10,8 @@ import httpx
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from kitty_ai.ask.models import chat_from
+from kitty_ai.ask.routes import make_ask_router
 from kitty_ai.auth import TokenVerifier, jwks_fetcher
 from kitty_ai.entry.parse import parser_from
 from kitty_ai.entry.routes import make_router
@@ -51,9 +53,11 @@ def create_app(settings: Settings | None = None, make_worker: Callable[[Settings
         return JSONResponse({"status": "ok", "worker": "off" if worker is None else "running"})
 
     if settings.auth_issuer:
-        # Plain-language entry (/parse, /resolve): Caddy serves these under /ai/. Keys are fetched on first use.
+        # Plain-language entry (/parse, /resolve) and Ask Kitty (/ask): Caddy serves these under /ai/.
+        # Keys are fetched on first use.
         http = httpx.Client(timeout=15)
         verifier = TokenVerifier(settings.auth_issuer, settings.auth_audience, jwks_fetcher(settings.auth_issuer, http))
         app.include_router(make_router(settings, verifier, parser_from(settings), http))
+        app.include_router(make_ask_router(settings, verifier, chat_from(settings), http))
 
     return app

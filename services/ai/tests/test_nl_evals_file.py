@@ -13,7 +13,7 @@ def test_nl_evals_file_is_well_formed():
     for case in lines:
         assert set(case) == {"text", "today", "currency", "expect"}, case
         assert set(case["expect"]) <= EXPECT_FIELDS, case
-        assert case["expect"]["intent"] in {"expense", "reminder", "unclear"}
+        assert case["expect"]["intent"] in {"expense", "reminder", "question", "unclear"}
         # Every expected value has to be something the model could return.
         ParsedSentence.model_validate({"intent": case["expect"]["intent"]})
 
@@ -26,4 +26,6 @@ def test_the_owners_five_sentences_are_in_the_set():
         "me, John and Joe bought dinner, I had a salad for R50, Joe had a steak for R100 and John had the fish for R70",
         "add R20 debt for Bob",
         "tell Bob he owes me R20",
+        "Add groceries to Family budget. I spent R2000",
+        "Me and Joe split on Uber for R50, split it between me and him",
     } <= texts

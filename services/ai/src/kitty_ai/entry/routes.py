@@ -110,7 +110,9 @@ def make_router(
             return _error(422, "unclear")
         match = match_group(parsed.group, body.groupId, groups)
         try:
-            if match.group_id is None:
+            if parsed.intent == "question":  # the app sends it on to /ask
+                draft = {"intent": "question", "groupId": match.group_id, "issues": [], "members": []}
+            elif match.group_id is None:
                 draft = {"intent": parsed.intent, "groupId": None, "issues": [match.issue], "members": []}
             else:
                 draft = draft_for(reader, parsed, match.group_id)
