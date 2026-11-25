@@ -122,8 +122,6 @@ def test_lookups_use_the_callers_token():
     assert all(r.headers["authorization"] == "Bearer tok-1" for r in seen)
 
 
-def test_not_a_question_excludes_changing_an_existing_expense():
+def test_not_a_question_covers_crossing_off():
     spec = next(t for t in TOOLS if t.name == "not_a_question")
-    # With the rule only in the prompt, Gemini still called it for "Cross off the Uber for Joe, I paid him".
-    wanted = "Never call it to cross off, mark as paid, delete or change an existing expense or payment"
-    assert wanted in spec.description
+    assert "crossing off an existing expense as paid" in spec.description
