@@ -102,7 +102,11 @@ var ledger = builder.AddDotnetProject("ledger", "../../services/ledger/src/Kitty
 
 // Reads receipt photos (local OCR, redaction, Gemini) and plain-language sentences. Uses the ai service's own uv
 // environment. A fixed, unproxied port, so the phone (through `adb reverse`) reaches it at the same address as the web.
+// Plain HTTP, like Keycloak: the phone can't trust Aspire's development certificate.
+#pragma warning disable ASPIRECERTIFICATES001
 var ai = builder.AddUvicornApp("ai", "../../services/ai", "kitty_ai.main:create_app")
+    .WithoutHttpsCertificate()
+#pragma warning restore ASPIRECERTIFICATES001
     .WithUv()
     .WithArgs("--factory")
     .WithEndpoint("http", e => { e.Port = AiPort; e.IsProxied = false; })
