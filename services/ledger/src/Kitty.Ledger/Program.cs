@@ -128,6 +128,7 @@ group.MapMembers();
 group.MapExpenses();
 group.MapBalances();
 group.MapSettlements();
+group.MapOpenItems();
 group.MapReminders();
 group.MapFx();
 group.MapRecurring();

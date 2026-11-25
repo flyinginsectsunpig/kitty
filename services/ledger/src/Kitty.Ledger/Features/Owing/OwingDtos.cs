@@ -5,12 +5,25 @@ namespace Kitty.Ledger.Features.Owing;
 /// <summary>Direction: "i_pay" or "pays_me". From the group's settle-up plan, as /balances.</summary>
 public sealed record OwingTransferDto(string Direction, Guid MemberId, string Name, MoneyDto Amount);
 
-/// <summary>A settlement involving me. Date: when it was recorded, in South African time.</summary>
-public sealed record OwingPaymentDto(string From, string To, MoneyDto Amount, DateOnly Date);
+/// <summary>
+/// A settlement involving me. Date: when it was recorded, in South African time. Unallocated: the part of it not
+/// counted against any item it covers.
+/// </summary>
+public sealed record OwingPaymentDto(string From, string To, MoneyDto Amount, DateOnly Date, MoneyDto Unallocated);
 
-/// <summary>Since: the expenses involving me after I was last square in this currency, newest first, at most ten.</summary>
+/// <summary>Who an item is still open with. Direction: "i_pay" (I owe them Amount on it) or "pays_me" (they owe me).</summary>
+public sealed record OpenWithDto(Guid MemberId, string Name, string Direction, MoneyDto Amount);
+
+/// <summary>One expense as <see cref="ExpenseLineDto"/>, with what's still open on it between me and each other member.</summary>
+public sealed record OwingLineDto(Guid ExpenseId, string Description, DateOnly Date, string Category, MoneyDto Total, MoneyDto MyShare,
+    string PaidBy, IReadOnlyList<OpenWithDto> Open);
+
+/// <summary>
+/// Since: the expenses with something still open between me and another member, newest first, at most ten.
+/// Payments: the settlements involving me after I was last square in this currency.
+/// </summary>
 public sealed record OwingCurrencyDto(string Currency, MoneyDto MyNet, IReadOnlyList<OwingTransferDto> Transfers,
-    IReadOnlyList<ExpenseLineDto> Since, int MoreSince, IReadOnlyList<OwingPaymentDto> Payments);
+    IReadOnlyList<OwingLineDto> Since, int MoreSince, IReadOnlyList<OwingPaymentDto> Payments);
 
 public sealed record OwingGroupDto(Guid Id, string Name, IReadOnlyList<OwingCurrencyDto> Currencies);
 

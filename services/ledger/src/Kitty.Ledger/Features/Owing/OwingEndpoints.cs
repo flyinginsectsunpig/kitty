@@ -3,6 +3,7 @@ using Kitty.Ledger.Data.Entities;
 using Kitty.Ledger.Domain.Balances;
 using Kitty.Ledger.Features.Balances;
 using Kitty.Ledger.Features.Common;
+using Kitty.Ledger.Features.Settlements;
 using Kitty.Ledger.Infrastructure.Auth;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,7 +19,8 @@ public static class OwingEndpoints
 
     /// <summary>
     /// Every group I'm in where I'm not square, with my part of each group's settle-up plan (the same plan /balances and
-    /// reminders use) and the expenses and payments since I was last square; plus the totals and the people, summed across groups.
+    /// reminders use), the items still open between me and anyone else, and the payments since I was last square; plus the
+    /// totals and the people, summed across groups.
     /// </summary>
     private static async Task<IResult> GetAsync(ICurrentUser current, LedgerDbContext db, CancellationToken ct)
     {
@@ -41,6 +43,7 @@ public static class OwingEndpoints
             var names = members.ToDictionary(kv => kv.Key, kv => kv.Value.DisplayName);
             var expenses = await db.Expenses.AsNoTracking().Where(e => e.GroupId == g.Id && e.DeletedAt == null).ToListAsync(ct);
             var settlements = await db.Settlements.AsNoTracking().Where(s => s.GroupId == g.Id && s.DeletedAt == null).ToListAsync(ct);
+            var effective = OpenItems.Effective(expenses, settlements);
 
             var currencies = new List<OwingCurrencyDto>();
             foreach (var (currency, net) in owing)
@@ -54,12 +57,12 @@ public static class OwingEndpoints
                 foreach (var t in transfers)
                     PersonFor(people, members[t.MemberId]).Add(t.Direction, currency, t.Amount.Minor, g.Name);
 
-                var since = LastSquare.Since(RecordedRows.Order(expenses, settlements, currency, me));
-                var items = since.OfType<Expense>().OrderByDescending(e => e.OccurredOn).ThenByDescending(e => e.CreatedAt)
-                    .ThenBy(e => e.Id).Select(e => ExpenseLineDto.Of(e, me, names)).ToList();
-                var payments = since.OfType<Settlement>().OrderByDescending(s => s.CreatedAt)
+                var items = OpenLines(expenses, settlements, currency, me, names);
+                var payments = LastSquare.Since(RecordedRows.Order(expenses, settlements, currency, me)).OfType<Settlement>()
+                    .OrderByDescending(s => s.CreatedAt)
                     .Select(s => new OwingPaymentDto(names[s.FromMemberId], names[s.ToMemberId], M(s.AmountMinor),
-                        DateOnly.FromDateTime(s.CreatedAt.ToOffset(SouthAfrica).DateTime)))
+                        DateOnly.FromDateTime(s.CreatedAt.ToOffset(SouthAfrica).DateTime),
+                        M(s.AmountMinor - s.Covers.Sum(c => effective.GetValueOrDefault((s.Id, c.ExpenseId))))))
                     .ToList();
                 currencies.Add(new OwingCurrencyDto(currency, M(net[me]), transfers, items.Take(MaxSince).ToList(),
                     Math.Max(0, items.Count - MaxSince), payments));
@@ -84,6 +87,35 @@ public static class OwingEndpoints
             foreach (var (c, v) in p.OwesMe) owedToMe[c] = owedToMe.GetValueOrDefault(c) + v;
         }
         return Results.Ok(new OwingDto(Money(iOwe), Money(owedToMe), personDtos, result));
+    }
+
+    /// <summary>
+    /// The items with something still open between me and any other member, either way, newest first, each with who
+    /// it's open with.
+    /// </summary>
+    private static List<OwingLineDto> OpenLines(List<Expense> expenses, List<Settlement> settlements, string currency, Guid me,
+        IReadOnlyDictionary<Guid, string> names)
+    {
+        var open = new List<(Expense Expense, OpenWithDto With)>();
+        foreach (var other in names.Keys.Where(id => id != me))
+        {
+            foreach (var i in OpenItems.Between(expenses, settlements, currency, me, other))
+                open.Add((i.Expense, new OpenWithDto(other, names[other], "i_pay", MoneyDto.Of(i.Open, currency))));
+            foreach (var i in OpenItems.Between(expenses, settlements, currency, other, me))
+                open.Add((i.Expense, new OpenWithDto(other, names[other], "pays_me", MoneyDto.Of(i.Open, currency))));
+        }
+        return open.GroupBy(o => o.Expense.Id)
+            .Select(g => (Expense: g.First().Expense,
+                With: g.Select(o => o.With).OrderBy(w => w.Name, StringComparer.Ordinal).ThenBy(w => w.MemberId).ThenBy(w => w.Direction,
+                    StringComparer.Ordinal).ToList()))
+            .OrderByDescending(x => x.Expense.OccurredOn).ThenByDescending(x => x.Expense.CreatedAt).ThenBy(x => x.Expense.Id)
+            .Select(x =>
+            {
+                var line = ExpenseLineDto.Of(x.Expense, me, names);
+                return new OwingLineDto(line.ExpenseId, line.Description, line.Date, line.Category, line.Total, line.MyShare, line.PaidBy,
+                    x.With);
+            })
+            .ToList();
     }
 
     private static Person PersonFor(Dictionary<string, Person> people, Member m)
