@@ -150,11 +150,12 @@ before the heavy infrastructure lands.
 - *Natural-language entry:* `POST /parse-expense` returns a draft expense
   (amount, currency, payer, participants resolved against group members,
   split type). The client shows it for confirmation.
-- *Ask Kitty (RAG + agent):* consumes ledger events, embeds expense
-  descriptions into pgvector (in the ledger's Postgres, separate schema,
-  every row tagged with `group_id`). Questions run as a tool-using agent
-  whose tools are read-only ledger queries executed **with the asking user's
-  token**, so authorization is enforced by the ledger, not by the prompt.
+- *Ask Kitty (agent):* questions run as a tool-using agent whose tools are
+  read-only ledger lookups (what I owe and am owed; a group's spending over a
+  date range) executed **with the asking user's token**, so authorization is
+  enforced by the ledger, not by the prompt. The ledger does the arithmetic and
+  formats the money; the model only quotes it. No pgvector: every question the
+  owner asks is an exact lookup (see the phase 4b design).
 - *MCP server:* Streamable HTTP transport, OAuth via Keycloak. Tools:
   `list_groups`, `get_balances`, `list_expenses`, `draft_expense` (creates a
   draft the user must confirm in the app — anti-goal 2).
@@ -324,7 +325,9 @@ before the heavy infrastructure lands.
    outbox, ai receipt parsing, itemized split, SignalR table mode.
 3. **pulse**: FX + multi-currency, recurring expenses, push/email
    notifications, gRPC.
-4. **AI depth**: NL entry, Ask Kitty (RAG + agent), MCP server, evals in CI.
+4. **AI depth**: 4a NL entry, 4b Ask Kitty (agent over read-only lookups), 4c crossing
+   things off by sentence (a payment linked to the expenses it covers), 4d MCP
+   server, 4e evals in CI.
 5. **Production**: Terraform, k3s, Helm, Argo CD, OpenTelemetry → Grafana,
    security scanning, Playwright, k6.
 6. **Fun + polish**: roulette, Kitty Wrapped, offline add-expense queue on
