@@ -36,6 +36,22 @@ export interface paths {
         patch: operations["UpdateMe"];
         trace?: never;
     };
+    "/me/owing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetOwing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/notifications": {
         parameters: {
             query?: never;
@@ -204,6 +220,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["ListActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/spending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSpending"];
         put?: never;
         post?: never;
         delete?: never;
@@ -691,6 +723,10 @@ export interface components {
             currencies: components["schemas"]["CurrencyBalanceDto"][];
             converted: null | components["schemas"]["ConvertedBalanceDto"];
         };
+        CategoryTotalDto: {
+            category: string;
+            total: components["schemas"]["MoneyDto"];
+        };
         ChargeWriteDto: {
             /** Format: uuid */
             id: string;
@@ -708,6 +744,11 @@ export interface components {
             currency: string;
             members: components["schemas"]["MemberNetDto"][];
             transfers: components["schemas"]["TransferDto"][];
+            /** Format: int32 */
+            excludedCount: number;
+        };
+        ConvertedSpendingDto: {
+            total: components["schemas"]["MoneyDto"];
             /** Format: int32 */
             excludedCount: number;
         };
@@ -766,6 +807,17 @@ export interface components {
             /** Format: int64 */
             convertedAmountMinor: null | number;
         };
+        ExpenseLineDto: {
+            /** Format: uuid */
+            expenseId: string;
+            description: string;
+            /** Format: date */
+            date: string;
+            category: string;
+            total: components["schemas"]["MoneyDto"];
+            myShare: components["schemas"]["MoneyDto"];
+            paidBy: string;
+        };
         ExpensePageDto: {
             items: components["schemas"]["ExpenseDto"][];
             nextCursor: null | string;
@@ -812,6 +864,8 @@ export interface components {
             /** Format: int32 */
             memberCount: number;
             myNet: components["schemas"]["NetDto"][];
+            /** Format: date-time */
+            createdAt: string;
         };
         GuestJoinDto: {
             /** Format: uuid */
@@ -874,6 +928,12 @@ export interface components {
             /** Format: int64 */
             netMinor: number;
         };
+        MoneyDto: {
+            currency: string;
+            /** Format: int64 */
+            minor: number;
+            text: string;
+        };
         NetDto: {
             currency: string;
             /** Format: int64 */
@@ -900,6 +960,51 @@ export interface components {
             reminderPush: boolean;
             reminderEmail: boolean;
         };
+        OwingCurrencyDto: {
+            currency: string;
+            myNet: components["schemas"]["MoneyDto"];
+            transfers: components["schemas"]["OwingTransferDto"][];
+            since: components["schemas"]["ExpenseLineDto"][];
+            /** Format: int32 */
+            moreSince: number;
+            payments: components["schemas"]["OwingPaymentDto"][];
+        };
+        OwingDto: {
+            iOwe: components["schemas"]["MoneyDto"][];
+            owedToMe: components["schemas"]["MoneyDto"][];
+            people: components["schemas"]["OwingPersonDto"][];
+            groups: components["schemas"]["OwingGroupDto"][];
+        };
+        OwingGroupDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            currencies: components["schemas"]["OwingCurrencyDto"][];
+        };
+        OwingPaymentDto: {
+            from: string;
+            to: string;
+            amount: components["schemas"]["MoneyDto"];
+            /** Format: date */
+            date: string;
+        };
+        OwingPersonDto: {
+            /** Format: uuid */
+            userId: null | string;
+            /** Format: uuid */
+            memberId: null | string;
+            name: string;
+            iOwe: components["schemas"]["MoneyDto"][];
+            owesMe: components["schemas"]["MoneyDto"][];
+            groups: string[];
+        };
+        OwingTransferDto: {
+            direction: string;
+            /** Format: uuid */
+            memberId: string;
+            name: string;
+            amount: components["schemas"]["MoneyDto"];
+        };
         ParticipantDto: {
             /** Format: uuid */
             memberId: string;
@@ -911,6 +1016,12 @@ export interface components {
             memberId: string;
             /** Format: int64 */
             amountMinor: number;
+        };
+        PayerTotalDto: {
+            /** Format: uuid */
+            memberId: string;
+            name: string;
+            paid: components["schemas"]["MoneyDto"];
         };
         PreviewShareDto: {
             kind: string;
@@ -1014,6 +1125,22 @@ export interface components {
             memberId: string;
             /** Format: int64 */
             amountMinor: number;
+        };
+        SpendingCurrencyDto: {
+            currency: string;
+            total: components["schemas"]["MoneyDto"];
+            myShare: components["schemas"]["MoneyDto"];
+            /** Format: int32 */
+            count: number;
+            byCategory: components["schemas"]["CategoryTotalDto"][];
+            byPayer: components["schemas"]["PayerTotalDto"][];
+            biggest: components["schemas"]["ExpenseLineDto"][];
+            latest: components["schemas"]["ExpenseLineDto"][];
+        };
+        SpendingDto: {
+            groupCurrency: string;
+            currencies: components["schemas"]["SpendingCurrencyDto"][];
+            converted: null | components["schemas"]["ConvertedSpendingDto"];
         };
         SplitDto: {
             method: components["schemas"]["SplitMethod"];
@@ -1186,6 +1313,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeDto"];
+                };
+            };
+        };
+    };
+    GetOwing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwingDto"];
                 };
             };
         };
@@ -1515,6 +1662,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityDto"][];
+                };
+            };
+        };
+    };
+    GetSpending: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                category?: string;
+                q?: string;
+            };
+            header?: never;
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpendingDto"];
                 };
             };
         };

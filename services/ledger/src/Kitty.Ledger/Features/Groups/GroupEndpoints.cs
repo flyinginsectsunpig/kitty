@@ -59,7 +59,7 @@ public static class GroupEndpoints
         var groups = await db.Groups
             .Where(g => g.Members.Any(m => m.UserId == user.Id))
             .OrderBy(g => g.Name)
-            .Select(g => new { g.Id, g.Name, g.BaseCurrency, MemberCount = g.Members.Count })
+            .Select(g => new { g.Id, g.Name, g.BaseCurrency, g.CreatedAt, MemberCount = g.Members.Count })
             .ToListAsync(ct);
 
         var myMembers = await db.Members.Where(m => m.UserId == user.Id).ToDictionaryAsync(m => m.GroupId, m => m.Id, ct);
@@ -71,7 +71,7 @@ public static class GroupEndpoints
                 .Select(kv => new NetDto(kv.Key, kv.Value.GetValueOrDefault(myMembers[g.Id])))
                 .Where(n => n.NetMinor != 0)
                 .ToList();
-            summaries.Add(new GroupSummaryDto(g.Id, g.Name, g.BaseCurrency.Trim(), g.MemberCount, myNet));
+            summaries.Add(new GroupSummaryDto(g.Id, g.Name, g.BaseCurrency.Trim(), g.MemberCount, myNet, g.CreatedAt));
         }
         return Results.Ok(summaries);
     }

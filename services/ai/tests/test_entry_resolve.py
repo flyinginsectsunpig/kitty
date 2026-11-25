@@ -197,3 +197,8 @@ def test_reminder_draft_carries_owed_and_stated():
 def test_a_reminder_without_a_person_is_missing():
     d = draft(parsed(intent="reminder"))
     assert ("reminder.member", "missing") in issues(d)
+
+
+def test_question_is_passed_through():
+    d = draft(parsed(intent="question", amount="20", people=[{"name": "Sam"}]))
+    assert d == {"intent": "question", "groupId": "g-flat", "issues": [], "members": []}

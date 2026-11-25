@@ -34,7 +34,7 @@ export type ReminderDraft = {
 
 /** What the ai service's /parse and /resolve return: one sentence, read and matched to a group. Nothing is saved. */
 export type PlainDraft = {
-  intent: "expense" | "reminder" | "unclear";
+  intent: "expense" | "reminder" | "question" | "unclear";
   groupId: string | null;
   expense?: ExpenseDraft;
   reminder?: ReminderDraft;

@@ -1,11 +1,18 @@
 "use server";
 
-import { canSave, draftToForm, toExpenseWriteDto, type PlainDraft } from "@kitty/core";
-import { parseSentence, resolveDraft, type AiResult } from "@/lib/ai";
+import { canSave, draftToForm, toExpenseWriteDto, type AskResult, type PlainDraft } from "@kitty/core";
+import { askKitty, parseSentence, resolveDraft, type AiResult } from "@/lib/ai";
 import { getLedger, problemCode } from "@/lib/ledger";
 
 export async function readSentence(text: string, groupId?: string): Promise<AiResult> {
   return parseSentence(text, groupId);
+}
+
+export async function askQuestion(
+  messages: { role: "person" | "kitty"; text: string }[],
+  groupId?: string,
+): Promise<AskResult> {
+  return askKitty(messages, groupId);
 }
 
 export async function rematchGroup(parsed: unknown, groupId: string): Promise<AiResult> {

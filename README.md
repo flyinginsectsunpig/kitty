@@ -25,6 +25,10 @@ See [the design](docs/superpowers/specs/2026-11-15-kitty-design.md).
 - **Type it in a sentence:** "petrol R600, split with Sam and Ana" or "tell Bob he owes me" becomes a card to check
   and save (or a reminder to send). Only the sentence goes to the AI model; names are matched to your group on Kitty's
   own server, and nothing is saved until you tap Save.
+- **Ask Kitty:** in the same box, ask "how much do I owe in total?", "how much do I owe Joe?" or "what's the biggest
+  family expense in the last 3 months?" and get the exact figures, with what's still open since you were last square,
+  and follow-ups ("when was that?"). The answers come from read-only lookups run as you, with the ledger doing the
+  sums; those details (amounts, descriptions, names) go to the AI model to phrase the answer.
 - **Notifications:** a push on the Android app or an email when you're added to an expense or a payment with you is
   recorded, and on Mondays what you owe. Each is a switch in Settings → Notifications. The ledger decides who to tell;
   pulse sends it (Firebase push, SMTP email), once.

@@ -95,6 +95,26 @@
         }
       }
     },
+    "/me/owing": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "operationId": "GetOwing",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwingDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/me/notifications": {
       "get": {
         "tags": [
@@ -557,6 +577,67 @@
                   "items": {
                     "$ref": "#/components/schemas/ActivityDto"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{groupId}/spending": {
+      "get": {
+        "tags": [
+          "Spending"
+        ],
+        "operationId": "GetSpending",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendingDto"
                 }
               }
             }
@@ -2148,6 +2229,21 @@
           }
         }
       },
+      "CategoryTotalDto": {
+        "required": [
+          "category",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyDto"
+          }
+        }
+      },
       "ChargeWriteDto": {
         "required": [
           "id",
@@ -2212,6 +2308,22 @@
             "items": {
               "$ref": "#/components/schemas/TransferDto"
             }
+          },
+          "excludedCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ConvertedSpendingDto": {
+        "required": [
+          "total",
+          "excludedCount"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "$ref": "#/components/schemas/MoneyDto"
           },
           "excludedCount": {
             "type": "integer",
@@ -2421,6 +2533,43 @@
           }
         }
       },
+      "ExpenseLineDto": {
+        "required": [
+          "expenseId",
+          "description",
+          "date",
+          "category",
+          "total",
+          "myShare",
+          "paidBy"
+        ],
+        "type": "object",
+        "properties": {
+          "expenseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "category": {
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "myShare": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "paidBy": {
+            "type": "string"
+          }
+        }
+      },
       "ExpensePageDto": {
         "required": [
           "items",
@@ -2571,7 +2720,8 @@
           "name",
           "baseCurrency",
           "memberCount",
-          "myNet"
+          "myNet",
+          "createdAt"
         ],
         "type": "object",
         "properties": {
@@ -2594,6 +2744,10 @@
             "items": {
               "$ref": "#/components/schemas/NetDto"
             }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -2801,6 +2955,26 @@
           }
         }
       },
+      "MoneyDto": {
+        "required": [
+          "currency",
+          "minor",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
       "NetDto": {
         "required": [
           "currency",
@@ -2899,6 +3073,201 @@
           }
         }
       },
+      "OwingCurrencyDto": {
+        "required": [
+          "currency",
+          "myNet",
+          "transfers",
+          "since",
+          "moreSince",
+          "payments"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "myNet": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "transfers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwingTransferDto"
+            }
+          },
+          "since": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseLineDto"
+            }
+          },
+          "moreSince": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwingPaymentDto"
+            }
+          }
+        }
+      },
+      "OwingDto": {
+        "required": [
+          "iOwe",
+          "owedToMe",
+          "people",
+          "groups"
+        ],
+        "type": "object",
+        "properties": {
+          "iOwe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoneyDto"
+            }
+          },
+          "owedToMe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoneyDto"
+            }
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwingPersonDto"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwingGroupDto"
+            }
+          }
+        }
+      },
+      "OwingGroupDto": {
+        "required": [
+          "id",
+          "name",
+          "currencies"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwingCurrencyDto"
+            }
+          }
+        }
+      },
+      "OwingPaymentDto": {
+        "required": [
+          "from",
+          "to",
+          "amount",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "OwingPersonDto": {
+        "required": [
+          "userId",
+          "memberId",
+          "name",
+          "iOwe",
+          "owesMe",
+          "groups"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "memberId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "iOwe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoneyDto"
+            }
+          },
+          "owesMe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoneyDto"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "OwingTransferDto": {
+        "required": [
+          "direction",
+          "memberId",
+          "name",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "direction": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyDto"
+          }
+        }
+      },
       "ParticipantDto": {
         "required": [
           "memberId",
@@ -2933,6 +3302,26 @@
           "amountMinor": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "PayerTotalDto": {
+        "required": [
+          "memberId",
+          "name",
+          "paid"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "paid": {
+            "$ref": "#/components/schemas/MoneyDto"
           }
         }
       },
@@ -3283,6 +3672,87 @@
           "amountMinor": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "SpendingCurrencyDto": {
+        "required": [
+          "currency",
+          "total",
+          "myShare",
+          "count",
+          "byCategory",
+          "byPayer",
+          "biggest",
+          "latest"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "myShare": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byCategory": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryTotalDto"
+            }
+          },
+          "byPayer": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayerTotalDto"
+            }
+          },
+          "biggest": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseLineDto"
+            }
+          },
+          "latest": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseLineDto"
+            }
+          }
+        }
+      },
+      "SpendingDto": {
+        "required": [
+          "groupCurrency",
+          "currencies",
+          "converted"
+        ],
+        "type": "object",
+        "properties": {
+          "groupCurrency": {
+            "type": "string"
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpendingCurrencyDto"
+            }
+          },
+          "converted": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ConvertedSpendingDto"
+              }
+            ]
           }
         }
       },
@@ -3676,6 +4146,9 @@
     },
     {
       "name": "Activity"
+    },
+    {
+      "name": "Spending"
     },
     {
       "name": "Table"

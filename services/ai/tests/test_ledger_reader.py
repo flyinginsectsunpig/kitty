@@ -16,7 +16,17 @@ def fake_ledger(seen: list[httpx.Request]) -> httpx.Client:
                 return httpx.Response(200, json={"id": ME, "displayName": "Zakhir", "email": None})
             case "/groups":
                 return httpx.Response(
-                    200, json=[{"id": G1, "name": "Flat 4B", "baseCurrency": "ZAR", "memberCount": 2, "myNet": []}]
+                    200,
+                    json=[
+                        {
+                            "id": G1,
+                            "name": "Flat 4B",
+                            "baseCurrency": "ZAR",
+                            "memberCount": 2,
+                            "myNet": [],
+                            "createdAt": "2026-01-05T10:00:00+00:00",
+                        }
+                    ],
                 )
             case p if p == f"/groups/{G1}":
                 return httpx.Response(
@@ -75,7 +85,7 @@ def test_reader_sends_the_callers_token_and_maps_groups():
     reader = LedgerReader("http://ledger.test", "tok-1", fake_ledger(seen))
     assert reader.me().id == ME
     [g] = reader.groups()
-    assert (g.id, g.name, g.base_currency) == (G1, "Flat 4B", "ZAR")
+    assert (g.id, g.name, g.base_currency, g.created_at) == (G1, "Flat 4B", "ZAR", "2026-01-05T10:00:00+00:00")
     group = reader.group(G1)
     assert [(m.display_name, m.user_id) for m in group.members] == [("Zakhir", ME), ("Bob", None)]
     assert all(r.headers["authorization"] == "Bearer tok-1" for r in seen)

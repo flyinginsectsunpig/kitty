@@ -88,6 +88,8 @@ def build_draft(
     owed_for: Callable[[str], dict[str, int]],
 ) -> dict:
     """The draft for one group. owed_for(member_id) is what that member owes the speaker (only asked for reminders)."""
+    if parsed.intent == "question":  # the app sends it on to /ask: nothing to fill in
+        return {"intent": "question", "groupId": group.id, "issues": [], "members": []}
     issues: list[dict] = []
     currency = (parsed.currency or group.base_currency).strip().upper()
     try:

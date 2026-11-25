@@ -7,7 +7,8 @@ public sealed record UpdateGroupDto(string Name);
 public sealed record MemberDto(Guid Id, string DisplayName, Guid? UserId, bool IsPlaceholder, string? PaymentDetails);
 public sealed record GroupDto(Guid Id, string Name, string BaseCurrency, IReadOnlyList<MemberDto> Members);
 public sealed record NetDto(string Currency, long NetMinor);
-public sealed record GroupSummaryDto(Guid Id, string Name, string BaseCurrency, int MemberCount, IReadOnlyList<NetDto> MyNet);
+public sealed record GroupSummaryDto(Guid Id, string Name, string BaseCurrency, int MemberCount, IReadOnlyList<NetDto> MyNet,
+    DateTimeOffset CreatedAt);
 
 public static class GroupMapping
 {

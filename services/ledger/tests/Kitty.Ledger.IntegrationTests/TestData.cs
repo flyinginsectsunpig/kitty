@@ -5,7 +5,7 @@ namespace Kitty.Ledger.IntegrationTests;
 public sealed record MemberDto(Guid Id, string DisplayName, Guid? UserId, bool IsPlaceholder, string? PaymentDetails);
 public sealed record GroupDto(Guid Id, string Name, string BaseCurrency, List<MemberDto> Members);
 public sealed record NetDto(string Currency, long NetMinor);
-public sealed record GroupSummaryDto(Guid Id, string Name, string BaseCurrency, int MemberCount, List<NetDto> MyNet);
+public sealed record GroupSummaryDto(Guid Id, string Name, string BaseCurrency, int MemberCount, List<NetDto> MyNet, DateTimeOffset CreatedAt);
 public sealed record InviteDto(string Token, DateTimeOffset ExpiresAt);
 public sealed record InvitePreviewDto(string GroupName, string? PlaceholderName, DateTimeOffset ExpiresAt);
 public sealed record MeDto(Guid Id, string DisplayName, string? Email);

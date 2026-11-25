@@ -16,7 +16,7 @@ class Person(BaseModel):
 
 
 class ParsedSentence(BaseModel):
-    intent: Literal["expense", "reminder", "unclear"]
+    intent: Literal["expense", "reminder", "question", "unclear"]
     group: str | None = Field(default=None, description='The group as written, e.g. "family", or null.')
     description: str | None = Field(default=None, description='A short title, e.g. "Dinner", "Petrol".')
     category: Category | None = None

@@ -53,6 +53,7 @@ const fakeAi = (result: Awaited<ReturnType<AiClient["parse"]>>): AiClient & { te
     texts,
     parse: async (text) => (texts.push(text), result),
     resolve: async () => result,
+    ask: async () => ({ error: "unexpected" }),
   };
 };
 
