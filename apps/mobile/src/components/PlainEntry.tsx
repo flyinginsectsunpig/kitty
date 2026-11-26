@@ -42,9 +42,10 @@ export const NOTICE =
 /**
  * Type an expense or a reminder in one sentence (the keyboard's microphone works too), check the card, then Save
  * or Send: nothing is saved until then. Or ask about your money: a question opens a short conversation, and
- * follow-ups go to Ask Kitty until New conversation. groupId: the group screen it's on, if any.
+ * follow-ups go to Ask Kitty until New conversation. groupId: the group screen it's on, if any. onChanged: the
+ * screen's reload, called after a payment is saved here (an expense opens the group screen, which loads afresh).
  */
-export function PlainEntry({ groupId }: { groupId?: string }) {
+export function PlainEntry({ groupId, onChanged }: { groupId?: string; onChanged?: () => void }) {
   const ai = useAi();
   const ledger = useLedger();
   const router = useRouter();
@@ -172,6 +173,7 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
       const p = d.payment!;
       const recorded = ["Payment recorded."];
       finish(recorded); // the card goes at once, so it can't be saved twice; the line below is only extra
+      onChanged?.(); // the balance behind the card has changed
       const line = await countingBothAfter(ledger, d.groupId!, p.fromMemberId!, p.toMemberId!, p.currency).catch(() => null);
       if (line) setDone((now) => (now === recorded ? [...recorded, line] : now));
     });

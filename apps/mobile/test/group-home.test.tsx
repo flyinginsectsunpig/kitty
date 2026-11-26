@@ -1,7 +1,9 @@
-import { act, fireEvent, screen } from "expo-router/testing-library";
+import type { PlainDraft } from "@kitty/core";
+import { act, fireEvent, screen, waitFor } from "expo-router/testing-library";
 import GroupLayout from "../src/app/(app)/groups/[id]/_layout";
 import Activity from "../src/app/(app)/groups/[id]/activity";
 import Overview from "../src/app/(app)/groups/[id]/index";
+import type { AiClient } from "../src/ai";
 import { fakeLedger, json } from "./support/fake-ledger";
 import { G, groupRoutes, ME, SAM } from "./support/group";
 import { renderApp } from "./support/render-app";
@@ -55,6 +57,43 @@ test("expenses list loads the next page at the end", async () => {
   expect(screen.getByText("Groceries")).toBeTruthy(); // appended, not replaced
   expect(screen.queryByText("Older expenses")).toBeNull();
   expect(calls.filter((c) => c.path.endsWith("/expenses")).map((c) => c.search)).toEqual(["?limit=30", "?cursor=c2&limit=30"]);
+});
+
+test("saving a payment from the card reloads the balances", async () => {
+  const payment: PlainDraft = {
+    intent: "payment",
+    groupId: G,
+    issues: [],
+    members: [
+      { id: ME, displayName: "Zee" },
+      { id: SAM, displayName: "Sam" },
+    ],
+    groups: [{ id: G, name: "Flat 4B" }],
+    parsed: { kind: "payment", counterpart: "Sam", direction: "i_paid" },
+    payment: {
+      fromMemberId: ME,
+      toMemberId: SAM,
+      currency: "ZAR",
+      amountMinor: 5000,
+      statedAmountMinor: null,
+      openItems: [{ expenseId: "e1", description: "Groceries", date: "2026-11-20", openMinor: 5000 }],
+      covers: [{ expenseId: "e1", amountMinor: 5000 }],
+    },
+  };
+  const ai: AiClient = { parse: async () => ({ draft: payment }), resolve: async () => ({ draft: payment }), ask: async () => ({ error: "unexpected" }) };
+  const { client, calls } = fakeLedger({
+    ...overviewRoutes({ "": { items: [], nextCursor: null } }),
+    [`POST /groups/${G}/settlements`]: () => json(201, {}),
+  });
+  await renderApp(routes, client, `/groups/${G}`, ai);
+  expect(await screen.findByText("You")).toBeTruthy();
+
+  await fireEvent.changeText(screen.getByLabelText("Add an expense or a reminder in a sentence"), "paid Sam for the groceries");
+  await fireEvent.press(screen.getByText("Go"));
+  await fireEvent.press(await screen.findByText("Save"));
+
+  expect(await screen.findByText("Payment recorded.")).toBeTruthy();
+  await waitFor(() => expect(calls.filter((c) => c.method === "GET" && c.path === `/groups/${G}/balances`)).toHaveLength(2));
 });
 
 test("a 404 group shows We couldn't find that.", async () => {

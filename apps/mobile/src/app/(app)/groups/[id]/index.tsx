@@ -42,7 +42,7 @@ export default function GroupOverview() {
   return (
     <Screen onRefresh={() => void state.reload()} refreshing={state.loading && state.data !== null}>
       <GroupNav groupId={groupId} active="" />
-      <PlainEntry groupId={groupId} />
+      <PlainEntry groupId={groupId} onChanged={() => void state.reload()} />
       <View style={styles.actions}>
         <Link href={`/groups/${groupId}/expenses/new`} asChild>
           <Button title="Add an expense" onPress={() => {}} />

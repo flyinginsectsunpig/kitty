@@ -258,6 +258,17 @@ describe("a payment card", () => {
     expect(screen.getByText(/^You paid Sam R\s50,00$/)).toBeTruthy();
   });
 
+  test("saving a payment reloads the groups list", async () => {
+    const { client, calls } = fakeLedger(groupRoutes({ ...groupsList, [`POST /groups/${G}/settlements`]: () => json(201, {}) }));
+    await renderApp(routes, client, "/groups", fakeAi({ draft: uberPayment([{ expenseId: UBER, amountMinor: 2500 }]) }));
+
+    await type("paid Sam for the Uber");
+    await fireEvent.press(await screen.findByText("Save"));
+
+    expect(await screen.findByText("Payment recorded.")).toBeTruthy();
+    await waitFor(() => expect(calls.filter((c) => c.method === "GET" && c.path === "/groups")).toHaveLength(2));
+  });
+
   test("unticking an item re-totals the card", async () => {
     const { client } = fakeLedger(groupRoutes(groupsList));
     const both = uberPayment([

@@ -32,7 +32,7 @@ export default function GroupsScreen() {
       <Link href="/groups/new" asChild>
         <Button title="New group" onPress={() => {}} />
       </Link>
-      {(groups.data?.length ?? 0) > 0 && <PlainEntry />}
+      {(groups.data?.length ?? 0) > 0 && <PlainEntry onChanged={() => void groups.reload()} />}
       <LoadState state={groups}>
         {(list) =>
           list.length === 0 ? (
