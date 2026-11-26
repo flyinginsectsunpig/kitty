@@ -36,7 +36,7 @@ public static class OpenItems
     /// <summary>
     /// How much each cover really counts, taking the payments in the order they were recorded: never more than was still
     /// owed on the item between that pair. A race can over-cover an item; the later cover is clamped. A cover on a deleted
-    /// expense counts nothing.
+    /// expense, or on one whose currency has since been edited away from the payment's, counts nothing.
     /// </summary>
     public static Dictionary<(Guid SettlementId, Guid ExpenseId), long> Effective(List<Expense> expenses, List<Settlement> liveSettlements)
     {
@@ -47,7 +47,7 @@ public static class OpenItems
         {
             foreach (var c in s.Covers)
             {
-                if (!live.TryGetValue(c.ExpenseId, out var e))
+                if (!live.TryGetValue(c.ExpenseId, out var e) || e.Currency.Trim() != s.Currency.Trim())
                 {
                     result[(s.Id, c.ExpenseId)] = 0;
                     continue;

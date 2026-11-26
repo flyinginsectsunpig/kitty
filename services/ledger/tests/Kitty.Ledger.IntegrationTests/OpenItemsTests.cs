@@ -132,4 +132,25 @@ public class OpenItemsTests(LedgerApiFactory factory)
         var payment = Assert.Single(Assert.Single(Assert.Single(owing.Groups).Currencies).Payments);
         Assert.Equal(MoneyDto.Of(1500), payment.Unallocated);
     }
+
+    [Fact]
+    public async Task Currency_edit_reopens_the_item_and_frees_the_cover()
+    {
+        var (c, g, me, joe, uber) = await FlatAsync();
+        (await c.SettleCoveringAsync(g, me, joe, 2500, (uber, 2500))).EnsureSuccessStatusCode();
+        (await c.PutJsonAsync($"/groups/{g}/expenses/{uber}",
+            ExpenseData.Equal(uber, 5000, joe, [me, joe], currency: "USD", description: "Uber", version: 1, on: On)))
+            .EnsureSuccessStatusCode();
+
+        var r = await GetAsync(c, g, me, joe);
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var dto = await r.ReadAsync<OpenItemsDto>();
+        var usd = dto.Currencies.Single(x => x.Currency == "USD");
+        var item = Assert.Single(usd.FromOwes);
+        Assert.Equal((uber, 2500L), (item.Item.ExpenseId, item.Open.Minor));
+        var owing = (await c.GetFromJsonAsync<OwingDto>("/me/owing", Ct))!;
+        var zar = Assert.Single(owing.Groups).Currencies.Single(x => x.Currency == "ZAR");
+        var payment = Assert.Single(zar.Payments);
+        Assert.Equal(MoneyDto.Of(2500), payment.Unallocated);
+    }
 }
