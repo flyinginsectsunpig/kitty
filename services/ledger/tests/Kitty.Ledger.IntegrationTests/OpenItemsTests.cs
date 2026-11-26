@@ -93,6 +93,9 @@ public class OpenItemsTests(LedgerApiFactory factory)
 
         Assert.Equal(MoneyDto.Of(2500), zar.FromOwes.Single(i => i.Item.ExpenseId == uber).Open);
         Assert.Equal(MoneyDto.Of(12000), zar.FromOwesTotal);
+        var owing = (await c.GetFromJsonAsync<OwingDto>("/me/owing", Ct))!;
+        var line = Assert.Single(Assert.Single(Assert.Single(owing.Groups).Currencies).Since, l => l.ExpenseId == uber);
+        Assert.Equal(MoneyDto.Of(2500), Assert.Single(line.Open).Amount);
     }
 
     [Fact]
