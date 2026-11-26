@@ -1,6 +1,6 @@
 "use client";
 
-import { allocateCovers, draftMoney, type OpenItem } from "@kitty/core";
+import { allocateCovers, coverLines, coverNote, draftMoney, type OpenItem } from "@kitty/core";
 import { useState } from "react";
 import { dayMonth } from "@/lib/day-month";
 
@@ -12,9 +12,10 @@ export function CoversPicker({ items, amountMinor, currency }: { items: OpenItem
   // The ticks are kept as ticked, not read back from the covers: an item the amount doesn't reach stays ticked.
   const [ticked, setTicked] = useState<string[]>([]);
   const { covers } = allocateCovers(items, ticked, amountMinor);
-  const last = covers.at(-1);
-  const lastItem = last && items.find((i) => i.expenseId === last.expenseId);
-  const partly = last && lastItem && last.amountMinor < lastItem.openMinor ? { cover: last, item: lastItem } : null;
+  // Before saving, say what a ticked item doesn't get: part of what's open, or nothing once the payment runs out.
+  const notes = coverLines(items, ticked, covers)
+    .map((l) => ({ id: l.expenseId, text: coverNote(l, currency) }))
+    .filter((n) => n.text !== null);
 
   const toggle = (id: string) => setTicked((t) => (t.includes(id) ? t.filter((x) => x !== id) : [...t, id]));
 
@@ -41,12 +42,11 @@ export function CoversPicker({ items, amountMinor, currency }: { items: OpenItem
           </li>
         ))}
       </ul>
-      {partly && (
-        <p className="mt-2 text-stone-600 dark:text-stone-400">
-          {partly.item.description}: <span className="tabular-nums">{draftMoney(partly.cover.amountMinor, currency)}</span> of{" "}
-          <span className="tabular-nums">{draftMoney(partly.item.openMinor, currency)}</span>
+      {notes.map((n) => (
+        <p key={n.id} className="mt-2 tabular-nums text-stone-600 dark:text-stone-400">
+          {n.text}
         </p>
-      )}
+      ))}
     </details>
   );
 }

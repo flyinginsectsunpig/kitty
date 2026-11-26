@@ -5,9 +5,12 @@ import {
   applyPick,
   askMessages,
   canSave,
+  coverLines,
+  coverNote,
   draftMoney,
   draftShares,
   routeFirst,
+  tickedOf,
   toggleCover,
   withCounterpart,
   type DraftIssue,
@@ -460,7 +463,10 @@ function PaymentSummary({
   const { other } = sides(draft);
   const name = other ? nameOf(other) : "someone";
   const amount = p.amountMinor === null ? "amount?" : draftMoney(p.amountMinor, p.currency);
-  const covered = new Set(p.covers.map((c) => c.expenseId));
+  const ticked = tickedOf(p);
+  const notes = coverLines(p.openItems, ticked, p.covers)
+    .map((l) => ({ id: l.expenseId, text: coverNote(l, p.currency) }))
+    .filter((n) => n.text !== null);
   return (
     <div className="space-y-2">
       <p className="font-semibold">
@@ -475,7 +481,7 @@ function PaymentSummary({
                 <input
                   type="checkbox"
                   className="size-4 accent-brand-600"
-                  checked={covered.has(item.expenseId)}
+                  checked={ticked.includes(item.expenseId)}
                   disabled={busy}
                   onChange={() => onToggle(item.expenseId)}
                 />
@@ -485,6 +491,11 @@ function PaymentSummary({
           ))}
         </ul>
       )}
+      {notes.map((n) => (
+        <p key={n.id} className="text-sm tabular-nums text-stone-600 dark:text-stone-400">
+          {n.text}
+        </p>
+      ))}
     </div>
   );
 }
