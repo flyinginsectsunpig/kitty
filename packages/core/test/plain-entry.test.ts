@@ -7,6 +7,9 @@ import {
   applyPick,
   canSave,
   countingBoth,
+  coverLines,
+  coverNote,
+  draftMoney,
   draftShares,
   draftToForm,
   toggleCover,
@@ -269,6 +272,33 @@ describe("payment drafts", () => {
     expect(skipped.payment?.covers).toEqual([]);
   });
 
+  test("an item ticked but given nothing stays ticked, and gets covered once the amount reaches it", () => {
+    const d = payment({ statedAmountMinor: 2500 }); // pays the pizza in full
+    const both = toggleCover(d, "e-uber");
+    expect(both.payment?.ticked).toEqual(["e-pizza", "e-uber"]);
+    expect(both.payment?.covers).toEqual([{ expenseId: "e-pizza", amountMinor: 2500 }]);
+    expect(both.payment?.amountMinor).toBe(2500);
+    const noPizza = toggleCover(both, "e-pizza");
+    expect(noPizza.payment?.ticked).toEqual(["e-uber"]);
+    expect(noPizza.payment?.covers).toEqual([{ expenseId: "e-uber", amountMinor: 2500 }]);
+  });
+
+  test("the ticked set starts from the ai draft's covers", () => {
+    const d = payment();
+    expect(d.payment?.ticked).toBeUndefined();
+    expect(toggleCover(d, "e-pizza").payment?.ticked).toEqual([]);
+  });
+
+  test("picking an item keeps the ones ticked though they get nothing", () => {
+    const d = payment(
+      { statedAmountMinor: 2500, ticked: ["e-pizza"], covers: [{ expenseId: "e-pizza", amountMinor: 2500 }] },
+      [{ field: "payment.items[0]", kind: "ambiguous", text: "Which one?", candidates: ["e-uber"] }],
+    );
+    const next = applyPick(d, 0, "e-uber");
+    expect(next.payment?.ticked).toEqual(["e-pizza", "e-uber"]);
+    expect(next.payment?.covers).toEqual([{ expenseId: "e-pizza", amountMinor: 2500 }]);
+  });
+
   test("a stale card asks for the sentence again, not a retry of the same card", () => {
     expect(errorMessage("cover_invalid")).toBe("Something on this list changed. Type it again.");
   });
@@ -293,6 +323,40 @@ describe("payment drafts", () => {
       paidInGroupCurrency: false,
       covers: [{ expenseId: "e-pizza", amountMinor: 2500 }],
     });
+  });
+});
+
+describe("coverLines", () => {
+  const groceries: OpenItem = { expenseId: "e-groceries", description: "Groceries", date: "2026-11-20", openMinor: 4000 };
+
+  test("says what each ticked item gets, oldest first", () => {
+    const ticked = ["e-groceries", "e-uber", "e-pizza"];
+    const { covers } = allocateCovers([pizza, uber, groceries], ticked, 5000);
+    expect(coverLines([groceries, uber, pizza], ticked, covers)).toEqual([
+      { expenseId: "e-pizza", description: "Pizza", openMinor: 2500, coveredMinor: 2500, state: "full" },
+      { expenseId: "e-uber", description: "Uber", openMinor: 9500, coveredMinor: 2500, state: "part" },
+      { expenseId: "e-groceries", description: "Groceries", openMinor: 4000, coveredMinor: 0, state: "none" },
+    ]);
+  });
+
+  test("leaves out items that aren't ticked", () => {
+    expect(coverLines([pizza, uber], ["e-uber"], [{ expenseId: "e-uber", amountMinor: 9500 }])).toEqual([
+      { expenseId: "e-uber", description: "Uber", openMinor: 9500, coveredMinor: 9500, state: "full" },
+    ]);
+  });
+
+  test("coverNote says nothing for a full cover, the part for a part, and that the payment runs out for none", () => {
+    const [full, part, none] = coverLines(
+      [pizza, uber, { ...uber, expenseId: "e-later", description: "Later", date: "2026-11-11" }],
+      ["e-pizza", "e-uber", "e-later"],
+      [
+        { expenseId: "e-pizza", amountMinor: 2500 },
+        { expenseId: "e-uber", amountMinor: 500 },
+      ],
+    );
+    expect(coverNote(full!, "ZAR")).toBeNull();
+    expect(coverNote(part!, "ZAR")).toBe(`Uber: ${draftMoney(500, "ZAR")} of ${draftMoney(9500, "ZAR")}`);
+    expect(coverNote(none!, "ZAR")).toBe("Later: not covered, the payment runs out");
   });
 });
 

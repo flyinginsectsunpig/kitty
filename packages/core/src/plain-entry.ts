@@ -47,6 +47,9 @@ export type PaymentDraft = {
   statedAmountMinor: number | null;
   openItems: OpenItem[]; // oldest first
   covers: PaymentCover[];
+  /** The items ticked on the card, kept apart from the covers: one the amount doesn't reach stays ticked. The ai
+   * draft has none; until the first tick it's the covers' items (see tickedOf). */
+  ticked?: string[];
 };
 
 /** What the ai service's /parse and /resolve return: one sentence, read and matched to a group. Nothing is saved. */
@@ -98,9 +101,7 @@ export function allocateCovers(
   ticked: string[],
   amountMinor: number | null,
 ): { covers: PaymentCover[]; amountMinor: number } {
-  const chosen = items
-    .filter((i) => ticked.includes(i.expenseId))
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.expenseId < b.expenseId ? -1 : a.expenseId > b.expenseId ? 1 : 0));
+  const chosen = oldestFirst(items.filter((i) => ticked.includes(i.expenseId)));
   let left = amountMinor;
   const covers: PaymentCover[] = [];
   for (const item of chosen) {
@@ -112,18 +113,57 @@ export function allocateCovers(
   return { covers, amountMinor: amountMinor ?? covers.reduce((sum, c) => sum + c.amountMinor, 0) };
 }
 
+function oldestFirst(items: OpenItem[]): OpenItem[] {
+  return [...items].sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 : a.expenseId < b.expenseId ? -1 : a.expenseId > b.expenseId ? 1 : 0,
+  );
+}
+
+/** What one ticked item gets from the payment: all of what's open, part of it, or nothing (the payment ran out). */
+export type CoverLine = {
+  expenseId: string;
+  description: string;
+  openMinor: number;
+  coveredMinor: number;
+  state: "full" | "part" | "none";
+};
+
+/** The ticked items, oldest first, each with what the covers give it. Both the card and Settle up say this before Save. */
+export function coverLines(items: OpenItem[], ticked: string[], covers: PaymentCover[]): CoverLine[] {
+  const given = new Map(covers.map((c) => [c.expenseId, c.amountMinor]));
+  return oldestFirst(items.filter((i) => ticked.includes(i.expenseId))).map((i) => {
+    const coveredMinor = given.get(i.expenseId) ?? 0;
+    const state = coveredMinor >= i.openMinor ? "full" : coveredMinor > 0 ? "part" : "none";
+    return { expenseId: i.expenseId, description: i.description, openMinor: i.openMinor, coveredMinor, state };
+  });
+}
+
+/** The note under a ticked item the payment doesn't fully cover; null when it covers it all. */
+export function coverNote(line: CoverLine, currency: string): string | null {
+  if (line.state === "part") {
+    return `${line.description}: ${draftMoney(line.coveredMinor, currency)} of ${draftMoney(line.openMinor, currency)}`;
+  }
+  if (line.state === "none") return `${line.description}: not covered, the payment runs out`;
+  return null;
+}
+
+/** The items ticked on a payment card: as ticked, or the ai draft's covers before the first tick. */
+export function tickedOf(p: PaymentDraft): string[] {
+  return p.ticked ?? p.covers.map((c) => c.expenseId);
+}
+
 function withTicked(draft: PlainDraft, ticked: string[]): PlainDraft {
   const p = draft.payment;
   if (!p) return draft;
   const { covers, amountMinor } = allocateCovers(p.openItems, ticked, p.statedAmountMinor);
-  return { ...draft, payment: { ...p, covers, amountMinor } };
+  return { ...draft, payment: { ...p, ticked, covers, amountMinor } };
 }
 
 /** Ticks or unticks one open item, then spreads the amount again. */
 export function toggleCover(draft: PlainDraft, expenseId: string): PlainDraft {
   const p = draft.payment;
   if (!p) return draft;
-  const ticked = p.covers.map((c) => c.expenseId);
+  const ticked = tickedOf(p);
   return withTicked(draft, ticked.includes(expenseId) ? ticked.filter((id) => id !== expenseId) : [...ticked, expenseId]);
 }
 
@@ -153,7 +193,7 @@ export function applyPick(draft: PlainDraft, issueIndex: number, memberId: strin
   if (draft.payment && /^payment\.items\[\d+\]$/.test(issue.field)) {
     const base = { ...draft, issues };
     if (!memberId) return base;
-    const ticked = draft.payment.covers.map((c) => c.expenseId);
+    const ticked = tickedOf(draft.payment);
     return withTicked(base, ticked.includes(memberId) ? ticked : [...ticked, memberId]);
   }
   const person = PERSON.exec(issue.field);
