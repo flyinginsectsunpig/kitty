@@ -43,3 +43,4 @@
 {"text": "I paid Joe R10 for the Uber", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "direction": "i_paid", "counterpart": "Joe", "items": ["Uber"], "amount": "10"}}
 {"text": "Sam paid me back", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "direction": "they_paid", "counterpart": "Sam", "items": []}}
 {"text": "cross off the Uber", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "items": ["Uber"]}}
+{"text": "Joe paid for the pizza, R120, split with me", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "expense", "amount": "120", "payer": "Joe", "split": "equal"}}
