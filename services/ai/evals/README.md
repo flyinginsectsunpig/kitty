@@ -18,8 +18,9 @@ AI_GEMINI_API_KEY=... uv run python evals/run_receipts.py --data .evals/cord
 
 ## Plain-language sentences
 
-`nl/phrases.jsonl` holds 37 labelled sentences (the owner's five scenarios among them); `nl/run.py` runs the
-configured model over them and prints intent, amount and people accuracy. Not in CI.
+`nl/phrases.jsonl` holds 46 labelled sentences (the owner's five scenarios and eight payments among them);
+`nl/run.py` runs the configured model over them and prints intent, amount and people accuracy, plus "other" for every
+other labelled field (category, direction, counterpart, items and so on). Not in CI.
 
 ```bash
 AI_GEMINI_API_KEY=... uv run python evals/nl/run.py --verbose
@@ -42,8 +43,11 @@ AI_GEMINI_API_KEY=... uv run python evals/ask/run.py --verbose
 No run recorded yet: it needs a Gemini API key (or a local Ollama), which this repository doesn't have.
 Record each run here: date, model, data set, receipts, total accuracy, item F1.
 
-Plain-language sentences: not run yet (2026-11-25): no Gemini key or Ollama on the development machine. Record each
-run here: date, model, intent / amount / people accuracy.
+Plain-language sentences, run by hand by the owner. Record each run here:
+
+| Date | Model | Intent | Amount | People | Other |
+|---|---|---|---|---|---|
+| 2026-11-26 | gemini-3.5-flash-lite | 46/46 | 23/23 | 20/24 | 68/73 |
 
 Ask Kitty, run by hand by the owner. Record each run here:
 
@@ -67,3 +71,9 @@ Phase 4c changed this set, so later runs aren't comparable with the three above:
 - `/me/owing` lists only what's still open, and each payment has its part not tied to an item.
 
 The plain-language set gained eight payment sentences (intent `payment`).
+
+Ask Kitty on the Phase 4c set:
+
+| Date | Model | Calls | Contains | Not contains | Entry | Model calls |
+|---|---|---|---|---|---|---|
+| 2026-11-26 | gemini-3.5-flash-lite | 20/20 | 35/35 | 8/8 | 26/26 | 58 over 26 |
