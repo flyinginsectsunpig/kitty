@@ -125,3 +125,11 @@ def test_lookups_use_the_callers_token():
 def test_not_a_question_covers_crossing_off():
     spec = next(t for t in TOOLS if t.name == "not_a_question")
     assert "crossing off an existing expense as paid" in spec.description
+
+
+def test_what_i_owe_says_it_lists_open_items_and_untied_payments():
+    spec = next(t for t in TOOLS if t.name == "what_i_owe")
+    assert "items still open" in spec.description
+    assert "what's left and who it's open with" in spec.description
+    assert "part not tied to an item" in spec.description
+    assert "the expenses and payments since they were last square" not in spec.description

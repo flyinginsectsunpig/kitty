@@ -41,7 +41,8 @@ TOOLS: list[ToolSpec] = [
     ToolSpec(
         "what_i_owe",
         "What the person owes and is owed across all their groups: grand totals per currency, per person, "
-        "and per group with the settle-up plan and the expenses and payments since they were last square. "
+        "and per group with the settle-up plan, the items still open (with what's left and who it's open with), "
+        "and the payments since they were last square with each one's part not tied to an item. "
         "Amounts are already formatted.",
         _NO_PARAMETERS,
     ),
