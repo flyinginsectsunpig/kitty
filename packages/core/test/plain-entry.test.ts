@@ -269,6 +269,10 @@ describe("payment drafts", () => {
     expect(skipped.payment?.covers).toEqual([]);
   });
 
+  test("a stale card asks for the sentence again, not a retry of the same card", () => {
+    expect(errorMessage("cover_invalid")).toBe("Something on this list changed. Type it again.");
+  });
+
   test("withCounterpart replaces only the counterpart", () => {
     expect(withCounterpart({ counterpart: "Jo", kind: "payment" }, "Joe Bloggs")).toEqual({ counterpart: "Joe Bloggs", kind: "payment" });
   });
