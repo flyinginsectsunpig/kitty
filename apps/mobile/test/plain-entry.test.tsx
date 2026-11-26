@@ -241,6 +241,23 @@ describe("a payment card", () => {
     expect(post.headers.get("Idempotency-Key")).toBe(post.body.id);
   });
 
+  test("the card says what each ticked item gets before saving", async () => {
+    const { client } = fakeLedger(groupRoutes(groupsList));
+    const part: PlainDraft = {
+      ...uberPayment([{ expenseId: PIZZA, amountMinor: 5000 }]),
+    };
+    part.payment = { ...part.payment!, statedAmountMinor: 5000 };
+    await renderApp(routes, client, "/groups", fakeAi({ draft: part }));
+
+    await type("paid Sam R50 for the pizza");
+    expect(await screen.findByText(/^Pizza: R\s50,00 of R\s95,00$/)).toBeTruthy();
+    await fireEvent.press(screen.getByRole("checkbox", { name: /^Uber/ }));
+
+    expect(await screen.findByText("Uber: not covered, the payment runs out")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /^Uber/ }).props.accessibilityState).toMatchObject({ checked: true });
+    expect(screen.getByText(/^You paid Sam R\s50,00$/)).toBeTruthy();
+  });
+
   test("unticking an item re-totals the card", async () => {
     const { client } = fakeLedger(groupRoutes(groupsList));
     const both = uberPayment([

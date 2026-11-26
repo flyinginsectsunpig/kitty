@@ -201,6 +201,23 @@ describe("what a payment covers", () => {
     expect(await screen.findByText(/^Uber: R\s10,00 of R\s25,00$/)).toBeTruthy();
   });
 
+  test("a ticked item the payment doesn't reach says so", async () => {
+    const withGroceries = {
+      ...open,
+      currencies: [{ ...open.currencies[0]!, fromOwes: [...open.currencies[0]!.fromOwes, line("e-groceries", "Groceries", "2026-11-20", 3000)] }],
+    };
+    const { client } = fakeLedger(
+      groupRoutes({ [`GET /groups/${G}/balances`]: () => json(200, owing), [`GET /groups/${G}/open-items`]: () => json(200, withGroceries) }),
+    );
+    await renderApp(routes, client, `/groups/${G}/settle`);
+    await fireEvent.press(await screen.findByText("What it covers"));
+    for (const name of [/^Groceries/, /^Uber/, /^Pizza/]) await fireEvent.press(screen.getByRole("checkbox", { name }));
+
+    expect(await screen.findByText(/^Uber: R\s10,00 of R\s25,00$/)).toBeTruthy();
+    expect(screen.getByText("Groceries: not covered, the payment runs out")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /^Groceries/ }).props.accessibilityState).toMatchObject({ checked: true });
+  });
+
   test("open items that can't be loaded leave the transfer without ticks", async () => {
     const { client } = fakeLedger(
       groupRoutes({

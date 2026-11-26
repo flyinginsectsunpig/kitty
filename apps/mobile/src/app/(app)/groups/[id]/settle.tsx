@@ -1,5 +1,5 @@
 import type { Schemas } from "@kitty/api-client";
-import { allocateCovers, describeRate, draftMoney, errorMessage, type OpenItem } from "@kitty/core";
+import { allocateCovers, coverLines, coverNote, describeRate, draftMoney, errorMessage, type OpenItem } from "@kitty/core";
 import { convertMinor, formatMoney, parseRate } from "@kitty/money";
 import { randomUUID } from "expo-crypto";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -224,9 +224,10 @@ function CoversPicker({ items, ticked, onTicked, covers, currency }: {
   currency: string;
 }) {
   const [open, setOpen] = useState(false);
-  const last = covers.at(-1);
-  const lastItem = last && items.find((i) => i.expenseId === last.expenseId);
-  const partly = last && lastItem && last.amountMinor < lastItem.openMinor ? { cover: last, item: lastItem } : null;
+  // Before saving, say what a ticked item doesn't get: part of what's open, or nothing once the payment runs out.
+  const notes = coverLines(items, ticked, covers)
+    .map((l) => ({ id: l.expenseId, text: coverNote(l, currency) }))
+    .filter((n) => n.text !== null);
   const toggle = (id: string) => onTicked(ticked.includes(id) ? ticked.filter((x) => x !== id) : [...ticked, id]);
   return (
     <View style={styles.foreign}>
@@ -244,11 +245,11 @@ function CoversPicker({ items, ticked, onTicked, covers, currency }: {
               onChange={() => toggle(i.expenseId)}
             />
           ))}
-          {partly && (
-            <Text style={styles.muted}>
-              {`${partly.item.description}: ${draftMoney(partly.cover.amountMinor, currency)} of ${draftMoney(partly.item.openMinor, currency)}`}
+          {notes.map((n) => (
+            <Text key={n.id} style={styles.muted}>
+              {n.text}
             </Text>
-          )}
+          ))}
         </>
       )}
     </View>

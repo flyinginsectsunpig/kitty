@@ -5,11 +5,14 @@ import {
   askMessages,
   canSave,
   countingBoth,
+  coverLines,
+  coverNote,
   draftMoney,
   draftShares,
   draftToForm,
   errorMessage,
   routeFirst,
+  tickedOf,
   toExpenseWriteDto,
   toSettlementWriteDto,
   toggleCover,
@@ -398,7 +401,10 @@ function PaymentSummary({ draft, nameOf, busy, onToggle }: {
   const { other } = sides(draft);
   const name = other ? nameOf(other) : "someone";
   const amount = p.amountMinor === null ? "amount?" : draftMoney(p.amountMinor, p.currency);
-  const covered = new Set(p.covers.map((c) => c.expenseId));
+  const ticked = tickedOf(p);
+  const notes = coverLines(p.openItems, ticked, p.covers)
+    .map((l) => ({ id: l.expenseId, text: coverNote(l, p.currency) }))
+    .filter((n) => n.text !== null);
   return (
     <View style={styles.summary}>
       <Text style={styles.title}>{theyPaid(draft) ? `${name} paid you ${amount}` : `You paid ${name} ${amount}`}</Text>
@@ -406,10 +412,15 @@ function PaymentSummary({ draft, nameOf, busy, onToggle }: {
         <Checkbox
           key={item.expenseId}
           label={itemLine(item, p.currency)}
-          checked={covered.has(item.expenseId)}
+          checked={ticked.includes(item.expenseId)}
           disabled={busy}
           onChange={() => onToggle(item.expenseId)}
         />
+      ))}
+      {notes.map((n) => (
+        <Text key={n.id} style={styles.note}>
+          {n.text}
+        </Text>
       ))}
     </View>
   );
