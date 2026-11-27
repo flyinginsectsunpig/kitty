@@ -2,6 +2,7 @@
 # Lints every chart and validates its rendered output (production values) against Kubernetes and CRD schemas.
 # Usage (repo root): deploy/tests/validate.sh      Needs helm and kubeconform on PATH.
 set -euo pipefail
+shopt -s nullglob
 cd "$(dirname "$0")/../.."
 
 # CRD schemas (Traefik, cert-manager, Argo CD, Sealed Secrets) come from the datree catalog. k3s's own HelmChartConfig
