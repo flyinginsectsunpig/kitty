@@ -60,6 +60,13 @@ expect "a 12 MB photo is refused" 413 \
   "$("${curl_k[@]}" -o /dev/null -w '%{http_code}' -X PUT -H 'x-ms-blob-type: BlockBlob' --data-binary "@$big" \
     "https://$HOST/blob/kitty/receipts/big")"
 rm -f "$big"
+# A real photo (2-10 MB) is buffered to disk by Traefik above 1 MB: one just under the limit must still reach Azurite,
+# whose own signature check answers with an XML <Code> (the upload isn't signed).
+near=$(mktemp) && head -c $((10 * 1024 * 1024)) /dev/zero > "$near"
+expect "a 10 MB photo reaches blob storage" 1 \
+  "$("${curl_k[@]}" -X PUT -H 'x-ms-blob-type: BlockBlob' --data-binary "@$near" \
+    "https://$HOST/blob/kitty/receipts/near" | grep -c '<Code>' || true)"
+rm -f "$near"
 
 echo "== live table updates (WebSocket)"
 ws=$("${curl_k[@]}" -i --http1.1 -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' \
