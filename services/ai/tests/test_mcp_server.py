@@ -140,3 +140,9 @@ def test_logs_have_no_arguments(rig, caplog):
     text = caplog.text
     assert "tool=draft_expense" in text and "sub=user-1" in text
     assert "Secret dinner" not in text
+
+
+def test_oversized_request_is_refused(rig):
+    client, _ = rig
+    big = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {"pad": "x" * 70_000}}
+    assert client.post("/mcp", json=big).status_code == 413

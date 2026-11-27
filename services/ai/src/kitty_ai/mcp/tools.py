@@ -19,6 +19,9 @@ from kitty_ai.mcp import summary
 from kitty_ai.mcp.drafts import DraftStore
 
 PAGE = 20
+# What one draft may hold: an assistant can send anything, and the draft is stored. 120 is the card's own description
+# length; 20 people and 10 items are more than any real expense or payment.
+MAX_DESCRIPTION, MAX_PEOPLE, MAX_ITEMS = 120, 20, 10
 log = logging.getLogger(__name__)
 
 
@@ -158,7 +161,25 @@ def _amount(value) -> str | None:
     return str(value)
 
 
+def _check_sizes(args: dict) -> None:
+    for key in ("payer", "counterpart", "person", "for", "currency", "date", "category", "split", "direction"):
+        if isinstance(args.get(key), str) and len(args[key]) > MAX_TEXT:
+            raise BadArguments(key)
+    if isinstance(args.get("description"), str) and len(args["description"]) > MAX_DESCRIPTION:
+        raise BadArguments("description")
+    for key, limit in (("people", MAX_PEOPLE), ("items", MAX_ITEMS)):
+        if isinstance(args.get(key), list) and len(args[key]) > limit:
+            raise BadArguments(key)
+    for i, p in enumerate(args.get("people") or []):
+        if isinstance(p, dict) and isinstance(p.get("name"), str) and len(p["name"]) > MAX_TEXT:
+            raise BadArguments(f"people[{i}].name")
+    for i, item in enumerate(args.get("items") or []):
+        if isinstance(item, str) and len(item) > MAX_TEXT:
+            raise BadArguments(f"items[{i}]")
+
+
 def _parsed(intent: str, args: dict) -> ParsedSentence:
+    _check_sizes(args)
     if intent == "expense":
         people = args.get("people") or []
         if not isinstance(people, list) or not all(isinstance(p, dict) for p in people):

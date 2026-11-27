@@ -166,5 +166,6 @@ def build_mcp(
         json_response=True,
         stateless_http=True,
         transport_security=security,
+        max_request_body_size=64 * 1024,  # a tool call is a few hundred bytes; the SDK's default is 4 MB
     )
     return McpAuth(app, verifier, exchanger, metadata_url(settings)), server.session_manager.run

@@ -211,3 +211,24 @@ def test_ledger_unreachable_is_a_result():
 
     reader = LedgerReader("http://ledger.test", "t", httpx.Client(transport=httpx.MockTransport(handle)))
     assert tools.list_groups(reader, {}) == {"error": "unavailable"}
+
+
+def test_draft_inputs_are_size_capped_and_nothing_is_stored():
+    store = InMemoryDraftStore()
+    cases = {
+        "description": {"description": "x" * 121},
+        "people": {"people": [{"name": f"p{i}"} for i in range(21)]},
+        "people[0].name": {"people": [{"name": "n" * 101}]},
+        "payer": {"payer": "p" * 101},
+    }
+    for field, extra in cases.items():
+        args = {"group": G, "description": "Dinner", "amount": 10} | extra
+        assert tools.draft(reader(), store, "user-1", WEB, "expense", args, TODAY) == {
+            "error": "bad_arguments",
+            "detail": field,
+        }
+    items = {"group": G, "direction": "i_paid", "counterpart": "Bob", "items": ["x"] * 11}
+    assert tools.draft(reader(), store, "user-1", WEB, "payment", items, TODAY)["detail"] == "items"
+    long_item = items | {"items": ["y" * 101]}
+    assert tools.draft(reader(), store, "user-1", WEB, "payment", long_item, TODAY)["detail"] == "items[0]"
+    assert store._drafts == {}
