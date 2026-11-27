@@ -1,0 +1,30 @@
+# In-cluster DNS: pods resolve the public hostname to Traefik, so the web app, ledger and ai reach Keycloak at the same
+# https issuer URL browsers see, without leaving the node (k3s reads *.override from this ConfigMap).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  kitty.override: |
+    rewrite name exact {{ .Values.host }} traefik.kube-system.svc.cluster.local
+---
+# k3s's bundled Traefik: fixed NodePorts, real client addresses (externalTrafficPolicy: Local) and access logs.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    ports:
+      web:
+        nodePort: {{ .Values.traefik.nodePorts.web }}
+      websecure:
+        nodePort: {{ .Values.traefik.nodePorts.websecure }}
+    service:
+      spec:
+        externalTrafficPolicy: Local
+    logs:
+      access:
+        enabled: true

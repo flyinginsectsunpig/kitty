@@ -1,0 +1,17 @@
+# The edge: what the internet can reach, rule for rule the same as deploy/compose/Caddyfile.
+host: kitty.localhost
+acme:
+  # production | staging (Let's Encrypt's test CA, for trying things without using up rate limits)
+  server: production
+tls:
+  # CI only: a self-signed certificate instead of Let's Encrypt.
+  selfSigned: false
+traefik:
+  # Fixed NodePorts. Before the k3s switch, Caddy holds 80/443 and these are how the cluster is reached
+  # (deploy/k3s/RUNBOOK.md); afterwards ServiceLB serves 80/443 as usual.
+  nodePorts:
+    web: 30080
+    websecure: 30443
+deny:
+  image: caddy:2.11.9-alpine
+  memory: 32Mi

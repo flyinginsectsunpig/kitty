@@ -1,0 +1,96 @@
+{{- define "edge.mw" -}}
+middlewares:
+  - name: security-headers
+  - name: compress
+{{- range . }}
+  - name: {{ . }}
+{{- end }}
+{{- end -}}
+# Every public path, in the Caddyfile's order. Priorities are explicit (higher wins), never left to rule length.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: kitty
+spec:
+  entryPoints: ["websecure"]
+  tls:
+    secretName: kitty-tls
+  routes:
+    # Keycloak: only what browsers need for the kitty realm. The admin console/API and the master realm stay private.
+    # Any ';' (servlet path parameters such as "..;") is refused, because Keycloak may resolve those differently.
+    - match: (Path(`/auth/realms/kitty`) || PathPrefix(`/auth/realms/kitty/`) || PathPrefix(`/auth/resources/`)) && !PathRegexp(`;`)
+      priority: 100
+      {{- include "edge.mw" list | nindent 6 }}
+      services:
+        - name: keycloak
+          port: 8080
+    - match: PathPrefix(`/auth`)
+      priority: 90
+      {{- include "edge.mw" list | nindent 6 }}
+      services:
+        - name: edge-deny
+          port: 8080
+    # Auth.js (sign-in, the Keycloak callback, sign-out) is part of the web app, under /api/auth.
+    - match: PathPrefix(`/api/auth/`)
+      priority: 80
+      {{- include "edge.mw" list | nindent 6 }}
+      services:
+        - name: web
+          port: 3000
+    # Public ledger API (and the live table's WebSocket): /api/health → ledger /health.
+    - match: PathPrefix(`/api`)
+      priority: 70
+      {{- include "edge.mw" (list "strip-api") | nindent 6 }}
+      services:
+        - name: ledger
+          port: 8080
+    # Receipt photos: browsers PUT them with a signed, write-only URL from the ledger. Nothing can be read back.
+    - match: PathPrefix(`/blob/`) && Method(`PUT`)
+      priority: 60
+      {{- include "edge.mw" (list "blob-size" "strip-blob") | nindent 6 }}
+      services:
+        - name: azurite
+          port: 10000
+    - match: PathPrefix(`/blob`)
+      priority: 55
+      {{- include "edge.mw" list | nindent 6 }}
+      services:
+        - name: edge-deny
+          port: 8080
+    # MCP: an assistant calling /ai/mcp without a token is pointed at this metadata (RFC 9728, at the root). Path kept.
+    - match: PathPrefix(`/.well-known/oauth-protected-resource`)
+      priority: 50
+      {{- include "edge.mw" list | nindent 6 }}
+      services:
+        - name: ai
+          port: 8000
+    # Plain-language entry, Ask Kitty, MCP: /ai/parse → ai /parse. The ai service checks the Keycloak token itself.
+    - match: PathPrefix(`/ai/`)
+      priority: 40
+      {{- include "edge.mw" (list "strip-ai") | nindent 6 }}
+      services:
+        - name: ai
+          port: 8000
+    - match: PathPrefix(`/`)
+      priority: 1
+      {{- include "edge.mw" list | nindent 6 }}
+      services:
+        - name: web
+          port: 3000
+---
+# Plain HTTP: everything is redirected to HTTPS, except cert-manager's ACME challenge, whose own Ingress has a longer
+# rule and so a higher priority than this one.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: kitty-http
+spec:
+  entryPoints: ["web"]
+  routes:
+    - match: PathPrefix(`/`)
+      priority: 1
+      middlewares:
+        - name: redirect-https
+      services:
+        - name: edge-deny
+          port: 8080

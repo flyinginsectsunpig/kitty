@@ -1,0 +1,4 @@
+# Production settings for the kitty-edge chart (defaults: deploy/charts/kitty-edge/values.yaml).
+host: kitty-split.duckdns.org
+acme:
+  server: production

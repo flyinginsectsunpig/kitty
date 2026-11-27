@@ -1,0 +1,60 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: security-headers
+spec:
+  headers:
+    stsSeconds: 31536000
+    contentTypeNosniff: true
+    referrerPolicy: strict-origin-when-cross-origin
+    customResponseHeaders:
+      Server: "" # removed
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: compress
+spec:
+  compress: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-api
+spec:
+  stripPrefix:
+    prefixes: ["/api"]
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-ai
+spec:
+  stripPrefix:
+    prefixes: ["/ai"]
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-blob
+spec:
+  stripPrefix:
+    prefixes: ["/blob"]
+---
+# Receipt photos: at most 11 MB, as in the Caddyfile.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: blob-size
+spec:
+  buffering:
+    maxRequestBodyBytes: 11534336
