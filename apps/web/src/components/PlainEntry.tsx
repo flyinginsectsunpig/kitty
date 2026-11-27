@@ -188,6 +188,9 @@ export function PlainEntry({
 
   const edit = () => {
     if (!draft?.groupId) return;
+    // The form saves it from here on, so an assistant's link stops working now: opening it again must not offer a
+    // second Save.
+    void finished();
     try {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch {

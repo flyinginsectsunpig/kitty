@@ -11,6 +11,7 @@ const ID = "abcDEF123_-xyz7890";
 const routes = {
   "(app)/d/[id]": DraftLink,
   "(app)/groups/[id]/index": () => <Text>Group home</Text>,
+  "(app)/groups/[id]/expenses/new": () => <Text>Expense form</Text>,
 };
 
 const dinner: PlainDraft = {
@@ -79,4 +80,17 @@ test("finishes_the_draft_after_save", async () => {
   await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.path === `/groups/${G}/expenses`)).toBe(true));
   await waitFor(() => expect(ai.finished).toEqual([ID]));
   await waitFor(() => expect(app.getPathname()).toBe(`/groups/${G}`));
+});
+
+test("finishes_the_draft_when_edit_hands_it_to_the_form", async () => {
+  // Saving from the full form happens elsewhere, so the link must stop working when the card hands the draft over:
+  // otherwise opening it again shows the card, and Save adds the expense twice.
+  const { client } = fakeLedger(groupRoutes({}));
+  const ai = fakeAi({ draft: dinner });
+  await renderApp(routes, client, `/d/${ID}`, ai);
+
+  await fireEvent.press(await screen.findByText("Edit"));
+
+  expect(await screen.findByText("Expense form")).toBeTruthy();
+  await waitFor(() => expect(ai.finished).toEqual([ID]));
 });

@@ -257,6 +257,9 @@ export function PlainEntry({
           }
           onSend={() => void send.run().then((r) => r.ok && finish([`Reminder sent to ${draft.reminder?.name ?? "them"}.`]))}
           onEdit={() => {
+            // The form saves it from here on, so an assistant's link stops working now: opening it again must not
+            // offer a second Save.
+            if (initial) void ai.finishDraft(initial.draftId);
             handOverDraft(draft);
             router.push(`/groups/${draft.groupId}/expenses/new?draft=1`);
           }}
