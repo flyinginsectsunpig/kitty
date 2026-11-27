@@ -117,6 +117,11 @@ var ai = builder.AddUvicornApp("ai", "../../services/ai", "kitty_ai.main:create_
     .WithEnvironment("AI_SCHEMA_REGISTRY_URL", schemaRegistry)
     .WithEnvironment("AI_BLOB_CONNECTION_STRING", blobs.Resource.ConnectionStringExpression)
     .WithEnvironment("AI_POSTGRES_DSN", ledgerDb.Resource.ConnectionStringExpression)
+    // MCP (phase 4d): ChatGPT, Claude and other assistants at http://localhost:5085/mcp. The secret matches the dev realm
+    // import's kitty-mcp client; draft links open the web app.
+    .WithEnvironment("AI_MCP_PUBLIC_URL", "http://localhost:" + AiPort + "/mcp")
+    .WithEnvironment("AI_MCP_CLIENT_SECRET", "dev-only-kitty-mcp-secret")
+    .WithEnvironment("AI_WEB_URL", "http://localhost:3000")
     .WaitFor(redpanda)
     .WaitFor(storage)
     .WaitFor(ledger); // the ledger creates the database
