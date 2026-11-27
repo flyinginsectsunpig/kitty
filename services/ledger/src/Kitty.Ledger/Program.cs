@@ -134,6 +134,7 @@ group.MapFx();
 group.MapRecurring();
 group.MapActivity();
 group.MapSpending();
+group.MapExpenseLines();
 group.MapTableSessions();
 var guestTable = app.MapGuestTable();
 ListenTokens.Map(group, guestTable);

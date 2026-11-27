@@ -260,6 +260,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/groups/{groupId}/expense-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListExpenseLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/groups/{groupId}/table-sessions/{sessionId}/listen-token": {
         parameters: {
             query?: never;
@@ -845,6 +861,10 @@ export interface components {
             total: components["schemas"]["MoneyDto"];
             myShare: components["schemas"]["MoneyDto"];
             paidBy: string;
+        };
+        ExpenseLinePageDto: {
+            items: components["schemas"]["ExpenseLineDto"][];
+            nextCursor: null | string;
         };
         ExpensePageDto: {
             items: components["schemas"]["ExpenseDto"][];
@@ -1790,6 +1810,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpendingDto"];
+                };
+            };
+        };
+    };
+    ListExpenseLines: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                category?: string;
+                q?: string;
+                member?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpenseLinePageDto"];
                 };
             };
         };

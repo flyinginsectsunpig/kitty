@@ -217,11 +217,11 @@ public static class ExpenseEndpoints
         }
     }
 
-    private static string EncodeCursor(Expense e) =>
+    internal static string EncodeCursor(Expense e) =>
         Base64Url.EncodeToString(Encoding.UTF8.GetBytes(
             $"{e.OccurredOn:yyyy-MM-dd}|{e.CreatedAt.UtcTicks}|{e.Id:D}"));
 
-    private static bool TryDecodeCursor(string cursor, out DateOnly on, out DateTimeOffset at, out Guid id)
+    internal static bool TryDecodeCursor(string cursor, out DateOnly on, out DateTimeOffset at, out Guid id)
     {
         on = default; at = default; id = default;
         try
