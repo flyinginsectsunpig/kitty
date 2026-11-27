@@ -194,10 +194,74 @@ Later realm changes are made in the admin console (or by re-importing deliberate
 
 ## Backups
 
-Everything that matters is in the `kitty_pgdata` volume:
+`deploy/compose/backup.sh` runs every night at 01:17 UTC (03:17 SAST) and writes one dated
+`kitty-<UTC time>.tar.gz` to `~/kitty-backups` (a few hundred KB for a small group). Each holds:
+
+| File | What |
+|---|---|
+| `globals.sql` | Postgres roles (`postgres`, `ai`, `pulse`) with their password hashes |
+| `ledger.dump` | the ledger database, including the ai and pulse tables (`pg_dump -Fc`) |
+| `keycloak.dump` | accounts and sign-in settings: losing this locks everyone out |
+| `azurite.tar.gz` | receipt photos |
+
+Redpanda's event log and Caddy's certificates are left out: both rebuild themselves.
+
+The server keeps the newest 7; a copy of each goes to the private Object Storage bucket
+`kitty-backups` (Always Free: 20 GB), where a lifecycle rule deletes copies after 30 days.
+
+### Setting it up (once)
+
+1. Object Storage, in the server's compartment:
+   ```bash
+   oci os bucket create --compartment-id <compartment> --name kitty-backups --public-access-type NoPublicAccess
+   # The lifecycle rule needs Object Storage itself to be allowed to delete, for this bucket only:
+   oci iam policy create --compartment-id <tenancy> --name kitty-backups-lifecycle \
+     --description "Lets Object Storage delete Kitty backups older than 30 days" \
+     --statements "[\"Allow service objectstorage-<region> to manage object-family in tenancy where target.bucket.name='kitty-backups'\"]"
+   oci os object-lifecycle-policy put --bucket-name kitty-backups --force --items \
+     '[{"name":"delete-after-30-days","action":"DELETE","timeAmount":30,"timeUnit":"DAYS","isEnabled":true,"objectNameFilter":{"inclusionPrefixes":["kitty-"]}}]'
+   ```
+2. A **write-only** upload link: the server can add backups but can't list, read or delete them, so a
+   compromised server can't touch the copies. Save it on the server as `~/.kitty-backup-par` (mode 600):
+   ```bash
+   oci os preauth-request create --bucket-name kitty-backups --name kitty-server-upload \
+     --access-type AnyObjectWrite --bucket-listing-action Deny --time-expires <date, e.g. 5 years out>
+   ```
+   The link in use expires on **2031-11-27**; make a new one before then. Without the file the script
+   still backs up, to the server only, and says so in its log.
+3. The schedule, `/etc/cron.d/kitty-backup`:
+   ```
+   SHELL=/bin/bash
+   PATH=/usr/local/bin:/usr/bin:/bin
+   17 1 * * * ubuntu /home/ubuntu/kitty/deploy/compose/backup.sh >> /home/ubuntu/kitty-backups/backup.log 2>&1
+   ```
+
+Check on it with `tail ~/kitty-backups/backup.log`: each night adds a `backup ok` line. Nothing alerts
+on a failed night yet (Phase 5 monitoring will).
+
+### Restoring
+
+Into a fresh deployment (or after wiping the `kitty_pgdata` volume), from the newest backup:
 
 ```bash
-docker compose -f deploy/compose/docker-compose.yml exec postgres pg_dumpall -U postgres | gzip > kitty-$(date +%F).sql.gz
+cd ~/kitty
+docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/.env stop ledger web ai pulse keycloak
+d=$(mktemp -d) && tar xzf ~/kitty-backups/kitty-<time>.tar.gz -C "$d"
+docker exec -i kitty-postgres-1 psql -U postgres < "$d/globals.sql"        # "already exists" errors are fine
+for db in ledger keycloak; do
+  docker exec kitty-postgres-1 dropdb -U postgres --if-exists "$db"
+  docker exec kitty-postgres-1 createdb -U postgres "$db"
+  docker exec -i kitty-postgres-1 pg_restore -U postgres -d "$db" --exit-on-error < "$d/$db.dump"
+done
+docker exec -i kitty-azurite-1 tar xzf - -C /data < "$d/azurite.tar.gz"
+docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/.env up -d
+rm -rf "$d"
 ```
 
-Copy the file off the server (e.g. to Oracle Object Storage, also free up to 20 GB).
+Keep the same `.env`: the restored roles keep their passwords, and Keycloak's client secrets live in its
+database. A copy from Object Storage: `oci os object get --bucket-name kitty-backups --name <name> --file <name>`.
+
+To test a backup without touching the live data, restore it into a throwaway container
+(`docker run -d --network none -e POSTGRES_PASSWORD=x -v "$d":/backup:ro pgvector/pgvector:pg17`) and
+compare each table's row count with the live database. The first backup was checked this way on
+2026-11-27: every table matched.
