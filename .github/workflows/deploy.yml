@@ -15,6 +15,7 @@ permissions:
 env:
   HELM_VERSION: v4.3.2
   KUBECONFORM_VERSION: v0.8.0
+  K3D_VERSION: v5.9.0
 
 jobs:
   charts:
@@ -39,3 +40,30 @@ jobs:
         run: uv run --with pytest --with pyyaml pytest deploy/tests -q
       - name: Lint and validate the rendered manifests
         run: deploy/tests/validate.sh
+
+  k3d:
+    # Installs everything into a throwaway k3d cluster and runs the smoke checks (deploy/tests/k3d-e2e.sh).
+    needs: charts
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install helm and k3d (checksums verified)
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin" && cd "$RUNNER_TEMP"
+          curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+          curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz.sha256sum" | sha256sum -c -
+          tar xzf "helm-${HELM_VERSION}-linux-amd64.tar.gz" && mv linux-amd64/helm bin/
+          base="https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}"
+          curl -fsSLO "$base/k3d-linux-amd64"
+          curl -fsSL "$base/checksums.txt" | grep ' k3d-linux-amd64$' | sha256sum -c -
+          install -m 0755 k3d-linux-amd64 bin/k3d
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Install Kitty into k3d and run the checks
+        run: deploy/tests/k3d-e2e.sh
+      - name: What was running (on failure)
+        if: failure()
+        run: |
+          kubectl get pods -A -o wide || true
+          kubectl -n kitty describe pods | tail -n 200 || true
+          for p in $(kubectl -n kitty get pods -o name); do echo "== $p"; kubectl -n kitty logs "$p" --all-containers --tail=40 || true; done
