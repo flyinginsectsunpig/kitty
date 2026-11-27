@@ -105,11 +105,13 @@ Secrets key (kept separately, above).
 
 1. Server, network, budget and bucket: Terraform (below) describes them; if the server is gone, create it as
    `deploy/compose/RUNBOOK.md` section 1 says (iptables included), then point DuckDNS at its IP.
-2. k3s, pinned to the version CI tests:
+2. k3s, pinned to the version CI tests, with its settings from `deploy/k3s/config.yaml`:
    ```bash
-   curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.37.2+k3s1 sh -s - --write-kubeconfig-mode 0600
+   sudo mkdir -p /etc/rancher/k3s && sudo cp ~/kitty/deploy/k3s/config.yaml /etc/rancher/k3s/config.yaml
+   curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.37.2+k3s1 sh -s -
    mkdir -p ~/.kube && sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config && sudo chown ubuntu: ~/.kube/config
    ```
+   (Next to a running Compose, use `config-alongside-compose.yaml` instead: see "The switch from Compose".)
 3. Helm and `kubeseal` on the server (pinned releases, checksums checked), and a clone of this repository at `~/kitty`.
 4. The Sealed Secrets key, if you have it (above). Then `deploy/k3s/bootstrap.sh main`. Argo CD installs
    cert-manager, Sealed Secrets and every chart; Postgres starts empty.
@@ -142,13 +144,21 @@ If it ever changes, update the DuckDNS name to the new IP (https://www.duckdns.o
 
 Kitty moved from Docker Compose to k3s on this same server, with Compose kept stopped for a week as the way back:
 
-- **Before the switch**, Caddy (Compose) held 80/443. Traefik was reachable on NodePorts 30080/30443, Caddy forwarded
-  `/.well-known/acme-challenge/*` to 30080 so the cluster got its real certificate, and the rehearsal ran
-  `deploy/compose/smoke.sh kitty-split.duckdns.org --connect-to 127.0.0.1:30443` and
-  `deploy/k3s/compare-data.sh` against a restored backup. The cluster's notifications were off.
-- **The switch:** stop Compose's writers, `backup.sh` (Compose), `restore.sh` into the cluster, `compare-data.sh`,
-  stop Compose, Traefik takes 80/443, notifications on, smoke checks, a browser sign-in.
-- **Way back** (only while Compose's volumes still exist): stop Traefik from serving 80/443
-  (`kubectl -n kube-system scale deployment traefik --replicas=0`), then
-  `docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/.env up -d`. Compose has its data as
-  it was at the switch; anything written in the cluster since needs `backup.sh` (k3s) and a Compose restore.
+- **Before the switch**, Caddy (Compose) held 80/443, so k3s ran with `deploy/k3s/config-alongside-compose.yaml`:
+  ServiceLB off, because its hostPorts are iptables rules that would have taken 80/443 from Caddy the moment k3s
+  started. Traefik was reachable on its NodePorts 30080/30443 at the server's private address. Caddy forwarded
+  `/.well-known/acme-challenge/*` to `<private address>:30080` so the cluster got its real certificate, and the
+  rehearsal ran `deploy/compose/smoke.sh kitty-split.duckdns.org --connect-to <private address>:30443`,
+  `deploy/k3s/restore.sh` and `deploy/k3s/compare-data.sh` against a restored backup. The cluster's notifications were
+  off. Right after installing k3s, `curl -sI https://kitty-split.duckdns.org` still had to answer from Caddy.
+- **The switch:** stop Compose's writers, `backup.sh` (Compose target), `restore.sh <archive> --no-start`,
+  `compare-data.sh` (identical), stop Compose, put `config.yaml` in place of the alongside file and
+  `sudo systemctl restart k3s` (ServiceLB now serves 80/443), start the apps, notifications on, smoke checks, a
+  browser sign-in.
+- **Way back** (only while Compose's volumes still exist): stop k3s and remove its network rules, then start Compose:
+  ```bash
+  sudo systemctl stop k3s && sudo /usr/local/bin/k3s-killall.sh
+  docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/.env up -d
+  ```
+  Compose has its data as it was at the switch; anything written in the cluster since needs `backup.sh` (k3s target)
+  and a Compose restore.

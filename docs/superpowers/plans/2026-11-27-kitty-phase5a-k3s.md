@@ -285,7 +285,7 @@
 - Consumes: `bootstrap.sh`, `seal-env.sh`, Task 7's Applications.
 - Produces: a running cluster syncing `feat/phase5a-k3s`, notifications off, Postgres empty; a commit with `deploy/secrets/production/kitty-secrets.yaml`.
 
-- [ ] **Step 1:** Install k3s (stable channel, pinned version) with `/etc/rancher/k3s/config.yaml`: `write-kubeconfig-mode: "0600"`; copy the kubeconfig to `~ubuntu/.kube/config`. The API (6443) stays closed in Oracle's security list and iptables. Expected: node Ready; Traefik's ServiceLB pods Pending on 80/443 (Caddy holds them) — that's intended.
+- [ ] **Step 1:** Install k3s v1.37.2+k3s1 with `deploy/k3s/config-alongside-compose.yaml` as `/etc/rancher/k3s/config.yaml` (ServiceLB **off**: its hostPorts are iptables rules that would take 80/443 from Caddy); copy the kubeconfig to `~ubuntu/.kube/config`. The API (6443) stays closed in Oracle's security list and iptables. Expected: node Ready, and `curl -sI https://kitty-split.duckdns.org` still answered by Caddy.
 - [ ] **Step 2:** `bootstrap.sh feat/phase5a-k3s`. Expected: Argo CD Applications appear; cert-manager and Sealed Secrets Healthy; Kitty charts waiting for `kitty-secrets`.
 - [ ] **Step 3:** The owner exports the Sealed Secrets key to their PC (command in the runbook; the builder doesn't handle its contents) and confirms where it's kept.
 - [ ] **Step 4:** The owner runs `seal-env.sh ~/kitty/deploy/compose/.env > kitty-secrets.yaml` on the server; the builder copies the encrypted file into `deploy/secrets/production/`, commits `chore(deploy): sealed production settings`, pushes. Expected: Argo CD syncs; every pod Ready within 10 minutes; `edge-deny`'s and Traefik's routes present.
@@ -294,18 +294,18 @@
 ### Task 14: Rehearsal — real certificate, restore, compare; Terraform import
 
 - [ ] **Step 1 (confirm):** add to the live Caddyfile a `handle /.well-known/acme-challenge/*` block forwarding to `<server private IP>:30080`, reload Caddy, run `smoke.sh kitty-split.duckdns.org` (16/16, Compose unaffected). Expected: cert-manager's `Certificate` Ready with a Let's Encrypt production certificate.
-- [ ] **Step 2:** `restore.sh` with last night's archive from `~/kitty-backups`. Expected: rollouts complete.
-- [ ] **Step 3:** On the server: `smoke.sh kitty-split.duckdns.org --connect-to 127.0.0.1:30443`. Expected: 16/16 against the cluster.
+- [ ] **Step 2:** `restore.sh` with last night's archive from `~/kitty-backups`. Expected: rollouts complete; Azurite restarted with the photos.
+- [ ] **Step 3:** On the server: `smoke.sh kitty-split.duckdns.org --connect-to <server private IP>:30443`. Expected: 16/16 against the cluster.
 - [ ] **Step 4:** `compare-data.sh`. Expected: identical for every table not written since last night's backup; any difference is explained by rows written today (check their timestamps) — else stop and investigate.
 - [ ] **Step 5 (confirm):** create bucket `kitty-tfstate` (private), write `terraform.tfvars` on the PC, `terraform init`, `terraform plan` with the import blocks. Expected: only imports, **0 to add, 0 to change, 0 to destroy**. Adjust the `.tf` code (never the real resources) until it is. Then `terraform apply` (imports only), commit the code changes.
 
 ### Task 15: Merge and the switch
 
 - [ ] **Step 1:** Owner reviews and merges the PR. `bootstrap.sh main`. Expected: every Application Synced to `main`.
-- [ ] **Step 2 (confirm; downtime starts):** stop Compose's `web ledger ai pulse keycloak`; `backup.sh` (compose target); `restore.sh` with that fresh archive into the cluster; `compare-data.sh` → identical.
-- [ ] **Step 3:** stop Compose entirely (`docker compose stop`); remove the Caddy forward (Caddy is stopped anyway). Expected: Traefik's ServiceLB pods bind 80/443.
+- [ ] **Step 2 (confirm; downtime starts):** stop Compose's `web ledger ai pulse keycloak`; `backup.sh` (compose target); `restore.sh <that archive> --no-start`; `compare-data.sh` → identical.
+- [ ] **Step 3:** stop Compose entirely (`docker compose stop`); copy `deploy/k3s/config.yaml` over `/etc/rancher/k3s/config.yaml` and `sudo systemctl restart k3s` (ServiceLB on); start the apps (the command `restore.sh --no-start` printed). Expected: ServiceLB serves 80/443.
 - [ ] **Step 4:** set pulse `notifications.enabled: true` in `deploy/values/production/kitty-pulse.yaml`, commit, push to `main`; Argo CD syncs.
-- [ ] **Step 5:** `smoke.sh kitty-split.duckdns.org` from the PC. Expected: 16/16. Downtime ends. If anything fails and can't be fixed in minutes: way back (runbook): stop k3s's Traefik, `docker compose up -d`.
+- [ ] **Step 5:** `smoke.sh kitty-split.duckdns.org` from the PC. Expected: 16/16. Downtime ends. If anything fails and can't be fixed in minutes: way back (runbook): `sudo systemctl stop k3s && sudo /usr/local/bin/k3s-killall.sh`, then `docker compose up -d`.
 - [ ] **Step 6 (Review Focus 5):** from the owner's PC, open the site; Traefik's access log line for that request shows the PC's public address, not the node's or `10.42.x`. Also send one request with a forged `X-Forwarded-For: 1.2.3.4` and check the address Traefik passes on still starts with the real one. If ServiceLB hides addresses, move Traefik to `hostPort` (HelmChartConfig) and re-check; the runbook records which.
 - [ ] **Step 7:** The owner signs in in a browser, opens a group, adds a test expense and deletes it; a typed sentence; a receipt photo; a foreign-currency expense; MCP discovery from Claude/ChatGPT if they use it.
 - [ ] **Step 8 (confirm):** change `/etc/cron.d/kitty-backup` to `KITTY_BACKUP_TARGET=k3s`; run it once by hand; check the archive and the upload.

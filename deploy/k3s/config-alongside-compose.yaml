@@ -1,0 +1,7 @@
+# k3s settings while Docker Compose still serves the site (before the switch: deploy/k3s/RUNBOOK.md).
+# ServiceLB is off: its hostPorts are iptables DNAT rules, not bound ports, so it would take 80/443 away from Caddy the
+# moment k3s starts. Meanwhile Traefik is reached on its NodePorts (30080, 30443). At the switch this file is replaced
+# by config.yaml and k3s restarted, and ServiceLB serves 80/443.
+write-kubeconfig-mode: "0600"
+disable:
+  - servicelb
