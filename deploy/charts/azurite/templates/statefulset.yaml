@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: azurite
+  labels:
+    app.kubernetes.io/name: azurite
+spec:
+  serviceName: azurite
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: azurite
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: azurite
+    spec:
+      containers:
+        - name: azurite
+          image: {{ .Values.image }}
+          args: {{ toJson .Values.args }}
+          env:
+            # Defined before AZURITE_ACCOUNTS, which refers to it.
+            - name: BLOB_ACCOUNT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: BLOB_ACCOUNT_KEY
+            - name: AZURITE_ACCOUNTS
+              value: kitty:$(BLOB_ACCOUNT_KEY)
+          ports:
+            - name: blob
+              containerPort: 10000
+          readinessProbe:
+            tcpSocket:
+              port: blob
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: {{ .Values.memory }}
+            limits:
+              memory: {{ .Values.memory }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        annotations:
+          helm.sh/resource-policy: keep
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: {{ .Values.storage }}

@@ -1,0 +1,10 @@
+# Runs once, when the data volume is empty: Keycloak gets its own database (same file as deploy/compose).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  labels:
+    app.kubernetes.io/name: postgres
+data:
+  10-keycloak.sql: |-
+{{ .Files.Get "files/10-keycloak.sql" | trimSuffix "\n" | indent 4 }}
