@@ -1,0 +1,7 @@
+# Personal and account-identifying values stay on the owner's PC (deploy/k3s/RUNBOOK.md, "Terraform").
+terraform.tfvars
+backend.hcl
+*.tfstate*
+.terraform/
+.terraform.lock.hcl.bak
+crash.log

@@ -16,6 +16,7 @@ env:
   HELM_VERSION: v4.3.2
   KUBECONFORM_VERSION: v0.8.0
   K3D_VERSION: v5.9.0
+  TERRAFORM_VERSION: 1.17.2
 
 jobs:
   charts:
@@ -40,6 +41,18 @@ jobs:
         run: uv run --with pytest --with pyyaml pytest deploy/tests -q
       - name: Lint and validate the rendered manifests
         run: deploy/tests/validate.sh
+      - name: Terraform format and validate (never plan or apply in CI)
+        working-directory: deploy/terraform/oracle
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}"
+          curl -fsSLO "$base/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          curl -fsSL "$base/terraform_${TERRAFORM_VERSION}_SHA256SUMS" | grep " terraform_${TERRAFORM_VERSION}_linux_amd64.zip$" | sha256sum -c -
+          unzip -q -o "terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -d bin
+          cd "$GITHUB_WORKSPACE/deploy/terraform/oracle"
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
 
   k3d:
     # Installs everything into a throwaway k3d cluster and runs the smoke checks (deploy/tests/k3d-e2e.sh).
