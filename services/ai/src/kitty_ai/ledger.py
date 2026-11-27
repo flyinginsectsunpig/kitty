@@ -91,3 +91,23 @@ class LedgerReader:
     def open_items(self, group_id: str, from_member: str, to_member: str) -> dict:
         """What's still open between two members: the ledger's /groups/{id}/open-items JSON."""
         return self._get(f"/groups/{group_id}/open-items", {"from": from_member, "to": to_member})
+
+    def expense_lines(
+        self,
+        group_id: str,
+        from_: str | None,
+        to: str | None,
+        category: str | None,
+        q: str | None,
+        member: str | None,
+        cursor: str | None,
+        limit: int = 20,
+    ) -> dict:
+        """A group's expenses as formatted lines, newest first: the ledger's /groups/{id}/expense-lines JSON."""
+        filters = {"from": from_, "to": to, "category": category, "q": q, "member": member, "cursor": cursor}
+        params = {k: v for k, v in filters.items() if v is not None} | {"limit": str(limit)}
+        return self._get(f"/groups/{group_id}/expense-lines", params)
+
+    def balances(self, group_id: str) -> dict:
+        """Who owes whom in a group, with the settle-up plan: the ledger's /groups/{id}/balances JSON."""
+        return self._get(f"/groups/{group_id}/balances")

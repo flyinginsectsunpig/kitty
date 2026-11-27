@@ -18,6 +18,21 @@ Kitty's AI service:
   quotes it. The conversation and the lookup results (amounts, descriptions, names) reach the model; logs record only
   the lookups used, the number of model calls and the time. Limits: 15 questions per person per hour; at most 12
   messages, a person's 1–500 characters. See `docs/superpowers/specs/2026-11-25-kitty-phase4b-ask-kitty-design.md`.
+- **Kitty in ChatGPT and Claude (MCP, phase 4d):** a Streamable HTTP MCP server at `/mcp` (Caddy: `/ai/mcp`).
+  - **Sign-in.** Assistants register themselves with Keycloak and sign the person in. Their tokens carry audience
+    `kitty-mcp`, never `kitty-ledger`. The service swaps each one at Keycloak (token exchange, as client `kitty-mcp`)
+    for a short-lived ledger token for the same person. A call without a token gets 401 pointing at
+    `/.well-known/oauth-protected-resource/mcp`.
+  - **Read tools:** `list_groups`, `get_balances`, `group_spending`, `list_expenses` (the ledger's
+    `GET /groups/{id}/expense-lines`).
+  - **Draft tools:** `draft_expense`, `draft_payment`, `draft_reminder`. They save nothing: each stores a draft for
+    24 hours and returns a summary and a `{web}/d/{id}` link, where the person checks the usual card and taps Save or
+    Send. The apps open it with `GET /drafts/{id}` (their own `kitty-ai` token, owner only) and finish it with
+    `DELETE /drafts/{id}`.
+  - **Limits and logs:** 120 reads and 30 drafts per person per hour. Logs record the tool, the person and the time.
+  - **Try it locally:** `claude mcp add --transport http kitty http://localhost:5085/mcp`. To check sign-in against
+    the running stack, run `uv run python scripts/check_mcp_auth.py <users-file> <email>`.
+  - See `docs/superpowers/specs/2026-11-27-kitty-phase4d-mcp-design.md`.
 
 | Variable | | |
 |---|---|---|
@@ -25,3 +40,7 @@ Kitty's AI service:
 | `AI_AUTH_ISSUER` | (empty: entry off) | the Keycloak realm URL whose tokens `/parse` and `/ask` accept |
 | `AI_AUTH_AUDIENCE` | `kitty-ai` | |
 | `AI_LEDGER_URL` | | the ledger's internal address |
+| `AI_MCP_PUBLIC_URL` | (empty: MCP off) | the address assistants use, e.g. `http://localhost:5085/mcp` or `https://{host}/ai/mcp` |
+| `AI_MCP_AUDIENCE` | `kitty-mcp` | the audience MCP tokens carry, and the client that exchanges them |
+| `AI_MCP_CLIENT_SECRET` | | that client's secret |
+| `AI_WEB_URL` | | where draft links point, e.g. `http://localhost:3000` |

@@ -115,3 +115,25 @@ def test_open_items_reads_both_members():
     [request] = seen
     assert request.url.path == "/groups/g1/open-items"
     assert dict(request.url.params) == {"from": "m1", "to": "m2"}
+
+
+def lines_ledger(seen: list[httpx.Request], status: int = 200) -> httpx.Client:
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(status, json={"items": [], "nextCursor": None})
+
+    return httpx.Client(transport=httpx.MockTransport(handle))
+
+
+def test_expense_lines_sends_only_set_filters():
+    seen: list[httpx.Request] = []
+    reader = LedgerReader("http://ledger", "t", lines_ledger(seen))
+    assert reader.expense_lines("g1", "2026-11-01", None, None, None, "m2", None) == {"items": [], "nextCursor": None}
+    assert seen[0].url.path == "/groups/g1/expense-lines"
+    assert dict(seen[0].url.params) == {"from": "2026-11-01", "member": "m2", "limit": "20"}
+
+
+def test_expense_lines_not_found():
+    reader = LedgerReader("http://ledger", "t", lines_ledger([], status=404))
+    with pytest.raises(NotFound):
+        reader.expense_lines("g1", None, None, None, None, None, None)

@@ -1,6 +1,6 @@
 import type { ExpoConfig } from "expo/config";
 
-// Android App Links: the site's /invite and /t links open in the app. Only for an https site (the deployed one);
+// Android App Links: the site's /invite, /t (table) and /d (an assistant's draft) links open in the app. Only for an https site (the deployed one);
 // the site confirms it with /.well-known/assetlinks.json once ANDROID_CERT_SHA256 is set there.
 const web = new URL(process.env.EXPO_PUBLIC_WEB_URL ?? "http://localhost:3000");
 const appLinks =
@@ -9,7 +9,7 @@ const appLinks =
         {
           action: "VIEW",
           autoVerify: true,
-          data: ["/invite/", "/t/"].map((pathPrefix) => ({ scheme: "https", host: web.host, pathPrefix })),
+          data: ["/invite/", "/t/", "/d/"].map((pathPrefix) => ({ scheme: "https", host: web.host, pathPrefix })),
           category: ["BROWSABLE", "DEFAULT"],
         },
       ]

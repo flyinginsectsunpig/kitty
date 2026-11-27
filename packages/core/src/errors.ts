@@ -38,6 +38,7 @@ const messages: Record<string, string> = {
   no_account: "They haven't joined Kitty, so there's no one to remind.",
   already_reminded: "You've already reminded them today.",
   cover_invalid: "Something on this list changed. Type it again.",
+  draft_gone: "This draft has expired or was already used. Ask again in your chat.",
 };
 
 export function errorMessage(code: string | undefined): string | null {

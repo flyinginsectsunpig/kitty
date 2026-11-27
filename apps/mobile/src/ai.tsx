@@ -13,6 +13,10 @@ export type AiClient = {
   parse(text: string, groupId?: string): Promise<AiResult>;
   resolve(parsed: unknown, groupId: string): Promise<AiResult>;
   ask(messages: { role: "person" | "kitty"; text: string }[], groupId?: string): Promise<AskResult>;
+  /** An assistant's draft (MCP), opened from its /d/{id} link; "draft_gone" when expired, used or someone else's. */
+  draft(id: string): Promise<AiResult>;
+  /** After Save or Send: the draft's link stops working. Failing is harmless (it expires in a day). */
+  finishDraft(id: string): Promise<void>;
 };
 
 export function makeAiClient(baseUrl: string, getToken: () => Promise<string>, fetchFn: typeof fetch = fetch): AiClient {
@@ -33,7 +37,25 @@ export function makeAiClient(baseUrl: string, getToken: () => Promise<string>, f
     const r = await post(path, body);
     return "error" in r ? { error: r.error } : { draft: r.json as PlainDraft };
   };
+  const draftUrl = (id: string) => `${baseUrl.replace(/\/$/, "")}/drafts/${encodeURIComponent(id)}`;
   return {
+    draft: async (id) => {
+      try {
+        const response = await fetchFn(draftUrl(id), { headers: { Authorization: `Bearer ${await getToken()}` } });
+        if (response.status === 404) return { error: "draft_gone" };
+        if (!response.ok) return { error: aiErrorCode(response.status) };
+        return { draft: (await response.json()) as PlainDraft };
+      } catch {
+        return { error: "ai_unavailable" };
+      }
+    },
+    finishDraft: async (id) => {
+      try {
+        await fetchFn(draftUrl(id), { method: "DELETE", headers: { Authorization: `Bearer ${await getToken()}` } });
+      } catch {
+        // It expires on its own.
+      }
+    },
     parse: (text, groupId) => call("/parse", { text, groupId: groupId ?? null }),
     resolve: (parsed, groupId) => call("/resolve", { parsed, groupId }),
     ask: async (messages, groupId) => {

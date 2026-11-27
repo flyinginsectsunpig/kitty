@@ -8,6 +8,7 @@ import type { AiClient } from "../src/ai";
 import { fakeLedger, json } from "./support/fake-ledger";
 import { G, groupRoutes, ME, SAM } from "./support/group";
 import { renderApp } from "./support/render-app";
+import { noDrafts } from "./support/no-drafts";
 
 const routes = {
   "(app)/groups/index": GroupsIndex,
@@ -51,6 +52,7 @@ const fakeAi = (result: Awaited<ReturnType<AiClient["parse"]>>): AiClient & { te
   const texts: string[] = [];
   return {
     texts,
+    ...noDrafts,
     parse: async (text) => (texts.push(text), result),
     resolve: async () => result,
     ask: async () => ({ error: "unexpected" }),
@@ -359,7 +361,8 @@ describe("a payment card", () => {
     };
     const resolved: unknown[] = [];
     const ai: AiClient = {
-      parse: async () => ({ draft: unsure }),
+      ...noDrafts,
+    parse: async () => ({ draft: unsure }),
       resolve: async (parsed, groupId) => (resolved.push({ parsed, groupId }), { draft: uberPayment([{ expenseId: UBER, amountMinor: 2500 }]) }),
       ask: async () => ({ error: "unexpected" }),
     };

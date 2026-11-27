@@ -20,7 +20,15 @@ import {
 } from "@kitty/core";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { askQuestion, readSentence, rematchGroup, saveDraft, savePayment, sendReminder } from "@/app/plain-entry/actions";
+import {
+  askQuestion,
+  finishDraftAction,
+  readSentence,
+  rematchGroup,
+  saveDraft,
+  savePayment,
+  sendReminder,
+} from "@/app/plain-entry/actions";
 import { dayMonth } from "@/lib/day-month";
 import { ErrorBanner } from "./ErrorBanner";
 
@@ -37,15 +45,27 @@ export const NOTICE =
  * Type an expense or a reminder in one sentence (check the card; Save or Send: nothing is saved until then), or ask
  * about your money. A question opens a short conversation; follow-ups go to Ask Kitty until New conversation.
  * groupId: the group page it's on, if any (a group named in the sentence wins).
+ * initial: a draft an assistant made (MCP), opened from its link; once saved or sent, its link stops working.
  */
-export function PlainEntry({ groupId }: { groupId?: string }) {
+export function PlainEntry({
+  groupId,
+  initial,
+}: {
+  groupId?: string;
+  initial?: { draft: PlainDraft; draftId: string };
+}) {
   const router = useRouter();
   const [text, setText] = useState("");
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turns, setTurns] = useState<Turn[]>(() => (initial ? [{ role: "draft", draft: initial.draft }] : []));
   const [error, setError] = useState<string | undefined>();
   const [done, setDone] = useState<string[] | null>(null);
   const [key, setKey] = useState(() => crypto.randomUUID());
   const [busy, start] = useTransition();
+
+  // The assistant's draft is used up once it's saved or sent.
+  const finished = async () => {
+    if (initial) await finishDraftAction(initial.draftId);
+  };
 
   const run = (work: () => Promise<void>) =>
     start(async () => {
@@ -133,6 +153,7 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
         if (!KEEP_KEY.has(r.error)) setKey(crypto.randomUUID());
         return setError(r.error);
       }
+      await finished();
       setDone(r.countingBoth ? ["Payment recorded.", r.countingBoth] : ["Payment recorded."]);
       setDraft(null);
       router.refresh();
@@ -146,6 +167,7 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
         if (!KEEP_KEY.has(code)) setKey(crypto.randomUUID());
         return setError(code);
       }
+      await finished();
       setDraft(null);
       router.push(`/groups/${draft.groupId}`);
       router.refresh();
@@ -159,12 +181,16 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
         if (!KEEP_KEY.has(code)) setKey(crypto.randomUUID());
         return setError(code);
       }
+      await finished();
       setDone([`Reminder sent to ${draft.reminder.name ?? "them"}.`]);
       setDraft(null);
     });
 
   const edit = () => {
     if (!draft?.groupId) return;
+    // The form saves it from here on, so an assistant's link stops working now: opening it again must not offer a
+    // second Save.
+    void finished();
     try {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch {

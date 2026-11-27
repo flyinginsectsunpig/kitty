@@ -328,7 +328,9 @@ before the heavy infrastructure lands.
 4. **AI depth**: 4a NL entry, 4b Ask Kitty (agent over read-only lookups), 4c crossing
    things off by sentence (a payment linked to the expenses it covers; shipped as
    designed in `2026-11-26-kitty-phase4c-cross-off-design.md`, with Settle up ticks
-   and a recent-payments list), 4d MCP server, 4e evals in CI.
+   and a recent-payments list), 4d MCP server (shipped as designed in
+   `2026-11-27-kitty-phase4d-mcp-design.md`: read tools plus drafts confirmed in Kitty
+   through a link, sign-in by Keycloak token exchange), 4e evals in CI.
 5. **Production**: Terraform, k3s, Helm, Argo CD, OpenTelemetry → Grafana,
    security scanning, Playwright, k6.
 6. **Fun + polish**: roulette, Kitty Wrapped, offline add-expense queue on

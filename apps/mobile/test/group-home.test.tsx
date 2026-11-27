@@ -7,6 +7,7 @@ import type { AiClient } from "../src/ai";
 import { fakeLedger, json } from "./support/fake-ledger";
 import { G, groupRoutes, ME, SAM } from "./support/group";
 import { renderApp } from "./support/render-app";
+import { noDrafts } from "./support/no-drafts";
 
 const expense = (id: string, description: string) => ({
   id,
@@ -80,7 +81,7 @@ test("saving a payment from the card reloads the balances", async () => {
       covers: [{ expenseId: "e1", amountMinor: 5000 }],
     },
   };
-  const ai: AiClient = { parse: async () => ({ draft: payment }), resolve: async () => ({ draft: payment }), ask: async () => ({ error: "unexpected" }) };
+  const ai: AiClient = { ...noDrafts, parse: async () => ({ draft: payment }), resolve: async () => ({ draft: payment }), ask: async () => ({ error: "unexpected" }) };
   const { client, calls } = fakeLedger({
     ...overviewRoutes({ "": { items: [], nextCursor: null } }),
     [`POST /groups/${G}/settlements`]: () => json(201, {}),

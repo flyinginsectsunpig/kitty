@@ -12,8 +12,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 
 from kitty_ai.auth import TokenVerifier, Unauthorized
+from kitty_ai.entry.drafting import draft_for
 from kitty_ai.entry.parse import Parser
-from kitty_ai.entry.resolve import build_draft, match_group
+from kitty_ai.entry.resolve import match_group
 from kitty_ai.entry.schema import ParsedSentence
 from kitty_ai.ledger import LedgerReader, NotFound
 from kitty_ai.limits import RateLimiter
@@ -61,21 +62,6 @@ def make_router(
             raise Unauthorized("no bearer token")
         return verifier.verify(header[7:].strip())
 
-    def draft_for(reader: LedgerReader, parsed: ParsedSentence, group_id: str) -> dict:
-        group = reader.group(group_id)
-        me = reader.me()
-        me_member = next((m.id for m in group.members if m.user_id == me.id), None)
-        if me_member is None:
-            raise NotFound(group_id)
-        return build_draft(
-            parsed,
-            group,
-            me_member,
-            today(),
-            lambda member: reader.owed_to_me(group.id, me_member, member),
-            lambda f, t: reader.open_items(group.id, f, t),
-        )
-
     def respond(draft: dict, parsed: ParsedSentence, groups) -> JSONResponse:
         draft["groups"] = [{"id": g.id, "name": g.name} for g in groups]
         draft["parsed"] = parsed.model_dump(mode="json")
@@ -120,7 +106,7 @@ def make_router(
             elif match.group_id is None:
                 draft = {"intent": parsed.intent, "groupId": None, "issues": [match.issue], "members": []}
             else:
-                draft = draft_for(reader, parsed, match.group_id)
+                draft = draft_for(reader, parsed, match.group_id, today())
         except NotFound:
             return _error(404, "not_found")
         log.info(
@@ -151,7 +137,7 @@ def make_router(
         if not any(g.id == body.groupId for g in groups):
             return _error(404, "not_found")
         try:
-            draft = draft_for(reader, parsed, body.groupId)
+            draft = draft_for(reader, parsed, body.groupId, today())
         except NotFound:
             return _error(404, "not_found")
         return respond(draft, parsed, groups)
