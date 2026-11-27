@@ -69,7 +69,7 @@ jobs:
           tar xzf "helm-${HELM_VERSION}-linux-amd64.tar.gz" && mv linux-amd64/helm bin/
           base="https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}"
           curl -fsSLO "$base/k3d-linux-amd64"
-          curl -fsSL "$base/checksums.txt" | grep ' k3d-linux-amd64$' | sha256sum -c -
+          curl -fsSL "$base/checksums.txt" | grep ' _dist/k3d-linux-amd64$' | sed 's| _dist/| |' | sha256sum -c -
           install -m 0755 k3d-linux-amd64 bin/k3d
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install Kitty into k3d and run the checks
