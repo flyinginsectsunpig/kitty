@@ -1,0 +1,14 @@
+# Cluster-internal only: the ledger's exchange-rate lookups (gRPC).
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse
+  labels:
+    app.kubernetes.io/name: kitty-pulse
+spec:
+  selector:
+    app.kubernetes.io/name: kitty-pulse
+  ports:
+    - name: grpc
+      port: 5090
+      targetPort: grpc

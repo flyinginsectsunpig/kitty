@@ -1,0 +1,5 @@
+# Production settings for the kitty-web chart (defaults: deploy/charts/kitty-web/values.yaml).
+# image.tag is written by CI (deploy/k3s/set-image-tag.sh) after the images pass their tests.
+host: kitty-split.duckdns.org
+image:
+  tag: sha-df424e7

@@ -1,0 +1,10 @@
+# pulse's own database role, limited to schema "pulse" (same file as deploy/compose). Safe on every start.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulse-db-setup
+  labels:
+    app.kubernetes.io/name: kitty-pulse
+data:
+  pulse-db-setup.sql: |-
+{{ .Files.Get "files/pulse-db-setup.sql" | trimSuffix "\n" | indent 4 }}

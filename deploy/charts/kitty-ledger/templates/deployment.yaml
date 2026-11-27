@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kitty-ledger
+  labels:
+    app.kubernetes.io/name: kitty-ledger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kitty-ledger
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kitty-ledger
+    spec:
+      initContainers:
+        - name: wait
+          image: {{ .Values.waitImage }}
+          command: ["sh", "-c", "for d in 'postgres 5432' 'redis 6379' 'redpanda 9092' 'pulse 5090'; do until nc -z $d; do echo waiting for $d; sleep 2; done; done"]
+      containers:
+        - name: ledger
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: POSTGRES_PASSWORD
+            - name: BLOB_ACCOUNT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: BLOB_ACCOUNT_KEY
+            - name: ConnectionStrings__ledger
+              value: Host=postgres;Database=ledger;Username=postgres;Password=$(POSTGRES_PASSWORD)
+            - name: Auth__Authority
+              value: https://{{ .Values.host }}/auth/realms/kitty
+            - name: Auth__Audience
+              value: kitty-ledger
+            - name: Ledger__MigrateOnStartup
+              value: "true"
+            - name: Ledger__TrustForwardedHeaders
+              value: "true" # only reachable through Traefik
+            - name: ConnectionStrings__redis
+              value: redis:6379 # SignalR backplane for live table updates
+            - name: ConnectionStrings__kafka
+              value: redpanda:9092
+            - name: Kafka__SchemaRegistryUrl
+              value: http://redpanda:8081
+            - name: ConnectionStrings__blobs
+              value: DefaultEndpointsProtocol=http;AccountName=kitty;AccountKey=$(BLOB_ACCOUNT_KEY);BlobEndpoint=http://azurite:10000/kitty;
+            # Browsers upload receipt photos through Traefik (same origin).
+            - name: Blob__PublicUrl
+              value: https://{{ .Values.host }}/blob
+            - name: Fx__Url
+              value: http://pulse:5090 # exchange rates (gRPC)
+            - name: ASPNETCORE_HTTP_PORTS
+              value: "8080;8082"
+            - name: Ledger__GrpcPort
+              value: "8082"
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: grpc
+              containerPort: 8082
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 50m
+              memory: {{ .Values.memory }}
+            limits:
+              memory: {{ .Values.memory }}

@@ -1,0 +1,8 @@
+# The ai service (Python): receipt reading, plain-language entry, Ask Kitty and the MCP server under /ai.
+image:
+  repository: ghcr.io/flyinginsectsunpig/kitty-ai
+  tag: sha-0000000
+host: kitty.localhost
+memory: 1500Mi
+waitImage: busybox:1.37
+setupImage: pgvector/pgvector:pg17

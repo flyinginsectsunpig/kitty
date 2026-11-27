@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kitty-web
+  labels:
+    app.kubernetes.io/name: kitty-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kitty-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kitty-web
+    spec:
+      initContainers:
+        - name: wait
+          image: {{ .Values.waitImage }}
+          command: ["sh", "-c", "for d in 'ledger 8080' 'keycloak 8080'; do until nc -z $d; do echo waiting for $d; sleep 2; done; done"]
+      containers:
+        - name: web
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          env:
+            # Plain-language entry: the web's server side calls the ai service directly.
+            - name: AI_URL
+              value: http://ai:8000
+            - name: AUTH_URL
+              value: https://{{ .Values.host }}
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: AUTH_SECRET
+            - name: AUTH_TRUST_HOST
+              value: "true"
+            - name: AUTH_KEYCLOAK_ID
+              value: kitty-web
+            - name: AUTH_KEYCLOAK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: KITTY_WEB_CLIENT_SECRET
+            - name: AUTH_KEYCLOAK_ISSUER
+              value: https://{{ .Values.host }}/auth/realms/kitty
+            - name: LEDGER_URL
+              value: http://ledger:8080
+            - name: TRUST_PROXY_HEADERS
+              value: "true" # only reachable through Traefik; passes guests' addresses on for the join limit
+            # Browsers open the live table connection through Traefik (same origin, so no CORS needed).
+            - name: LEDGER_PUBLIC_URL
+              value: https://{{ .Values.host }}/api
+            - name: ANDROID_CERT_SHA256
+              value: {{ .Values.androidCertSha256 | quote }}
+          ports:
+            - name: http
+              containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 50m
+              memory: {{ .Values.memory }}
+            limits:
+              memory: {{ .Values.memory }}

@@ -1,0 +1,10 @@
+# The ai service's own database role, limited to schema "ai" (same file as deploy/compose). Safe on every start.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-db-setup
+  labels:
+    app.kubernetes.io/name: kitty-ai
+data:
+  ai-db-setup.sql: |-
+{{ .Files.Get "files/ai-db-setup.sql" | trimSuffix "\n" | indent 4 }}

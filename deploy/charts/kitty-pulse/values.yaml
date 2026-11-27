@@ -1,0 +1,20 @@
+# pulse (Go): exchange rates over gRPC for the ledger, recurring expenses, and notifications.
+image:
+  repository: ghcr.io/flyinginsectsunpig/kitty-pulse
+  tag: sha-0000000
+host: kitty.localhost
+memory: 128Mi
+# Email and push. Off: pulse logs "email notifications are off" and sends nothing (used until the k3s switch, so a
+# rehearsal cluster can't message real people).
+notifications:
+  enabled: false
+smtp:
+  host: smtp.resend.com
+  port: 465
+  ssl: true
+  starttls: false
+# Push needs the Firebase service-account key as Secret "pulse-fcm" (key fcm.json). Off: push is off.
+fcm:
+  enabled: false
+waitImage: busybox:1.37
+setupImage: pgvector/pgvector:pg17

@@ -1,0 +1,9 @@
+# The web app (Next.js) and Auth.js sign-in.
+image:
+  repository: ghcr.io/flyinginsectsunpig/kitty-web
+  tag: sha-0000000
+host: kitty.localhost
+memory: 512Mi
+# The APK signing certificate's SHA-256, so invite and table links open in the Android app (optional).
+androidCertSha256: ""
+waitImage: busybox:1.37

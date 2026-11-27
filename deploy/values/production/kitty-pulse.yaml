@@ -1,0 +1,12 @@
+# Production settings for the kitty-pulse chart (defaults: deploy/charts/kitty-pulse/values.yaml).
+# image.tag is written by CI (deploy/k3s/set-image-tag.sh) after the images pass their tests.
+host: kitty-split.duckdns.org
+image:
+  tag: sha-df424e7
+notifications:
+  enabled: false # turned on at the k3s switch (deploy/k3s/RUNBOOK.md)
+smtp:
+  host: smtp.gmail.com
+  port: 465
+  ssl: true
+  starttls: false
