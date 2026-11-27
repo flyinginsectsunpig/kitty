@@ -37,6 +37,7 @@ const messages: Record<string, string> = {
   nothing_owed: "They don't owe you anything in this group.",
   no_account: "They haven't joined Kitty, so there's no one to remind.",
   already_reminded: "You've already reminded them today.",
+  cover_invalid: "Something on this list changed. Type it again.",
 };
 
 export function errorMessage(code: string | undefined): string | null {

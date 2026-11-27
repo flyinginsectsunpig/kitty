@@ -5,16 +5,23 @@ import {
   applyPick,
   askMessages,
   canSave,
+  coverLines,
+  coverNote,
   draftMoney,
   draftShares,
   routeFirst,
+  tickedOf,
+  toggleCover,
+  withCounterpart,
   type DraftIssue,
+  type OpenItem,
   type PlainDraft,
   type Turn,
 } from "@kitty/core";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { askQuestion, readSentence, rematchGroup, saveDraft, sendReminder } from "@/app/plain-entry/actions";
+import { askQuestion, readSentence, rematchGroup, saveDraft, savePayment, sendReminder } from "@/app/plain-entry/actions";
+import { dayMonth } from "@/lib/day-month";
 import { ErrorBanner } from "./ErrorBanner";
 
 /** Errors after which a retry should replay the same request (same key): it may not have finished, or never arrived. */
@@ -36,7 +43,7 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
   const [text, setText] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [error, setError] = useState<string | undefined>();
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState<string[] | null>(null);
   const [key, setKey] = useState(() => crypto.randomUUID());
   const [busy, start] = useTransition();
 
@@ -107,6 +114,30 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
       setKey(crypto.randomUUID());
     });
 
+  // A payment's other person, picked on the card: the sentence is matched again with that name.
+  const pickCounterpart = (memberId: string) =>
+    run(async () => {
+      const picked = draft?.members.find((m) => m.id === memberId);
+      if (!draft?.groupId || !picked) return;
+      const r = await rematchGroup(withCounterpart(draft.parsed, picked.displayName), draft.groupId);
+      if (r.error) return setError(r.error);
+      setDraft(r.draft ?? null);
+      setKey(crypto.randomUUID());
+    });
+
+  const pay = () =>
+    run(async () => {
+      if (!draft?.groupId || draft.intent !== "payment") return;
+      const r = await savePayment(draft, key);
+      if (r.error) {
+        if (!KEEP_KEY.has(r.error)) setKey(crypto.randomUUID());
+        return setError(r.error);
+      }
+      setDone(r.countingBoth ? ["Payment recorded.", r.countingBoth] : ["Payment recorded."]);
+      setDraft(null);
+      router.refresh();
+    });
+
   const save = () =>
     run(async () => {
       if (!draft?.groupId) return;
@@ -128,7 +159,7 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
         if (!KEEP_KEY.has(code)) setKey(crypto.randomUUID());
         return setError(code);
       }
-      setDone(`Reminder sent to ${draft.reminder.name ?? "them"}.`);
+      setDone([`Reminder sent to ${draft.reminder.name ?? "them"}.`]);
       setDraft(null);
     });
 
@@ -192,7 +223,13 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
         )}
       </div>
       <ErrorBanner code={error} />
-      {done && <p className="rounded-xl bg-green-50 p-3 text-sm text-owed dark:bg-green-950">{done}</p>}
+      {done && (
+        <div className="space-y-1 rounded-xl bg-green-50 p-3 text-sm text-owed dark:bg-green-950">
+          {done.map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+        </div>
+      )}
       {draft && (
         <DraftCard
           draft={draft}
@@ -202,7 +239,12 @@ export function PlainEntry({ groupId }: { groupId?: string }) {
             setKey(crypto.randomUUID()); // a changed draft is a different request
           }}
           onPickGroup={pickGroup}
-          onSave={save}
+          onPickCounterpart={pickCounterpart}
+          onToggle={(expenseId) => {
+            setDraft(toggleCover(draft, expenseId));
+            setKey(crypto.randomUUID());
+          }}
+          onSave={draft.intent === "payment" ? pay : save}
           onSend={send}
           onEdit={edit}
           onCancel={() => setDraft(null)}
@@ -217,6 +259,8 @@ function DraftCard({
   busy,
   onPick,
   onPickGroup,
+  onPickCounterpart,
+  onToggle,
   onSave,
   onSend,
   onEdit,
@@ -224,8 +268,11 @@ function DraftCard({
 }: {
   draft: PlainDraft;
   busy: boolean;
+  /** memberId is the picked member, or for a payment item the picked expense; null leaves it out. */
   onPick: (issueIndex: number, memberId: string | null) => void;
   onPickGroup: (groupId: string) => void;
+  onPickCounterpart: (memberId: string) => void;
+  onToggle: (expenseId: string) => void;
   onSave: () => void;
   onSend: () => void;
   onEdit: () => void;
@@ -243,6 +290,9 @@ function DraftCard({
 
       {draft.intent === "expense" && draft.expense && <ExpenseSummary draft={draft} nameOf={nameOf} />}
       {draft.intent === "reminder" && draft.reminder && <ReminderSummary draft={draft} groupName={group?.name} />}
+      {draft.intent === "payment" && draft.payment && (
+        <PaymentSummary draft={draft} nameOf={nameOf} busy={busy} onToggle={onToggle} />
+      )}
 
       {groupIssue >= 0 || !draft.groupId ? (
         <label className="block text-sm">
@@ -284,7 +334,18 @@ function DraftCard({
       )}
 
       {draft.issues.map((issue, i) =>
-        issue.field === "group" ? null : <IssuePicker key={`${issue.field}-${i}`} issue={issue} draft={draft} onPick={(m) => onPick(i, m)} />,
+        issue.field === "group" ? null : issue.field.startsWith("payment") ? (
+          <PaymentIssue
+            key={`${issue.field}-${i}`}
+            issue={issue}
+            draft={draft}
+            nameOf={nameOf}
+            onPickItem={(expenseId) => onPick(i, expenseId)}
+            onPickCounterpart={onPickCounterpart}
+          />
+        ) : (
+          <IssuePicker key={`${issue.field}-${i}`} issue={issue} draft={draft} onPick={(m) => onPick(i, m)} />
+        ),
       )}
 
       <div className="flex flex-wrap gap-2">
@@ -297,6 +358,11 @@ function DraftCard({
               Edit
             </button>
           </>
+        )}
+        {draft.intent === "payment" && (
+          <button className="btn-primary" disabled={busy || !canSave(draft)} onClick={onSave}>
+            Save
+          </button>
         )}
         {draft.intent === "reminder" && (
           <button
@@ -363,6 +429,156 @@ function ReminderSummary({ draft, groupName }: { draft: PlainDraft; groupName?: 
         </p>
       )}
     </div>
+  );
+}
+
+/** The resolver's reading of who paid: "they_paid" means the other person paid you; anything else, you paid them. */
+function theyPaid(draft: PlainDraft): boolean {
+  return (draft.parsed as { direction?: unknown } | null)?.direction === "they_paid";
+}
+
+/** The other person on a payment (null until matched), and you. */
+function sides(draft: PlainDraft): { other: string | null; me: string | null } {
+  const p = draft.payment;
+  if (!p) return { other: null, me: null };
+  return theyPaid(draft) ? { other: p.fromMemberId, me: p.toMemberId } : { other: p.toMemberId, me: p.fromMemberId };
+}
+
+function itemLine(item: OpenItem, currency: string): string {
+  return `${item.description} · ${dayMonth(item.date)} · ${draftMoney(item.openMinor, currency)} open`;
+}
+
+function PaymentSummary({
+  draft,
+  nameOf,
+  busy,
+  onToggle,
+}: {
+  draft: PlainDraft;
+  nameOf: (id: string | null) => string;
+  busy: boolean;
+  onToggle: (expenseId: string) => void;
+}) {
+  const p = draft.payment!;
+  const { other } = sides(draft);
+  const name = other ? nameOf(other) : "someone";
+  const amount = p.amountMinor === null ? "amount?" : draftMoney(p.amountMinor, p.currency);
+  const ticked = tickedOf(p);
+  const notes = coverLines(p.openItems, ticked, p.covers)
+    .map((l) => ({ id: l.expenseId, text: coverNote(l, p.currency) }))
+    .filter((n) => n.text !== null);
+  return (
+    <div className="space-y-2">
+      <p className="font-semibold">
+        {theyPaid(draft) ? `${name} paid you ` : `You paid ${name} `}
+        <span className="tabular-nums">{amount}</span>
+      </p>
+      {p.openItems.length > 0 && (
+        <ul className="space-y-1 text-sm">
+          {p.openItems.map((item) => (
+            <li key={item.expenseId}>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-brand-600"
+                  checked={ticked.includes(item.expenseId)}
+                  disabled={busy}
+                  onChange={() => onToggle(item.expenseId)}
+                />
+                <span className="tabular-nums">{itemLine(item, p.currency)}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+      {notes.map((n) => (
+        <p key={n.id} className="text-sm tabular-nums text-stone-600 dark:text-stone-400">
+          {n.text}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/** A payment issue fixed on the card: pick the other person or an item, or a short note when it can't be fixed here. */
+function PaymentIssue({
+  issue,
+  draft,
+  nameOf,
+  onPickItem,
+  onPickCounterpart,
+}: {
+  issue: DraftIssue;
+  draft: PlainDraft;
+  nameOf: (id: string | null) => string;
+  onPickItem: (expenseId: string | null) => void;
+  onPickCounterpart: (memberId: string) => void;
+}) {
+  const p = draft.payment;
+  const { other, me } = sides(draft);
+
+  if (issue.field === "payment.counterpart") {
+    const choices =
+      issue.kind === "ambiguous"
+        ? draft.members.filter((m) => issue.candidates.includes(m.id))
+        : draft.members.filter((m) => m.id !== me);
+    const question =
+      issue.kind === "ambiguous"
+        ? `Which ${issue.text}?`
+        : issue.text
+          ? `“${issue.text}” isn't someone you can pay in this group. Who did you mean?`
+          : "Who was the payment with?";
+    return (
+      <label className="block text-sm">
+        {question}
+        <select className="field mt-1" defaultValue="" onChange={(e) => e.target.value && onPickCounterpart(e.target.value)}>
+          <option value="" disabled>
+            Pick someone
+          </option>
+          {choices.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.displayName}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+
+  if (issue.kind === "other_currency") {
+    const what = issue.field.startsWith("payment.items[") && issue.text ? `“${issue.text}” is in another currency. ` : "";
+    return <p className="text-sm text-owes">{what}Record this one in Settle up.</p>;
+  }
+  if (issue.field === "payment.items") {
+    return <p className="text-sm text-owes">Nothing is open with {other ? nameOf(other) : "them"} right now.</p>;
+  }
+  if (issue.field === "payment.amount") {
+    return <p className="text-sm text-owes">Kitty couldn&apos;t read the amount. Try again with it, like R25.</p>;
+  }
+
+  // payment.items[n]: a phrase that matched several open items, or none.
+  const choices = (p?.openItems ?? []).filter((item) => issue.candidates.includes(item.expenseId));
+  const question =
+    issue.kind === "ambiguous" ? `Which ${issue.text}?` : `Nothing open matches “${issue.text}”. Which one did you mean?`;
+  return (
+    <label className="block text-sm">
+      {question}
+      <select
+        className="field mt-1"
+        defaultValue=""
+        onChange={(e) => onPickItem(e.target.value === "__out" ? null : e.target.value)}
+      >
+        <option value="" disabled>
+          Pick one
+        </option>
+        {choices.map((item) => (
+          <option key={item.expenseId} value={item.expenseId}>
+            {itemLine(item, p?.currency ?? "")}
+          </option>
+        ))}
+        <option value="__out">Leave it out</option>
+      </select>
+    </label>
   );
 }
 

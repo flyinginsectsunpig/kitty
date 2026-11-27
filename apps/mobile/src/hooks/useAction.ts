@@ -49,5 +49,9 @@ export function useAction<T>(fn: (idempotencyKey: string) => Promise<LedgerResul
   }, [fn]);
 
   const reset = useCallback(() => setError(null), []);
-  return { run, busy, error, setError, reset };
+  /** A new key for a changed request (the card was edited): a retry of the old one must not replay it. */
+  const renew = useCallback(() => {
+    key.current = randomUUID();
+  }, []);
+  return { run, busy, error, setError, reset, renew };
 }

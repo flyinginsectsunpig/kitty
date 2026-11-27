@@ -40,6 +40,15 @@ public static class SpendingData
         {
             id = Guid.NewGuid(), fromMemberId = from, toMemberId = to, currency, amountMinor = amount, paidInGroupCurrency = false,
         });
+
+    /// <summary>A ZAR payment that says which expenses it covers, and how much of each.</summary>
+    public static Task<HttpResponseMessage> SettleCoveringAsync(this HttpClient c, Guid groupId, Guid from, Guid to, long amount,
+        params (Guid ExpenseId, long Amount)[] covers) =>
+        c.PostJsonAsync($"/groups/{groupId}/settlements", new
+        {
+            id = Guid.NewGuid(), fromMemberId = from, toMemberId = to, currency = "ZAR", amountMinor = amount,
+            covers = covers.Select(x => new { expenseId = x.ExpenseId, amountMinor = x.Amount }),
+        });
 }
 
 [Collection(ApiCollection.Name)]

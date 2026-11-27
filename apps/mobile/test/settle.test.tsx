@@ -1,4 +1,5 @@
-import { fireEvent, screen } from "expo-router/testing-library";
+import { act, fireEvent, screen, waitFor } from "expo-router/testing-library";
+import { Alert } from "react-native";
 import GroupLayout from "../src/app/(app)/groups/[id]/_layout";
 import Settle from "../src/app/(app)/groups/[id]/settle";
 import { fakeLedger, json } from "./support/fake-ledger";
@@ -145,5 +146,149 @@ describe("a debt in another currency", () => {
     expect(await screen.findByText("We couldn't look up the exchange rate. Enter it to record this payment.")).toBeTruthy();
     expect(screen.getByLabelText(/^Rate/)).toBeTruthy();
     expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
+  });
+});
+
+describe("what a payment covers", () => {
+  const PIZZA = "44444444-4444-4444-8444-444444444444";
+  const UBER = "55555555-5555-4555-8555-555555555555";
+  const money = (minor: number) => ({ currency: "ZAR", minor, text: "" });
+  const line = (expenseId: string, description: string, date: string, open: number) => ({
+    item: { expenseId, description, date, category: "food", total: money(open * 2), myShare: money(open), paidBy: "Sam" },
+    open: money(open),
+  });
+  const open = {
+    fromMemberId: ME,
+    toMemberId: SAM,
+    currencies: [
+      {
+        currency: "ZAR",
+        fromOwes: [line(PIZZA, "Pizza", "2026-11-01", 4000), line(UBER, "Uber", "2026-11-10", 2500)],
+        fromOwesTotal: money(6500),
+        toOwes: [],
+        toOwesTotal: money(0),
+      },
+    ],
+  };
+
+  test("ticked items go with Mark as paid", async () => {
+    const { client, calls } = fakeLedger(
+      groupRoutes({
+        [`GET /groups/${G}/balances`]: () => json(200, owing),
+        [`GET /groups/${G}/open-items`]: () => json(200, open),
+        [`POST /groups/${G}/settlements`]: () => json(201, {}),
+      }),
+    );
+    await renderApp(routes, client, `/groups/${G}/settle`);
+    await fireEvent.press(await screen.findByText("What it covers"));
+    await fireEvent.press(screen.getByRole("checkbox", { name: /^Uber · 10 Nov · R\s25,00 open$/ }));
+    await fireEvent.press(screen.getByText("Mark as paid"));
+
+    expect(await screen.findByText("Payment recorded.")).toBeTruthy();
+    expect(calls.find((c) => c.method === "GET" && c.path === `/groups/${G}/open-items`)!.search).toBe(`?from=${ME}&to=${SAM}`);
+    expect(calls.find((c) => c.method === "POST")!.body).toMatchObject({ amountMinor: 5000, covers: [{ expenseId: UBER, amountMinor: 2500 }] });
+  });
+
+  test("a partly covered item says so", async () => {
+    const { client } = fakeLedger(
+      groupRoutes({ [`GET /groups/${G}/balances`]: () => json(200, owing), [`GET /groups/${G}/open-items`]: () => json(200, open) }),
+    );
+    await renderApp(routes, client, `/groups/${G}/settle`);
+    await fireEvent.press(await screen.findByText("What it covers"));
+    await fireEvent.press(screen.getByRole("checkbox", { name: /^Uber/ }));
+    await fireEvent.press(screen.getByRole("checkbox", { name: /^Pizza/ }));
+
+    expect(await screen.findByText(/^Uber: R\s10,00 of R\s25,00$/)).toBeTruthy();
+  });
+
+  test("a ticked item the payment doesn't reach says so", async () => {
+    const withGroceries = {
+      ...open,
+      currencies: [{ ...open.currencies[0]!, fromOwes: [...open.currencies[0]!.fromOwes, line("e-groceries", "Groceries", "2026-11-20", 3000)] }],
+    };
+    const { client } = fakeLedger(
+      groupRoutes({ [`GET /groups/${G}/balances`]: () => json(200, owing), [`GET /groups/${G}/open-items`]: () => json(200, withGroceries) }),
+    );
+    await renderApp(routes, client, `/groups/${G}/settle`);
+    await fireEvent.press(await screen.findByText("What it covers"));
+    for (const name of [/^Groceries/, /^Uber/, /^Pizza/]) await fireEvent.press(screen.getByRole("checkbox", { name }));
+
+    expect(await screen.findByText(/^Uber: R\s10,00 of R\s25,00$/)).toBeTruthy();
+    expect(screen.getByText("Groceries: not covered, the payment runs out")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /^Groceries/ }).props.accessibilityState).toMatchObject({ checked: true });
+  });
+
+  test("open items that can't be loaded leave the transfer without ticks", async () => {
+    const { client } = fakeLedger(
+      groupRoutes({
+        [`GET /groups/${G}/balances`]: () => json(200, owing),
+        [`GET /groups/${G}/open-items`]: () => {
+          throw new TypeError("Network request failed");
+        },
+      }),
+    );
+    await renderApp(routes, client, `/groups/${G}/settle`);
+    expect(await screen.findByText("Mark as paid")).toBeTruthy();
+    expect(screen.queryByText("What it covers")).toBeNull();
+  });
+});
+
+describe("recent payments", () => {
+  const P = "66666666-6666-4666-8666-666666666666";
+  const payment = {
+    payment: {
+      id: P, fromMemberId: ME, toMemberId: SAM, currency: "ZAR", amountMinor: 2500, createdBy: ME, createdAt: "2026-11-20T10:00:00Z",
+      fxRate: null, fxRateDate: null, fxRateSource: null, convertedAmountMinor: null, paidInGroupCurrency: false,
+      covers: [{ expenseId: "e-uber", amountMinor: 2500 }],
+    },
+    from: "Zee",
+    to: "Sam",
+    date: "2026-11-20",
+    covers: [{ expenseId: "e-uber", description: "Uber", amount: { currency: "ZAR", minor: 2500, text: "" } }],
+  };
+
+  test("recent payments list and delete", async () => {
+    const alert = jest.spyOn(Alert, "alert");
+    let deleted = false;
+    const { client, calls } = fakeLedger(
+      groupRoutes({
+        [`GET /groups/${G}/balances`]: () => json(200, settled),
+        [`GET /groups/${G}/settlements`]: () => json(200, deleted ? [] : [payment]),
+        [`DELETE /groups/${G}/settlements/${P}`]: () => {
+          deleted = true;
+          return json(204);
+        },
+      }),
+    );
+    await renderApp(routes, client, `/groups/${G}/settle`);
+
+    expect(await screen.findByText("Recent payments")).toBeTruthy();
+    expect(screen.getByText(/^You paid Sam R\s25,00 · 20 Nov · for: Uber$/)).toBeTruthy();
+    expect(screen.getByText(/^Everyone is settled up/)).toBeTruthy();
+    expect(calls.find((c) => c.path === `/groups/${G}/settlements`)!.search).toBe("?limit=20");
+    await fireEvent.press(screen.getByRole("button", { name: /^Delete payment: You paid Sam R\s25,00$/ }));
+    expect(calls.filter((c) => c.method === "DELETE")).toHaveLength(0); // nothing until confirmed
+
+    const [title, message, buttons] = alert.mock.calls[0]!;
+    expect([title, message]).toEqual(["Delete this payment?", "Its items go back on the list."]);
+    expect(buttons!.map((b) => b.text)).toEqual(["Cancel", "Delete"]);
+    await act(async () => buttons!.find((b) => b.text === "Delete")!.onPress!());
+
+    expect(await screen.findByText("Payment deleted.")).toBeTruthy();
+    const del = calls.find((c) => c.method === "DELETE")!;
+    expect(del.path).toBe(`/groups/${G}/settlements/${P}`);
+    expect(del.headers.get("Idempotency-Key")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText("Recent payments")).toBeNull());
+    expect(calls.filter((c) => c.path === `/groups/${G}/balances`)).toHaveLength(2);
+    alert.mockRestore();
+  });
+
+  test("payments that can't be loaded leave the section out", async () => {
+    const { client } = fakeLedger(
+      groupRoutes({ [`GET /groups/${G}/balances`]: () => json(200, owing), [`GET /groups/${G}/settlements`]: () => json(500, { code: "unexpected" }) }),
+    );
+    await renderApp(routes, client, `/groups/${G}/settle`);
+    expect(await screen.findByText(/^You pay Sam R\s50,00$/)).toBeTruthy();
+    expect(screen.queryByText("Recent payments")).toBeNull();
   });
 });

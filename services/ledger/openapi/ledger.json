@@ -452,6 +452,55 @@
         }
       }
     },
+    "/groups/{groupId}/open-items": {
+      "get": {
+        "tags": [
+          "Settlements"
+        ],
+        "operationId": "GetOpenItems",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenItemsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/groups/{groupId}/reminders": {
       "post": {
         "tags": [
@@ -931,6 +980,47 @@
       }
     },
     "/groups/{groupId}/settlements": {
+      "get": {
+        "tags": [
+          "Settlements"
+        ],
+        "operationId": "ListSettlements",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SettlementLineDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "Settlements"
@@ -2331,6 +2421,43 @@
           }
         }
       },
+      "CoverDto": {
+        "required": [
+          "expenseId",
+          "amountMinor"
+        ],
+        "type": "object",
+        "properties": {
+          "expenseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CoverLineDto": {
+        "required": [
+          "expenseId",
+          "description",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "expenseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyDto"
+          }
+        }
+      },
       "CreateGroupDto": {
         "required": [
           "id",
@@ -3073,6 +3200,102 @@
           }
         }
       },
+      "OpenItemDto": {
+        "required": [
+          "item",
+          "open"
+        ],
+        "type": "object",
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/ExpenseLineDto"
+          },
+          "open": {
+            "$ref": "#/components/schemas/MoneyDto"
+          }
+        }
+      },
+      "OpenItemsCurrencyDto": {
+        "required": [
+          "currency",
+          "fromOwes",
+          "fromOwesTotal",
+          "toOwes",
+          "toOwesTotal"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "fromOwes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenItemDto"
+            }
+          },
+          "fromOwesTotal": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "toOwes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenItemDto"
+            }
+          },
+          "toOwesTotal": {
+            "$ref": "#/components/schemas/MoneyDto"
+          }
+        }
+      },
+      "OpenItemsDto": {
+        "required": [
+          "fromMemberId",
+          "toMemberId",
+          "currencies"
+        ],
+        "type": "object",
+        "properties": {
+          "fromMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenItemsCurrencyDto"
+            }
+          }
+        }
+      },
+      "OpenWithDto": {
+        "required": [
+          "memberId",
+          "name",
+          "direction",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyDto"
+          }
+        }
+      },
       "OwingCurrencyDto": {
         "required": [
           "currency",
@@ -3099,7 +3322,7 @@
           "since": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ExpenseLineDto"
+              "$ref": "#/components/schemas/OwingLineDto"
             }
           },
           "moreSince": {
@@ -3172,12 +3395,57 @@
           }
         }
       },
+      "OwingLineDto": {
+        "required": [
+          "expenseId",
+          "description",
+          "date",
+          "category",
+          "total",
+          "myShare",
+          "paidBy",
+          "open"
+        ],
+        "type": "object",
+        "properties": {
+          "expenseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "category": {
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "myShare": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "paidBy": {
+            "type": "string"
+          },
+          "open": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenWithDto"
+            }
+          }
+        }
+      },
       "OwingPaymentDto": {
         "required": [
           "from",
           "to",
           "amount",
-          "date"
+          "date",
+          "unallocated"
         ],
         "type": "object",
         "properties": {
@@ -3193,6 +3461,9 @@
           "date": {
             "type": "string",
             "format": "date"
+          },
+          "unallocated": {
+            "$ref": "#/components/schemas/MoneyDto"
           }
         }
       },
@@ -3555,7 +3826,8 @@
           "fxRateDate",
           "fxRateSource",
           "convertedAmountMinor",
-          "paidInGroupCurrency"
+          "paidInGroupCurrency",
+          "covers"
         ],
         "type": "object",
         "properties": {
@@ -3614,6 +3886,43 @@
           },
           "paidInGroupCurrency": {
             "type": "boolean"
+          },
+          "covers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverDto"
+            }
+          }
+        }
+      },
+      "SettlementLineDto": {
+        "required": [
+          "payment",
+          "from",
+          "to",
+          "date",
+          "covers"
+        ],
+        "type": "object",
+        "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/SettlementDto"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "covers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverLineDto"
+            }
           }
         }
       },
@@ -3655,6 +3964,15 @@
           "paidInGroupCurrency": {
             "type": "boolean",
             "default": false
+          },
+          "covers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CoverDto"
+            }
           }
         }
       },
@@ -4139,6 +4457,9 @@
       "name": "Balances"
     },
     {
+      "name": "Settlements"
+    },
+    {
       "name": "Reminders"
     },
     {
@@ -4158,9 +4479,6 @@
     },
     {
       "name": "Expenses"
-    },
-    {
-      "name": "Settlements"
     },
     {
       "name": "Recurring"

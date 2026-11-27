@@ -47,7 +47,14 @@ def main() -> int:
         for key, want in expect.items():
             bucket = key if key in scores else "other"
             have = _people(got) if key == "people" else getattr(got, key)
-            right = sorted(n.casefold() for n in want) == have if key == "people" else have == want
+            if key == "items":
+                have = sorted(n.casefold() for n in have)
+            if key in ("people", "items"):
+                right = sorted(n.casefold() for n in want) == have
+            elif isinstance(want, str) and isinstance(have, str):
+                right = have.casefold() == want.casefold()
+            else:
+                right = have == want
             scores[bucket][0] += right
             scores[bucket][1] += 1
             if opts.verbose and not right:

@@ -1,6 +1,15 @@
 "use server";
 
-import { canSave, draftToForm, toExpenseWriteDto, type AskResult, type PlainDraft } from "@kitty/core";
+import type { Schemas } from "@kitty/api-client";
+import {
+  canSave,
+  countingBoth,
+  draftToForm,
+  toExpenseWriteDto,
+  toSettlementWriteDto,
+  type AskResult,
+  type PlainDraft,
+} from "@kitty/core";
 import { askKitty, parseSentence, resolveDraft, type AiResult } from "@/lib/ai";
 import { getLedger, problemCode } from "@/lib/ledger";
 
@@ -43,4 +52,51 @@ export async function sendReminder(groupId: string, memberId: string, idempotenc
     headers: { "Idempotency-Key": idempotencyKey },
   });
   return error ? problemCode(error) : null;
+}
+
+/** What's open item by item between two members of a group, both ways; null when the ledger can't say. */
+export async function openItems(groupId: string, from: string, to: string): Promise<Schemas["OpenItemsDto"] | null> {
+  const ledger = await getLedger();
+  const { data } = await ledger.GET("/groups/{groupId}/open-items", { params: { path: { groupId }, query: { from, to } } });
+  return data ?? null;
+}
+
+/**
+ * Saves a confirmed payment card as a settlement with its covers. The key is both the settlement id and the
+ * Idempotency-Key, so a retry replays. Once saved, countingBoth is the line comparing what's still open both ways
+ * (null when only one side is open, or it can't be worked out: the payment is saved either way).
+ */
+export async function savePayment(
+  draft: PlainDraft,
+  idempotencyKey: string,
+): Promise<{ error: string | null; countingBoth: string | null }> {
+  const p = draft.payment;
+  if (draft.intent !== "payment" || !p || !draft.groupId || !canSave(draft)) return { error: "validation_failed", countingBoth: null };
+  const groupId = draft.groupId;
+  const ledger = await getLedger();
+  const { error } = await ledger.POST("/groups/{groupId}/settlements", {
+    params: { path: { groupId } },
+    body: toSettlementWriteDto(draft, idempotencyKey),
+    headers: { "Idempotency-Key": idempotencyKey },
+  });
+  if (error) return { error: problemCode(error), countingBoth: null };
+
+  try {
+    return { error: null, countingBoth: await countingBothAfter(groupId, p.fromMemberId!, p.toMemberId!, p.currency) };
+  } catch {
+    return { error: null, countingBoth: null }; // saved; only the extra line is missing
+  }
+}
+
+async function countingBothAfter(groupId: string, from: string, to: string, currency: string): Promise<string | null> {
+  const ledger = await getLedger();
+  const [open, me, group] = await Promise.all([
+    openItems(groupId, from, to),
+    ledger.GET("/me").then((r) => r.data),
+    ledger.GET("/groups/{groupId}", { params: { path: { groupId } } }).then((r) => r.data),
+  ]);
+  const meMember = group?.members.find((m) => m.userId === me?.id);
+  const other = group?.members.find((m) => m.id === (meMember?.id === from ? to : from));
+  if (!open || !meMember || !other) return null;
+  return countingBoth(open, currency, meMember.id, other.displayName);
 }

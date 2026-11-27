@@ -22,8 +22,12 @@ def parsed(**kw) -> ParsedSentence:
     return ParsedSentence.model_validate({"intent": "expense", **kw})
 
 
-def draft(p: ParsedSentence, group=FLAT, owed=None):
-    return build_draft(p, group, ME.id, TODAY, (lambda member_id: owed or {}))
+def no_open_items(from_member: str, to_member: str) -> dict:
+    raise AssertionError("open_items is only asked for payments")
+
+
+def draft(p: ParsedSentence, group=FLAT, owed=None, open_items=no_open_items):
+    return build_draft(p, group, ME.id, TODAY, (lambda member_id: owed or {}), open_items)
 
 
 def issues(d) -> list[tuple[str, str]]:
@@ -202,3 +206,176 @@ def test_a_reminder_without_a_person_is_missing():
 def test_question_is_passed_through():
     d = draft(parsed(intent="question", amount="20", people=[{"name": "Sam"}]))
     assert d == {"intent": "question", "groupId": "g-flat", "issues": [], "members": []}
+
+
+# Payments
+
+
+def owed_item(expense_id: str, description: str, day: str, minor: int, currency: str = "ZAR") -> dict:
+    item = {
+        "expenseId": expense_id,
+        "description": description,
+        "date": day,
+        "category": "other",
+        "total": {"currency": currency, "minor": minor * 2, "text": ""},
+        "myShare": {"currency": currency, "minor": minor, "text": ""},
+        "paidBy": "Joe",
+    }
+    return {"item": item, "open": {"currency": currency, "minor": minor, "text": ""}}
+
+
+UBER = owed_item("e-uber", "Uber", "2026-11-18", 2500)
+GROCERIES = owed_item("e-groceries", "Groceries", "2026-11-20", 9500)
+
+
+class FakeOpenItems:
+    """The ledger's open items from one member to another, newest first like the ledger lists them."""
+
+    def __init__(self, *items: dict):
+        self.items, self.calls = items, []
+
+    def __call__(self, from_member: str, to_member: str) -> dict:
+        self.calls.append((from_member, to_member))
+        by_currency: dict[str, list[dict]] = {}
+        for i in sorted(self.items, key=lambda i: i["item"]["date"], reverse=True):
+            by_currency.setdefault(i["open"]["currency"], []).append(i)
+        currencies = [
+            {
+                "currency": c,
+                "fromOwes": owes,
+                "fromOwesTotal": {"currency": c, "minor": sum(i["open"]["minor"] for i in owes), "text": ""},
+                "toOwes": [],
+                "toOwesTotal": {"currency": c, "minor": 0, "text": ""},
+            }
+            for c, owes in by_currency.items()
+        ]
+        return {"fromMemberId": from_member, "toMemberId": to_member, "currencies": currencies}
+
+
+def payment(open_items=None, **kw) -> dict:
+    p = parsed(intent="payment", counterpart="Joe", **kw)
+    return draft(p, open_items=open_items or FakeOpenItems(UBER, GROCERIES))
+
+
+def test_payment_covers_the_named_item():
+    d = payment(direction="i_paid", items=["Uber"])
+    pay = d["payment"]
+    assert (pay["fromMemberId"], pay["toMemberId"], pay["currency"]) == (ME.id, JOE.id, "ZAR")
+    assert pay["covers"] == [{"expenseId": "e-uber", "amountMinor": 2500}]
+    assert (pay["amountMinor"], pay["statedAmountMinor"]) == (2500, None)
+    assert pay["openItems"] == [
+        {"expenseId": "e-uber", "description": "Uber", "date": "2026-11-18", "openMinor": 2500},
+        {"expenseId": "e-groceries", "description": "Groceries", "date": "2026-11-20", "openMinor": 9500},
+    ]
+    assert d["intent"] == "payment" and issues(d) == []
+
+
+def test_payment_part_amount_stays_on_one_item():
+    pay = payment(direction="i_paid", items=["uber"], amount="10")["payment"]
+    assert pay["covers"] == [{"expenseId": "e-uber", "amountMinor": 1000}]
+    assert (pay["amountMinor"], pay["statedAmountMinor"]) == (1000, 1000)
+
+
+def test_payment_without_items_covers_everything_open():
+    pay = payment(direction="i_paid")["payment"]
+    assert pay["covers"] == [
+        {"expenseId": "e-uber", "amountMinor": 2500},
+        {"expenseId": "e-groceries", "amountMinor": 9500},
+    ]
+    assert pay["amountMinor"] == 12000
+
+
+def test_a_stated_amount_is_allocated_oldest_first_and_the_rest_stays_untied():
+    pay = payment(direction="i_paid", amount="150")["payment"]
+    assert pay["covers"] == [
+        {"expenseId": "e-uber", "amountMinor": 2500},
+        {"expenseId": "e-groceries", "amountMinor": 9500},
+    ]
+    assert pay["amountMinor"] == 15000
+    pay = payment(direction="i_paid", amount="30")["payment"]
+    assert pay["covers"] == [
+        {"expenseId": "e-uber", "amountMinor": 2500},
+        {"expenseId": "e-groceries", "amountMinor": 500},
+    ]
+
+
+def test_two_matches_is_an_ambiguous_issue():
+    second = owed_item("e-uber-2", "Uber home", "2026-11-19", 4000)
+    d = payment(FakeOpenItems(UBER, second, GROCERIES), direction="i_paid", items=["Uber"])
+    issue = next(i for i in d["issues"] if i["field"] == "payment.items[0]")
+    assert (issue["kind"], sorted(issue["candidates"])) == ("ambiguous", ["e-uber", "e-uber-2"])
+    assert d["payment"]["covers"] == []
+
+
+def test_an_unknown_item_is_no_match_with_every_open_item():
+    d = payment(direction="i_paid", items=["Uber", "petrol"])
+    issue = next(i for i in d["issues"] if i["field"] == "payment.items[1]")
+    assert (issue["kind"], issue["text"], issue["candidates"]) == ("no_match", "petrol", ["e-uber", "e-groceries"])
+    assert d["payment"]["covers"] == [{"expenseId": "e-uber", "amountMinor": 2500}]
+
+
+def test_a_phrase_matches_by_word_prefixes():
+    pay = payment(FakeOpenItems(owed_item("e-w", "Woolworths groceries", "2026-11-21", 300)), items=["groc wool"])
+    assert pay["payment"]["covers"] == [{"expenseId": "e-w", "amountMinor": 300}]
+
+
+def test_payment_with_nothing_open_is_an_issue():
+    d = payment(FakeOpenItems(), direction="i_paid", items=["Uber"])
+    assert issues(d) == [("payment.items", "missing")]
+    assert (d["payment"]["covers"], d["payment"]["openItems"]) == ([], [])
+
+
+def test_they_paid_reverses_the_members():
+    open_items = FakeOpenItems(UBER, GROCERIES)
+    pay = payment(open_items, direction="they_paid")["payment"]
+    assert (pay["fromMemberId"], pay["toMemberId"]) == (JOE.id, ME.id)
+    assert open_items.calls == [(JOE.id, ME.id)]
+
+
+def test_no_direction_means_i_paid():
+    open_items = FakeOpenItems(UBER)
+    pay = payment(open_items, items=["Uber"])["payment"]
+    assert (pay["fromMemberId"], pay["toMemberId"]) == (ME.id, JOE.id)
+    assert open_items.calls == [(ME.id, JOE.id)]
+
+
+def test_other_currency_item_is_flagged():
+    hotel = owed_item("e-hotel", "Hotel", "2026-11-10", 12000, "EUR")
+    d = payment(FakeOpenItems(UBER, hotel), direction="i_paid", items=["hotel"])
+    assert issues(d) == [("payment.items[0]", "other_currency")]
+    assert [i["expenseId"] for i in d["payment"]["openItems"]] == ["e-uber"]  # only the group's currency is listed
+    assert d["payment"]["covers"] == []
+
+
+def test_a_sentence_in_another_currency_is_flagged():
+    d = payment(direction="i_paid", items=["Uber"], amount="10", currency="EUR")
+    assert ("payment.amount", "other_currency") in issues(d)
+    assert d["payment"]["currency"] == "ZAR"
+
+
+def test_a_missing_or_unknown_counterpart_is_an_issue_and_the_ledger_isnt_asked():
+    d = draft(parsed(intent="payment", direction="i_paid", items=["Uber"]))  # no_open_items raises if called
+    assert issues(d) == [("payment.counterpart", "missing")]
+    pay = d["payment"]
+    assert (pay["fromMemberId"], pay["toMemberId"], pay["openItems"], pay["covers"]) == (ME.id, None, [], [])
+    assert issues(draft(parsed(intent="payment", counterpart="Thabo"))) == [("payment.counterpart", "no_match")]
+    assert issues(draft(parsed(intent="payment", counterpart="me"))) == [("payment.counterpart", "no_match")]
+    d = draft(parsed(intent="payment", direction="they_paid", counterpart="Jo"))
+    issue = d["issues"][0]
+    assert (issue["field"], issue["kind"], sorted(issue["candidates"])) == (
+        "payment.counterpart",
+        "ambiguous",
+        [JOE.id, JOHN.id],
+    )
+    assert (d["payment"]["fromMemberId"], d["payment"]["toMemberId"]) == (None, ME.id)
+
+
+def test_unreadable_amount_is_an_issue():
+    d = payment(direction="i_paid", amount="2 000")
+    issue = next(i for i in d["issues"] if i["field"] == "payment.amount")
+    assert (issue["kind"], issue["text"]) == ("missing", "2 000")
+    assert (d["payment"]["amountMinor"], d["payment"]["statedAmountMinor"]) == (None, None)
+
+
+def test_payment_draft_lists_the_groups_members():
+    assert payment(items=["Uber"])["members"][0] == {"id": ME.id, "displayName": "Zakhir McKinnon"}

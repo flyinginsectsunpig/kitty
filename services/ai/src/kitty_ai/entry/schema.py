@@ -16,7 +16,7 @@ class Person(BaseModel):
 
 
 class ParsedSentence(BaseModel):
-    intent: Literal["expense", "reminder", "question", "unclear"]
+    intent: Literal["expense", "reminder", "question", "payment", "unclear"]
     group: str | None = Field(default=None, description='The group as written, e.g. "family", or null.')
     description: str | None = Field(default=None, description='A short title, e.g. "Dinner", "Petrol".')
     category: Category | None = None
@@ -27,3 +27,6 @@ class ParsedSentence(BaseModel):
     people: list[Person] = Field(default_factory=list)
     split: Literal["equal", "amounts"] | None = None
     reminder_amount: str | None = Field(default=None, description="For a reminder: the amount mentioned, if any.")
+    direction: Literal["i_paid", "they_paid"] | None = None
+    counterpart: str | None = Field(default=None, description="The other person in a payment, as written.")
+    items: list[str] = Field(default_factory=list, description='What a payment was for, as written, e.g. ["Uber"].')

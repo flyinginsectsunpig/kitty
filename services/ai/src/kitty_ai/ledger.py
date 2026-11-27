@@ -87,3 +87,7 @@ class LedgerReader:
         """A group's spending: the ledger's /groups/{id}/spending JSON. Filters left as None are not sent."""
         params = {k: v for k, v in {"from": from_, "to": to, "category": category, "q": q}.items() if v is not None}
         return self._get(f"/groups/{group_id}/spending", params)
+
+    def open_items(self, group_id: str, from_member: str, to_member: str) -> dict:
+        """What's still open between two members: the ledger's /groups/{id}/open-items JSON."""
+        return self._get(f"/groups/{group_id}/open-items", {"from": from_member, "to": to_member})

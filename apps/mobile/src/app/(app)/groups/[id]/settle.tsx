@@ -1,9 +1,9 @@
 import type { Schemas } from "@kitty/api-client";
-import { describeRate, errorMessage } from "@kitty/core";
+import { allocateCovers, coverLines, coverNote, describeRate, draftMoney, errorMessage, type OpenItem } from "@kitty/core";
 import { convertMinor, formatMoney, parseRate } from "@kitty/money";
 import { randomUUID } from "expo-crypto";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../../components/Button";
 import { Checkbox } from "../../../../components/Checkbox";
 import { TextField } from "../../../../components/TextField";
@@ -16,6 +16,7 @@ import { useAction } from "../../../../hooks/useAction";
 import { useFetchRate } from "../../../../hooks/useFetchRate";
 import { useLoad } from "../../../../hooks/useLoad";
 import { useLedger } from "../../../../ledger";
+import { dayMonth } from "../../../../lib/day-month";
 import { colors, font, radius, space } from "../../../../theme";
 
 type Transfer = Schemas["TransferDto"] & { currency: string };
@@ -24,42 +25,58 @@ export default function SettleScreen() {
   const ledger = useLedger();
   const { group, me } = useGroup();
   const balances = useLoad(() => ledger.GET("/groups/{groupId}/balances", { params: { path: { groupId: group.id } } }), [ledger, group.id]);
-  const [recorded, setRecorded] = useState(false);
+  // Recent payments are extra: if they can't be loaded, the section is left out and the transfers still show.
+  const payments = useLoad(
+    () => ledger.GET("/groups/{groupId}/settlements", { params: { path: { groupId: group.id }, query: { limit: 20 } } }),
+    [ledger, group.id],
+  );
+  const [notice, setNotice] = useState<string | null>(null);
+  // Bumped once everything has loaded again, so each transfer's card (its open items and ticks) starts afresh.
+  const [round, setRound] = useState(0);
+  const refresh = () => void Promise.all([balances.reload(), payments.reload()]).then(() => setRound((r) => r + 1));
+  const changed = (message: string) => {
+    setNotice(message);
+    refresh();
+  };
 
   // Your own payments first, then ones you are owed, then everyone else's.
   const rank = (t: Transfer) => (t.fromMemberId === me.id ? 0 : t.toMemberId === me.id ? 1 : 2);
 
   return (
-    <Screen onRefresh={() => void balances.reload()} refreshing={balances.loading && balances.data !== null}>
+    <Screen onRefresh={refresh} refreshing={balances.loading && balances.data !== null}>
       <GroupNav groupId={group.id} active="/settle" />
-      {recorded && <Text style={styles.success}>Payment recorded.</Text>}
+      {notice && <Text style={styles.success}>{notice}</Text>}
       <LoadState state={balances}>
         {(b) => {
           const transfers = b.currencies.flatMap((c) => c.transfers.map((t) => ({ ...t, currency: c.currency }))).sort((x, y) => rank(x) - rank(y));
-          if (transfers.length === 0)
-            return (
-              <Card>
-                <Text style={styles.center}>Everyone is settled up. 🎉</Text>
-              </Card>
-            );
           return (
             <>
-              <Text style={styles.muted}>The fewest payments that settle everyone. Pay outside Kitty, then mark it as paid.</Text>
-              {transfers.map((t, i) => (
-                <View key={`${t.currency}-${t.fromMemberId}-${t.toMemberId}-${t.amountMinor}`} style={styles.stack}>
-                  <TransferCard
-                    transfer={t}
-                    onPaid={() => {
-                      setRecorded(true);
-                      void balances.reload();
-                    }}
-                  />
-                  {/* Someone who owes you: one Remind per person, under their first payment to you. */}
-                  {t.toMemberId === me.id && transfers.findIndex((x) => x.toMemberId === me.id && x.fromMemberId === t.fromMemberId) === i && (
-                    <RemindButton memberId={t.fromMemberId} />
-                  )}
+              {transfers.length === 0 ? (
+                <Card>
+                  <Text style={styles.center}>Everyone is settled up. 🎉</Text>
+                </Card>
+              ) : (
+                <>
+                  <Text style={styles.muted}>The fewest payments that settle everyone. Pay outside Kitty, then mark it as paid.</Text>
+                  {transfers.map((t, i) => (
+                    <View key={`${round}-${t.currency}-${t.fromMemberId}-${t.toMemberId}-${t.amountMinor}`} style={styles.stack}>
+                      <TransferCard transfer={t} onPaid={() => changed("Payment recorded.")} />
+                      {/* Someone who owes you: one Remind per person, under their first payment to you. */}
+                      {t.toMemberId === me.id && transfers.findIndex((x) => x.toMemberId === me.id && x.fromMemberId === t.fromMemberId) === i && (
+                        <RemindButton memberId={t.fromMemberId} />
+                      )}
+                    </View>
+                  ))}
+                </>
+              )}
+              {payments.data && payments.data.length > 0 && (
+                <View style={styles.stack}>
+                  <Text style={styles.heading}>Recent payments</Text>
+                  {payments.data.map((line) => (
+                    <PaymentRow key={line.payment.id} line={line} onDeleted={() => changed("Payment deleted.")} />
+                  ))}
                 </View>
-              ))}
+              )}
             </>
           );
         }}
@@ -112,6 +129,10 @@ function TransferCard({ transfer: t, onPaid }: { transfer: Transfer; onPaid: () 
   // Something typed that isn't a rate is sent as typed, so the ledger rejects it: never swapped for the ECB rate.
   const typed = showRateBox ? typedRate.trim() : "";
   const fxRate = typed ? (parseRate(typed) ?? typed) : foreign && inGroupCurrency ? ecb?.rate : undefined;
+  const items = useOpenItems(t);
+  // The ticks are kept as ticked, not read back from the covers: an item the amount doesn't reach stays ticked.
+  const [ticked, setTicked] = useState<string[]>([]);
+  const covers = useMemo(() => allocateCovers(items, ticked, t.amountMinor).covers, [items, ticked, t.amountMinor]);
   const pay = useAction(
     useCallback(
       (key: string) =>
@@ -121,10 +142,12 @@ function TransferCard({ transfer: t, onPaid }: { transfer: Transfer; onPaid: () 
             id, fromMemberId: t.fromMemberId, toMemberId: t.toMemberId, currency: t.currency, amountMinor: t.amountMinor,
             ...(fxRate ? { fxRate } : {}),
             paidInGroupCurrency: foreign && inGroupCurrency,
+            // Nothing ticked: a payment not tied to an item, as before.
+            ...(covers.length > 0 ? { covers } : {}),
           },
           headers: { "Idempotency-Key": key },
         }),
-      [ledger, group.id, id, t, fxRate, foreign, inGroupCurrency],
+      [ledger, group.id, id, t, fxRate, foreign, inGroupCurrency, covers],
     ),
   );
   useEffect(() => {
@@ -157,12 +180,116 @@ function TransferCard({ transfer: t, onPaid }: { transfer: Transfer; onPaid: () 
           onInGroupCurrency={setInGroupCurrency} typedRate={typedRate} onTypedRate={setTypedRate} showRateBox={showRateBox}
         />
       )}
+      {items.length > 0 && (
+        <CoversPicker items={items} ticked={ticked} onTicked={setTicked} covers={covers} currency={t.currency} />
+      )}
       <ErrorBanner message={pay.error} />
       <Button title="Mark as paid" busy={pay.busy} onPress={() => void pay.run().then((r) => r.ok && onPaid())} />
     </Card>
   );
 }
 
+/**
+ * What the payer still owes the receiver item by item, in the transfer's currency, for the ticks. Empty while
+ * loading and when the ledger can't list them: the ticks are optional, and the transfer is marked as paid without.
+ */
+function useOpenItems(t: Transfer): OpenItem[] {
+  const ledger = useLedger();
+  const { group } = useGroup();
+  const [items, setItems] = useState<OpenItem[]>([]);
+  const { fromMemberId: from, toMemberId: to, currency } = t;
+  useEffect(() => {
+    let live = true;
+    ledger
+      .GET("/groups/{groupId}/open-items", { params: { path: { groupId: group.id }, query: { from, to } } })
+      .then((r) => {
+        const open = r.data?.currencies.find((c) => c.currency === currency)?.fromOwes ?? [];
+        if (live)
+          setItems(open.map((o) => ({ expenseId: o.item.expenseId, description: o.item.description, date: o.item.date, openMinor: o.open.minor })));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [ledger, group.id, from, to, currency]);
+  return items;
+}
+
+/** "What it covers": the open items, none ticked at first; the payment is spread over the ticked ones, oldest first. */
+function CoversPicker({ items, ticked, onTicked, covers, currency }: {
+  items: OpenItem[];
+  ticked: string[];
+  onTicked: (ticked: string[]) => void;
+  covers: { expenseId: string; amountMinor: number }[];
+  currency: string;
+}) {
+  const [open, setOpen] = useState(false);
+  // Before saving, say what a ticked item doesn't get: part of what's open, or nothing once the payment runs out.
+  const notes = coverLines(items, ticked, covers)
+    .map((l) => ({ id: l.expenseId, text: coverNote(l, currency) }))
+    .filter((n) => n.text !== null);
+  const toggle = (id: string) => onTicked(ticked.includes(id) ? ticked.filter((x) => x !== id) : [...ticked, id]);
+  return (
+    <View style={styles.foreign}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={styles.toggle} hitSlop={6}>
+        <Text style={styles.muted}>{open ? "▾" : "▸"}</Text>
+        <Text style={styles.muted}>What it covers</Text>
+      </Pressable>
+      {open && (
+        <>
+          {items.map((i) => (
+            <Checkbox
+              key={i.expenseId}
+              label={`${i.description} · ${dayMonth(i.date)} · ${draftMoney(i.openMinor, currency)} open`}
+              checked={ticked.includes(i.expenseId)}
+              onChange={() => toggle(i.expenseId)}
+            />
+          ))}
+          {notes.map((n) => (
+            <Text key={n.id} style={styles.muted}>
+              {n.text}
+            </Text>
+          ))}
+        </>
+      )}
+    </View>
+  );
+}
+
+/** One of Recent payments, with Delete: the items it covered go back on the list. */
+function PaymentRow({ line: r, onDeleted }: { line: Schemas["SettlementLineDto"]; onDeleted: () => void }) {
+  const ledger = useLedger();
+  const { group, me } = useGroup();
+  const p = r.payment;
+  const remove = useAction(
+    useCallback(
+      (key: string) =>
+        ledger.DELETE("/groups/{groupId}/settlements/{settlementId}", {
+          params: { path: { groupId: group.id, settlementId: p.id } },
+          headers: { "Idempotency-Key": key },
+        }),
+      [ledger, group.id, p.id],
+    ),
+  );
+  const from = p.fromMemberId === me.id ? "You" : r.from;
+  const to = p.toMemberId === me.id ? "you" : r.to;
+  const what = r.covers.map((c) => c.description).join(", ");
+  const money = formatMoney(p.amountMinor, p.currency);
+  const confirmDelete = () =>
+    Alert.alert("Delete this payment?", "Its items go back on the list.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => void remove.run().then((done) => done.ok && onDeleted()) },
+    ]);
+  return (
+    <Card>
+      <View style={styles.paymentRow}>
+        <Text style={[styles.line, styles.grow]}>{`${from} paid ${to} ${money} · ${dayMonth(r.date)}${what ? ` · for: ${what}` : ""}`}</Text>
+        <Button title="Delete" variant="secondary" busy={remove.busy} accessibilityLabel={`Delete payment: ${from} paid ${to} ${money}`} onPress={confirmDelete} />
+      </View>
+      <ErrorBanner message={remove.error} />
+    </Card>
+  );
+}
 
 /**
  * Settling a debt in another currency: today's ECB rate, the option to pay in the group's currency, and a rate box —
@@ -221,6 +348,10 @@ function ForeignFields({ transfer: t, groupCurrency, quote, inGroupCurrency, onI
 
 const styles = StyleSheet.create({
   stack: { gap: space.sm },
+  heading: { fontSize: font.base, fontWeight: "600", color: colors.text },
+  toggle: { flexDirection: "row", alignItems: "center", gap: space.xs, minHeight: 32 },
+  paymentRow: { flexDirection: "row", alignItems: "center", gap: space.md },
+  grow: { flex: 1 },
   foreign: { gap: space.xs },
   line: { fontSize: font.base, color: colors.text },
   strong: { fontWeight: "600" },

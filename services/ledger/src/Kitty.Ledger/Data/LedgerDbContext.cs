@@ -149,6 +149,13 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
             e.HasOne<Group>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Member>().WithMany().HasForeignKey(x => x.FromMemberId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Member>().WithMany().HasForeignKey(x => x.ToMemberId).OnDelete(DeleteBehavior.Restrict);
+            e.OwnsMany(x => x.Covers, c =>
+            {
+                c.ToTable("SettlementCovers");
+                c.WithOwner().HasForeignKey("SettlementId");
+                c.HasKey("SettlementId", nameof(SettlementCover.ExpenseId));
+                c.HasOne<Expense>().WithMany().HasForeignKey(x => x.ExpenseId).OnDelete(DeleteBehavior.Restrict);
+            });
         });
 
         b.Entity<AuditEntry>(e =>

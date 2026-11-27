@@ -180,6 +180,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/groups/{groupId}/open-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetOpenItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/groups/{groupId}/reminders": {
         parameters: {
             query?: never;
@@ -315,7 +331,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["ListSettlements"];
         put?: never;
         post: operations["CreateSettlement"];
         delete?: never;
@@ -752,6 +768,18 @@ export interface components {
             /** Format: int32 */
             excludedCount: number;
         };
+        CoverDto: {
+            /** Format: uuid */
+            expenseId: string;
+            /** Format: int64 */
+            amountMinor: number;
+        };
+        CoverLineDto: {
+            /** Format: uuid */
+            expenseId: string;
+            description: string;
+            amount: components["schemas"]["MoneyDto"];
+        };
         CreateGroupDto: {
             /** Format: uuid */
             id: string;
@@ -960,11 +988,36 @@ export interface components {
             reminderPush: boolean;
             reminderEmail: boolean;
         };
+        OpenItemDto: {
+            item: components["schemas"]["ExpenseLineDto"];
+            open: components["schemas"]["MoneyDto"];
+        };
+        OpenItemsCurrencyDto: {
+            currency: string;
+            fromOwes: components["schemas"]["OpenItemDto"][];
+            fromOwesTotal: components["schemas"]["MoneyDto"];
+            toOwes: components["schemas"]["OpenItemDto"][];
+            toOwesTotal: components["schemas"]["MoneyDto"];
+        };
+        OpenItemsDto: {
+            /** Format: uuid */
+            fromMemberId: string;
+            /** Format: uuid */
+            toMemberId: string;
+            currencies: components["schemas"]["OpenItemsCurrencyDto"][];
+        };
+        OpenWithDto: {
+            /** Format: uuid */
+            memberId: string;
+            name: string;
+            direction: string;
+            amount: components["schemas"]["MoneyDto"];
+        };
         OwingCurrencyDto: {
             currency: string;
             myNet: components["schemas"]["MoneyDto"];
             transfers: components["schemas"]["OwingTransferDto"][];
-            since: components["schemas"]["ExpenseLineDto"][];
+            since: components["schemas"]["OwingLineDto"][];
             /** Format: int32 */
             moreSince: number;
             payments: components["schemas"]["OwingPaymentDto"][];
@@ -981,12 +1034,25 @@ export interface components {
             name: string;
             currencies: components["schemas"]["OwingCurrencyDto"][];
         };
+        OwingLineDto: {
+            /** Format: uuid */
+            expenseId: string;
+            description: string;
+            /** Format: date */
+            date: string;
+            category: string;
+            total: components["schemas"]["MoneyDto"];
+            myShare: components["schemas"]["MoneyDto"];
+            paidBy: string;
+            open: components["schemas"]["OpenWithDto"][];
+        };
         OwingPaymentDto: {
             from: string;
             to: string;
             amount: components["schemas"]["MoneyDto"];
             /** Format: date */
             date: string;
+            unallocated: components["schemas"]["MoneyDto"];
         };
         OwingPersonDto: {
             /** Format: uuid */
@@ -1105,6 +1171,15 @@ export interface components {
             /** Format: int64 */
             convertedAmountMinor: null | number;
             paidInGroupCurrency: boolean;
+            covers: components["schemas"]["CoverDto"][];
+        };
+        SettlementLineDto: {
+            payment: components["schemas"]["SettlementDto"];
+            from: string;
+            to: string;
+            /** Format: date */
+            date: string;
+            covers: components["schemas"]["CoverLineDto"][];
         };
         SettlementWriteDto: {
             /** Format: uuid */
@@ -1119,6 +1194,7 @@ export interface components {
             fxRate?: null | string;
             /** @default false */
             paidInGroupCurrency: boolean;
+            covers?: null | components["schemas"]["CoverDto"][];
         };
         ShareDto: {
             /** Format: uuid */
@@ -1592,6 +1668,31 @@ export interface operations {
             };
         };
     };
+    GetOpenItems: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenItemsDto"];
+                };
+            };
+        };
+    };
     CreateReminder: {
         parameters: {
             query?: never;
@@ -1861,6 +1962,30 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ListSettlements: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementLineDto"][];
+                };
             };
         };
     };

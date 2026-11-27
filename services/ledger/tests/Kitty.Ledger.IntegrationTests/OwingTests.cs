@@ -3,8 +3,11 @@ using System.Net.Http.Json;
 namespace Kitty.Ledger.IntegrationTests;
 
 public sealed record OwingTransferDto(string Direction, Guid MemberId, string Name, MoneyDto Amount);
-public sealed record OwingPaymentDto(string From, string To, MoneyDto Amount, DateOnly Date);
-public sealed record OwingCurrencyDto(string Currency, MoneyDto MyNet, List<OwingTransferDto> Transfers, List<ExpenseLineDto> Since,
+public sealed record OwingPaymentDto(string From, string To, MoneyDto Amount, DateOnly Date, MoneyDto Unallocated);
+public sealed record OpenWithDto(Guid MemberId, string Name, string Direction, MoneyDto Amount);
+public sealed record OwingLineDto(Guid ExpenseId, string Description, DateOnly Date, string Category, MoneyDto Total, MoneyDto MyShare,
+    string PaidBy, List<OpenWithDto> Open);
+public sealed record OwingCurrencyDto(string Currency, MoneyDto MyNet, List<OwingTransferDto> Transfers, List<OwingLineDto> Since,
     int MoreSince, List<OwingPaymentDto> Payments);
 public sealed record OwingGroupDto(Guid Id, string Name, List<OwingCurrencyDto> Currencies);
 public sealed record OwingPersonDto(Guid? UserId, Guid? MemberId, string Name, List<MoneyDto> IOwe, List<MoneyDto> OwesMe,
@@ -105,7 +108,7 @@ public class OwingTests(LedgerApiFactory factory)
         var zar = Assert.Single(Assert.Single((await OwingAsync(w.Owner)).Groups).Currencies);
 
         Assert.Equal(["Groceries", "Uber"], zar.Since.Select(l => l.Description));
-        Assert.Equal([new OwingPaymentDto("Owner", "Friend", MoneyDto.Of(5000), SouthAfricanToday)], zar.Payments);
+        Assert.Equal([new OwingPaymentDto("Owner", "Friend", MoneyDto.Of(5000), SouthAfricanToday, MoneyDto.Of(5000))], zar.Payments);
         Assert.Equal(MoneyDto.Of(-7000), zar.MyNet);
         Assert.Equal(7000, Assert.Single(zar.Transfers).Amount.Minor);
     }
@@ -189,5 +192,33 @@ public class OwingTests(LedgerApiFactory factory)
         Assert.Equal([MoneyDto.Of(1000, "EUR"), MoneyDto.Of(1000)], o.IOwe);
         Assert.Equal(["EUR", "ZAR"], Assert.Single(o.Groups).Currencies.Select(c => c.Currency));
         Assert.Equal(["Paris lunch"], Assert.Single(o.Groups).Currencies[0].Since.Select(l => l.Description));
+    }
+
+    [Fact]
+    public async Task Owing_lists_only_open_items_with_who_they_are_open_with()
+    {
+        var w = await WorldAsync();
+        var uber = await w.Owner.SpendAsync(w.Flat, 5000, w.FriendM, [w.Me, w.FriendM], "Uber", On);
+        await w.Owner.SpendAsync(w.Flat, 19000, w.FriendM, [w.Me, w.FriendM], "Groceries", On.AddDays(1));
+        (await w.Owner.SettleCoveringAsync(w.Flat, w.Me, w.FriendM, 2500, (uber, 2500))).EnsureSuccessStatusCode();
+
+        var zar = Assert.Single(Assert.Single((await OwingAsync(w.Owner)).Groups).Currencies);
+
+        var groceries = Assert.Single(zar.Since);
+        Assert.Equal("Groceries", groceries.Description);
+        Assert.Equal([new OpenWithDto(w.FriendM, "Friend", "i_pay", MoneyDto.Of(9500))], groceries.Open);
+    }
+
+    [Fact]
+    public async Task Payment_shows_its_unallocated_part()
+    {
+        var w = await WorldAsync();
+        var uber = await w.Owner.SpendAsync(w.Flat, 5000, w.FriendM, [w.Me, w.FriendM], "Uber", On);
+        await w.Owner.SpendAsync(w.Flat, 19000, w.FriendM, [w.Me, w.FriendM], "Groceries", On.AddDays(1));
+        (await w.Owner.SettleCoveringAsync(w.Flat, w.Me, w.FriendM, 5000, (uber, 2500))).EnsureSuccessStatusCode();
+
+        var zar = Assert.Single(Assert.Single((await OwingAsync(w.Owner)).Groups).Currencies);
+
+        Assert.Equal(MoneyDto.Of(2500), Assert.Single(zar.Payments).Unallocated);
     }
 }

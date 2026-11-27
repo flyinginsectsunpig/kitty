@@ -41,7 +41,8 @@ TOOLS: list[ToolSpec] = [
     ToolSpec(
         "what_i_owe",
         "What the person owes and is owed across all their groups: grand totals per currency, per person, "
-        "and per group with the settle-up plan and the expenses and payments since they were last square. "
+        "and per group with the settle-up plan, the items still open (with what's left and who it's open with), "
+        "and the payments since they were last square with each one's part not tied to an item. "
         "Amounts are already formatted.",
         _NO_PARAMETERS,
     ),
@@ -63,9 +64,8 @@ TOOLS: list[ToolSpec] = [
     ),
     ToolSpec(
         "not_a_question",
-        "Call this when the latest message is a new expense to add or a reminder to send, not a question. Never call "
-        "it to cross off, mark as paid, delete or change an existing expense or payment, even when the person says "
-        "they paid someone: answer those yourself.",
+        "Call this when the latest message is something to add or a reminder to send, not a question: a new "
+        "expense, a payment that happened, or crossing off an existing expense as paid.",
         _NO_PARAMETERS,
     ),
 ]

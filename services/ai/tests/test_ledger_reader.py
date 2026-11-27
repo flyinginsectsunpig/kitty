@@ -100,3 +100,18 @@ def test_a_group_the_ledger_hides_is_not_found():
     reader = LedgerReader("http://ledger.test", "tok-1", fake_ledger([]))
     with pytest.raises(NotFound):
         reader.group("99999999-9999-9999-9999-999999999999")
+
+
+def test_open_items_reads_both_members():
+    seen: list[httpx.Request] = []
+    body = {"fromMemberId": "m1", "toMemberId": "m2", "currencies": []}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=body)
+
+    reader = LedgerReader("http://ledger.test", "tok-1", httpx.Client(transport=httpx.MockTransport(handle)))
+    assert reader.open_items("g1", "m1", "m2") == body
+    [request] = seen
+    assert request.url.path == "/groups/g1/open-items"
+    assert dict(request.url.params) == {"from": "m1", "to": "m2"}

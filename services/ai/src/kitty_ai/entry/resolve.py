@@ -80,14 +80,115 @@ def _issue(field_name: str, kind: str, text: str, candidates: list[str] | None =
     return {"field": field_name, "kind": kind, "text": text, "candidates": candidates or []}
 
 
+def _phrase_matches(phrase: str, description: str) -> bool:
+    """Every word of the phrase starts some word of the description: "groc wool" matches "Woolworths groceries"."""
+    words = _norm(description).split()
+    return all(any(w.startswith(p) for w in words) for p in _norm(phrase).split())
+
+
+def _payment(
+    parsed: ParsedSentence,
+    group: Group,
+    me_member_id: str,
+    currency: str,
+    issues: list[dict],
+    open_items: Callable[[str, str], dict],
+) -> dict:
+    """The payment the sentence describes, crossing off the open items it names (all of them when it names none)."""
+    other_id = None
+    if not parsed.counterpart:
+        issues.append(_issue("payment.counterpart", "missing", ""))
+    else:
+        m = match_member(parsed.counterpart, me_member_id, group.members)
+        if m.kind == "ok" and m.member_id == me_member_id:  # paying yourself isn't a payment
+            issues.append(_issue("payment.counterpart", "no_match", parsed.counterpart))
+        elif m.kind != "ok":
+            issues.append(_issue("payment.counterpart", m.kind, parsed.counterpart, m.candidates))
+        else:
+            other_id = m.member_id
+    # Crossing something off means the speaker paid, unless the sentence says they did.
+    from_id, to_id = (other_id, me_member_id) if parsed.direction == "they_paid" else (me_member_id, other_id)
+
+    base = group.base_currency
+    if currency != base:
+        issues.append(_issue("payment.amount", "other_currency", parsed.currency or ""))
+    stated = to_minor(parsed.amount, currency) if parsed.amount else None
+    unreadable = bool(parsed.amount) and stated is None  # never read as "pay everything open"
+    if unreadable:
+        issues.append(_issue("payment.amount", "missing", parsed.amount or ""))
+
+    owed: list[dict] = []
+    if other_id is not None:
+        owed = [o for c in open_items(from_id, to_id)["currencies"] for o in c["fromOwes"]]
+    in_base = sorted(
+        (o for o in owed if o["open"]["currency"] == base), key=lambda o: (o["item"]["date"], o["item"]["expenseId"])
+    )
+    elsewhere = [o for o in owed if o["open"]["currency"] != base]
+    open_list = [
+        {
+            "expenseId": o["item"]["expenseId"],
+            "description": o["item"]["description"],
+            "date": o["item"]["date"],
+            "openMinor": o["open"]["minor"],
+        }
+        for o in in_base
+    ]
+    if other_id is not None and not open_list:
+        issues.append(_issue("payment.items", "missing", ""))
+
+    covered = {i["expenseId"] for i in open_list} if not any(p.strip() for p in parsed.items) else set()
+    for n, phrase in enumerate(parsed.items):
+        if not phrase.strip():
+            continue
+        hits = [i["expenseId"] for i in open_list if _phrase_matches(phrase, i["description"])]
+        if len(hits) == 1:
+            covered.add(hits[0])
+        elif hits:
+            issues.append(_issue(f"payment.items[{n}]", "ambiguous", phrase, hits))
+        elif any(_phrase_matches(phrase, o["item"]["description"]) for o in elsewhere):
+            issues.append(_issue(f"payment.items[{n}]", "other_currency", phrase))
+        elif open_list:
+            issues.append(_issue(f"payment.items[{n}]", "no_match", phrase, [i["expenseId"] for i in open_list]))
+
+    # Oldest first. A stated amount of the group's currency is spread over the covered items, each up to what's open
+    # on it, and any rest stays not tied to an item; without one, each covered item is paid in full.
+    left = stated if currency == base else None
+    covers: list[dict] = []
+    for i in open_list:
+        if i["expenseId"] not in covered:
+            continue
+        amount = i["openMinor"] if left is None else min(i["openMinor"], left)
+        if amount > 0:
+            covers.append({"expenseId": i["expenseId"], "amountMinor": amount})
+        if left is not None:
+            left -= amount
+    if unreadable:
+        total = None
+    elif currency == base and stated is not None:
+        total = stated
+    else:
+        total = sum(c["amountMinor"] for c in covers) or None
+    return {
+        "fromMemberId": from_id,
+        "toMemberId": to_id,
+        "currency": base,
+        "amountMinor": total,
+        "statedAmountMinor": stated,
+        "openItems": open_list,
+        "covers": covers,
+    }
+
+
 def build_draft(
     parsed: ParsedSentence,
     group: Group,
     me_member_id: str,
     today: date,
     owed_for: Callable[[str], dict[str, int]],
+    open_items: Callable[[str, str], dict],
 ) -> dict:
-    """The draft for one group. owed_for(member_id) is what that member owes the speaker (only asked for reminders)."""
+    """The draft for one group. owed_for(member_id) is what that member owes the speaker (only asked for reminders);
+    open_items(from_member, to_member) is the ledger's open items between two members (only asked for payments)."""
     if parsed.intent == "question":  # the app sends it on to /ask: nothing to fill in
         return {"intent": "question", "groupId": group.id, "issues": [], "members": []}
     issues: list[dict] = []
@@ -123,6 +224,10 @@ def build_draft(
             "statedAmountMinor": to_minor(stated, currency) if stated else None,
             "statedCurrency": currency,
         }
+        return draft
+
+    if parsed.intent == "payment":
+        draft["payment"] = _payment(parsed, group, me_member_id, currency, issues, open_items)
         return draft
 
     if parsed.intent != "expense":
