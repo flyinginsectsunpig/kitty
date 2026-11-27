@@ -15,6 +15,8 @@ from kitty_ai.ask.routes import make_ask_router
 from kitty_ai.auth import TokenVerifier, jwks_fetcher
 from kitty_ai.entry.parse import parser_from
 from kitty_ai.entry.routes import make_router
+from kitty_ai.mcp.draft_routes import make_draft_router
+from kitty_ai.mcp.drafts import DraftStore, InMemoryDraftStore, PostgresDraftStore
 from kitty_ai.receipts.extract import extractor_from
 from kitty_ai.receipts.worker import Worker
 from kitty_ai.settings import Settings
@@ -63,5 +65,10 @@ def create_app(settings: Settings | None = None, make_worker: Callable[[Settings
         verifier = TokenVerifier(settings.auth_issuer, settings.auth_audience, jwks_fetcher(settings.auth_issuer, http))
         app.include_router(make_router(settings, verifier, parser_from(settings), http))
         app.include_router(make_ask_router(settings, verifier, chat_from(settings), http))
+        # Drafts an assistant made through MCP, opened from their link in the apps.
+        drafts: DraftStore = (
+            PostgresDraftStore(settings.postgres_dsn) if settings.postgres_dsn else InMemoryDraftStore()
+        )
+        app.include_router(make_draft_router(settings, verifier, drafts, http))
 
     return app
