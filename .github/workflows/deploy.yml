@@ -1,0 +1,41 @@
+name: deploy
+
+# Checks the Kubernetes deployment in deploy/: chart tests (pytest), helm lint, and schema validation of the
+# rendered manifests. See deploy/k3s/RUNBOOK.md.
+on:
+  push:
+    branches: [main]
+    paths: ["deploy/**", "infra/keycloak/**", ".github/workflows/deploy.yml"]
+  pull_request:
+    paths: ["deploy/**", "infra/keycloak/**", ".github/workflows/deploy.yml"]
+
+permissions:
+  contents: read
+
+env:
+  HELM_VERSION: v4.3.2
+  KUBECONFORM_VERSION: v0.8.0
+
+jobs:
+  charts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.12.24"
+      - name: Install helm and kubeconform (checksums verified)
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin" && cd "$RUNNER_TEMP"
+          curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+          curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz.sha256sum" | sha256sum -c -
+          tar xzf "helm-${HELM_VERSION}-linux-amd64.tar.gz" && mv linux-amd64/helm bin/
+          base="https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}"
+          curl -fsSLO "$base/kubeconform-linux-amd64.tar.gz"
+          curl -fsSL "$base/CHECKSUMS" | grep ' kubeconform-linux-amd64.tar.gz$' | sha256sum -c -
+          tar xzf kubeconform-linux-amd64.tar.gz -C bin kubeconform
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Chart tests
+        run: uv run --with pytest --with pyyaml pytest deploy/tests -q
+      - name: Lint and validate the rendered manifests
+        run: deploy/tests/validate.sh
