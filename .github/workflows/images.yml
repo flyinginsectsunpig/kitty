@@ -59,3 +59,31 @@ jobs:
             ${{ steps.tags.outputs.image }}:latest
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy-tag:
+    # Points the server at the images just published: writes their sha- tag into deploy/values/production and commits
+    # it to main; Argo CD rolls it out (deploy/k3s/RUNBOOK.md). Pushes made with GITHUB_TOKEN start no workflows, and
+    # [skip ci] says so too: no loop.
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: deploy-tag
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+      - name: Write the image tag and push it
+        run: |
+          tag="sha-${GITHUB_SHA::7}"
+          # A newer code commit on main will write its own tag: never roll the server back to this older one.
+          latest=$(git log -1 --format=%H --invert-grep --grep='\[skip ci\]')
+          if [ "$latest" != "$GITHUB_SHA" ]; then echo "main has moved on to $latest; not writing $tag"; exit 0; fi
+          deploy/k3s/set-image-tag.sh "$tag"
+          if git diff --quiet; then echo "already at $tag"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(deploy): images $tag [skip ci]"
+          git push || { git pull --rebase && git push; }
