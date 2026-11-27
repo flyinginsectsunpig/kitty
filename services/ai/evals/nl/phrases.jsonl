@@ -44,3 +44,63 @@
 {"text": "Sam paid me back", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "direction": "they_paid", "counterpart": "Sam", "items": []}}
 {"text": "cross off the Uber", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "payment", "items": ["Uber"]}}
 {"text": "Joe paid for the pizza, R120, split with me", "today": "2026-11-26", "currency": "ZAR", "expect": {"intent": "expense", "amount": "120", "payer": "Joe", "split": "equal"}}
+{"text": "braai at Sipho's, I paid R640 for meat, split with Sipho and Thabo", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "640", "payer": "me", "people": ["me", "Sipho", "Thabo"], "split": "equal"}}
+{"text": "taxi fare R36 with my brother", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "36", "category": "transport"}}
+{"text": "Checkers R1 380 for the house", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "1380", "category": "groceries"}}
+{"text": "Spar run R312.40 with Naledi", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "312.40", "category": "groceries", "people": ["me", "Naledi"], "split": "equal"}}
+{"text": "Uber home R142 split with Kyle and Megan", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "142", "category": "transport", "people": ["me", "Kyle", "Megan"], "split": "equal"}}
+{"text": "petrol R900 for the trip to Cape Town, split with the guys", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "900", "category": "transport"}}
+{"text": "rent R7200 for December", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "7200", "category": "rent"}}
+{"text": "DStv R929 in the flat group", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "929", "group": "flat", "category": "entertainment"}}
+{"text": "water and lights R1100 for the townhouse", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "1100", "category": "utilities"}}
+{"text": "Kauai smoothies R96, I paid for me and Zanele", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "96", "payer": "me", "category": "food", "people": ["me", "Zanele"]}}
+{"text": "Lerato owes me R250 for the concert tickets", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "people": ["Lerato"], "split": "amounts"}}
+{"text": "add R80 debt for Pieter", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "people": ["Pieter"], "split": "amounts"}}
+{"text": "pizza night: I had R95, Thabo had R110, Sipho had R85", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "people": ["me", "Thabo", "Sipho"], "split": "amounts"}}
+{"text": "Mpho paid R560 for the Airbnb cleaning fee, split with me and Kagiso", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "560", "payer": "Mpho", "split": "equal"}}
+{"text": "toll fees R67 on the N3 with Lee", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "67", "category": "transport", "people": ["me", "Lee"], "split": "equal"}}
+{"text": "groceries R2 450.75 family group", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "2450.75", "category": "groceries", "group": "family"}}
+{"text": "data bundle R149 for Ana, she'll pay me back", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "people": ["Ana"], "split": "amounts"}}
+{"text": "gym fees R499 each for me and Megan", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "people": ["me", "Megan"], "split": "amounts"}}
+{"text": "shisanyama R380 split three ways with Bongani and Lwazi", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "380", "category": "food", "people": ["me", "Bongani", "Lwazi"], "split": "equal"}}
+{"text": "concert tickets R1 200 with Thandi", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "1200", "category": "entertainment", "people": ["me", "Thandi"], "split": "equal"}}
+{"text": "Kyle paid R300 for petrol and I paid R150 for snacks, split everything with Kyle", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense"}}
+{"text": "sushi last Friday R680 with Naledi", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "680", "category": "food", "people": ["me", "Naledi"], "split": "equal"}}
+{"text": "R1.5k for the braai stand, split with Sipho", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "1500", "people": ["me", "Sipho"], "split": "equal"}}
+{"text": "Will paid for lunch, R210, split with me", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "210", "payer": "Will", "split": "equal"}}
+{"text": "Hope owes me R60 for coffee", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "people": ["Hope"], "split": "amounts"}}
+{"text": "uber eats R189 for me, Grace and Faith", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "189", "people": ["me", "Grace", "Faith"], "split": "equal"}}
+{"text": "R50 each from Sam and Lee for the cake", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense"}}
+{"text": "Rose and I split a R90 bunch of flowers for mom", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "90", "people": ["me", "Rose"], "split": "equal"}}
+{"text": "petrol R700, I paid R500 and Sam paid R200", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "700"}}
+{"text": "add R1,500 to the holiday house for the deposit", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "expense", "amount": "1500", "group": "holiday house"}}
+{"text": "remind Thabo he owes me R120 for the Uber", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "reminder", "people": ["Thabo"], "reminder_amount": "120"}}
+{"text": "tell Megan to pay me back", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "reminder", "people": ["Megan"]}}
+{"text": "send Lwazi a reminder about the braai money", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "reminder", "people": ["Lwazi"]}}
+{"text": "nudge Kyle for the R45 he owes", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "reminder", "people": ["Kyle"], "reminder_amount": "45"}}
+{"text": "can you remind my brother Sizwe to settle up", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "reminder", "people": ["Sizwe"]}}
+{"text": "ask Naledi for the R300 she still owes me", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "reminder", "people": ["Naledi"], "reminder_amount": "300"}}
+{"text": "remind Grace about the concert tickets", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "reminder", "people": ["Grace"]}}
+{"text": "ping Pieter that he owes me R80", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "reminder", "people": ["Pieter"], "reminder_amount": "80"}}
+{"text": "I paid Sipho back for the braai meat", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "payment", "direction": "i_paid", "counterpart": "Sipho", "items": ["braai meat"]}}
+{"text": "Thabo paid me back for the petrol", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "payment", "direction": "they_paid", "counterpart": "Thabo", "items": ["petrol"]}}
+{"text": "cross off the groceries for Naledi, I paid her", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "payment", "direction": "i_paid", "counterpart": "Naledi", "items": ["groceries"]}}
+{"text": "Megan paid me R70 for the Uber", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "payment", "direction": "they_paid", "counterpart": "Megan", "items": ["Uber"], "amount": "70"}}
+{"text": "I EFT'd Kyle R200 for the concert tickets", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "payment", "direction": "i_paid", "counterpart": "Kyle", "items": ["concert tickets"], "amount": "200"}}
+{"text": "Lwazi paid me back today", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "payment", "direction": "they_paid", "counterpart": "Lwazi", "items": []}}
+{"text": "cross off the pizza and the drinks, Bongani paid me", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "payment", "direction": "they_paid", "counterpart": "Bongani", "items": ["pizza", "drinks"]}}
+{"text": "I paid Zanele R150 towards the Airbnb", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "payment", "direction": "i_paid", "counterpart": "Zanele", "items": ["Airbnb"], "amount": "150"}}
+{"text": "how much does Sipho owe me?", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "question"}}
+{"text": "what did we spend on petrol last month?", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "question"}}
+{"text": "who owes me money?", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "question"}}
+{"text": "how much have I spent on Uber this year?", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "question"}}
+{"text": "what's my balance in the flat group?", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "question"}}
+{"text": "did Thabo pay me back for the braai?", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "question"}}
+{"text": "how much do I owe everyone in total?", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "question"}}
+{"text": "what was the biggest expense on the Cape Town trip?", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "question"}}
+{"text": "make me a sandwich", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "unclear"}}
+{"text": "change the rent to R8000", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "unclear"}}
+{"text": "undo that", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "unclear"}}
+{"text": "thanks Kitty!", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "unclear"}}
+{"text": "split", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "unclear"}}
+{"text": "lol", "today": "2026-11-27", "currency": "ZAR", "expect": {"intent": "unclear"}}
