@@ -1,10 +1,9 @@
 """Runs Ask Kitty's agent with the configured model (Gemini or Ollama) over evals/ask/questions.jsonl, against a fixed
 fake ledger (world.json) instead of the real one, and reports how often it called the expected lookups and said (and
-didn't say) the expected things. Not run in CI (free-tier limits); run by hand and record the result in
-evals/README.md.
+didn't say) the expected things. Runs nightly in CI (evals.yml, with --json-out for evals/gate.py), and by hand.
 
 Usage (from services/ai, with AI_GEMINI_API_KEY or AI_OLLAMA_URL set):
-  uv run python evals/ask/run.py [--delay 4] [--verbose]
+  uv run python evals/ask/run.py [--delay 4] [--verbose] [--json-out F]
 """
 
 import argparse
@@ -22,6 +21,9 @@ from kitty_ai.ask.tools import run_tool
 from kitty_ai.ledger import LedgerReader
 from kitty_ai.receipts.extract import RateLimited, UnusableOutput
 from kitty_ai.settings import Settings
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from results import model_name, ratio, write_results  # noqa: E402  (evals/ is a folder of scripts, not a package)
 
 HERE = pathlib.Path(__file__).parent
 NB = " "
@@ -122,6 +124,7 @@ def main() -> int:
         "--delay", type=float, default=4.0, help="seconds between questions (free tier: 15 calls a minute)"
     )
     args.add_argument("--verbose", action="store_true")
+    args.add_argument("--json-out", type=pathlib.Path, help="also write the scores here, for evals/gate.py")
     opts = args.parse_args()
 
     chat = chat_from(Settings())
@@ -130,6 +133,7 @@ def main() -> int:
     cases = [json.loads(line) for line in (HERE / "questions.jsonl").read_text(encoding="utf-8").splitlines() if line]
     scores = {"calls": [0, 0], "contains": [0, 0], "not_contains": [0, 0], "entry": [0, 0]}
     model_calls = 0
+    skipped = 0
     for case in cases:
         conversation = [Message(m["role"], m["text"]) for m in case["conversation"]]
         system = system_prompt(date.fromisoformat(case["today"]), world["/me"]["displayName"], None)
@@ -144,6 +148,7 @@ def main() -> int:
                 break
         else:
             print(f"gave up (rate limited): {conversation[-1].text}", file=sys.stderr)
+            skipped += 1
             continue
         model_calls += calls
         expect = case["expect"]
@@ -165,6 +170,9 @@ def main() -> int:
         if total:
             print(f"{name}_pass {right / total:.2f} ({right}/{total})")
     print(f"model_calls {model_calls} over {len(cases)} questions")
+    if opts.json_out:
+        metrics = {name: ratio(right, total) for name, (right, total) in scores.items() if total}
+        write_results(opts.json_out, "ask", model_name(), len(cases), skipped, metrics, {"model_calls": model_calls})
     return 0
 
 
