@@ -1,6 +1,5 @@
 # Everything here existed before Terraform: these blocks adopt it into the state on the first apply (which creates and
-# changes nothing when the plan says "0 to add, 0 to change, 0 to destroy"). The default route table and security list
-# need no import: their resources adopt the VCN's defaults by ID.
+# changes nothing when the plan says "0 to add, 0 to change, 0 to destroy").
 
 import {
   to = oci_core_instance.kitty
@@ -20,6 +19,16 @@ import {
 import {
   to = oci_core_internet_gateway.main
   id = var.existing.internet_gateway
+}
+
+import {
+  to = oci_core_route_table.main
+  id = var.existing.route_table
+}
+
+import {
+  to = oci_core_security_list.public
+  id = var.existing.security_list
 }
 
 import {

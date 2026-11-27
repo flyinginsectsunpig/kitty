@@ -28,8 +28,13 @@ resource "oci_core_instance" "kitty" {
     ssh_authorized_keys = var.ssh_public_key
   }
 
+  # If it were ever destroyed anyway, its disk (and so the data) would survive.
+  preserve_boot_volume = true
+
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [source_details, metadata, create_vnic_details, defined_tags, freeform_tags]
+    # shape_config: resizing an A1 restarts it, and a restart is exactly where "out of host capacity" bites.
+    ignore_changes = [source_details, metadata, create_vnic_details, shape_config, availability_domain,
+    defined_tags, freeform_tags]
   }
 }

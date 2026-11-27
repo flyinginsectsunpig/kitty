@@ -24,8 +24,10 @@ def test_instance_cannot_be_destroyed():
     body = block(tf_text()["instance.tf"], "oci_core_instance", "kitty")
     assert re.search(r"prevent_destroy\s*=\s*true", body)
     ignored = re.search(r"ignore_changes\s*=\s*\[([^\]]*)\]", body, re.S).group(1)
-    for attr in ("source_details", "metadata", "create_vnic_details"):
+    # shape_config: resizing an A1 restarts it, and restarting is where "out of host capacity" bites.
+    for attr in ("source_details", "metadata", "create_vnic_details", "shape_config", "availability_domain"):
         assert attr in ignored, attr
+    assert re.search(r"preserve_boot_volume\s*=\s*true", body)  # even a destroy would keep the disk
 
 
 def test_no_personal_values_committed():
@@ -44,7 +46,7 @@ def test_no_upload_link_in_terraform():
 
 
 def test_firewall_opens_only_ssh_http_https():
-    body = block(tf_text()["network.tf"], "oci_core_default_security_list", "public")
+    body = block(tf_text()["network.tf"], "oci_core_security_list", "public")
     ports = sorted(int(p) for p in re.findall(r"\b(?:min|max)\s*=\s*(\d+)", body))
     assert ports == [22, 22, 80, 80, 443, 443]  # min and max of each range
 
@@ -52,7 +54,14 @@ def test_firewall_opens_only_ssh_http_https():
 def test_imports_cover_the_existing_resources():
     imports = tf_text()["imports.tf"]
     for target in ("oci_core_instance.kitty", "oci_core_vcn.main", "oci_core_subnet.public",
-                   "oci_core_internet_gateway.main", "oci_budget_budget.cost_guard", "oci_budget_alert_rule.cost_guard",
+                   "oci_core_internet_gateway.main", "oci_core_route_table.main", "oci_core_security_list.public",
+                   "oci_budget_budget.cost_guard", "oci_budget_alert_rule.cost_guard",
                    "oci_objectstorage_bucket.backups", "oci_objectstorage_object_lifecycle_policy.backups",
                    "oci_identity_policy.backups_lifecycle"):  # fmt: skip
         assert re.search(rf"to\s*=\s*{re.escape(target)}\b", imports), target
+
+
+def test_default_network_resources_are_imported_not_adopted():
+    # "Adopting" the VCN's defaults by id shows them as new and overwrites their rules unseen; importing makes the
+    # first plan compare the code with what really exists.
+    assert not any("oci_core_default_" in t for t in tf_text().values())

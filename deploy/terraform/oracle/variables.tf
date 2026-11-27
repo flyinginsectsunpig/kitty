@@ -47,6 +47,8 @@ variable "existing" {
     vcn               = string
     subnet            = string
     internet_gateway  = string
+    route_table       = string
+    security_list     = string
     budget            = string
     budget_alert_rule = string
     lifecycle_policy  = string
