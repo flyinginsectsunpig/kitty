@@ -1,0 +1,11 @@
+# The kitty realm (same file as infra/keycloak). Imported only when the realm doesn't exist yet (--import-realm), so
+# a restored database keeps its own realm settings.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm
+  labels:
+    app.kubernetes.io/name: keycloak
+data:
+  kitty-realm.json: |-
+{{ .Files.Get "files/kitty-realm.json" | trimSuffix "\n" | indent 4 }}

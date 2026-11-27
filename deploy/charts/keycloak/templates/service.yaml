@@ -1,0 +1,15 @@
+# Cluster-internal only. The public allowlist is in kitty-edge; the admin console is reached with
+#   kubectl -n kitty port-forward svc/keycloak 8180:8080   then http://localhost:8180/auth/admin
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  labels:
+    app.kubernetes.io/name: keycloak
+spec:
+  selector:
+    app.kubernetes.io/name: keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

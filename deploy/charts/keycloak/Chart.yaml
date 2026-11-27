@@ -1,0 +1,5 @@
+apiVersion: v2
+name: keycloak
+description: Kitty keycloak (sign-in), official image, imports the kitty realm on first start.
+type: application
+version: 0.1.0
