@@ -1,16 +1,13 @@
 """GET and DELETE /drafts/{id}: the apps open an assistant's draft from its link and finish it after Save or Send.
 Called with the person's own app token (audience kitty-ai). Only the person the draft was made for can open it."""
 
-from collections.abc import Callable
-from datetime import date
-
 import httpx
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
 from kitty_ai.auth import TokenVerifier, Unauthorized
 from kitty_ai.entry.drafting import draft_for
-from kitty_ai.entry.routes import south_african_today
+from kitty_ai.entry.routes import SOUTH_AFRICA
 from kitty_ai.ledger import LedgerReader, NotFound
 from kitty_ai.mcp.drafts import DraftStore
 from kitty_ai.settings import Settings
@@ -25,7 +22,6 @@ def make_draft_router(
     verifier: TokenVerifier,
     store: DraftStore,
     http_client: httpx.Client,
-    today: Callable[[], date] = south_african_today,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -47,8 +43,10 @@ def make_draft_router(
         reader = LedgerReader(settings.ledger_url, caller.token, http_client)
         try:
             groups = reader.groups()
-            # Resolved afresh: balances and open items may have moved since the assistant made it.
-            card = draft_for(reader, draft.parsed, draft.group_id, today())
+            # Resolved afresh: balances and open items may have moved since the assistant made it. "Today" is the day it
+            # was made, so a draft made late at night and opened the next morning keeps its date.
+            made_on = draft.created_at.astimezone(SOUTH_AFRICA).date()
+            card = draft_for(reader, draft.parsed, draft.group_id, made_on)
         except NotFound:
             return _error(404, "not_found")
         except httpx.HTTPError:

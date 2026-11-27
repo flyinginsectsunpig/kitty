@@ -2,8 +2,9 @@
 through a LedgerReader holding their exchanged ledger token. Nothing here writes to the ledger: drafts are stored for
 the person to open from a link and Save or Send in Kitty.
 
-Errors are results the assistant can read and act on ({"error": ...}), never exceptions, except a ledger that's down."""
+Errors are results the assistant can read and act on ({"error": ...}), never exceptions."""
 
+import logging
 from datetime import date
 
 import httpx
@@ -18,6 +19,7 @@ from kitty_ai.mcp import summary
 from kitty_ai.mcp.drafts import DraftStore
 
 PAGE = 20
+log = logging.getLogger(__name__)
 
 
 class BadArguments(Exception):
@@ -84,7 +86,12 @@ def _guarded(work) -> dict:
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 400:
             return {"error": "bad_arguments"}
-        raise
+        # Never the exception text: its URL carries the person's search text and ids.
+        log.warning("ledger answered %d to an MCP tool", e.response.status_code)
+        return {"error": "unavailable"}
+    except httpx.HTTPError as e:
+        log.warning("ledger unreachable from an MCP tool: %s", type(e).__name__)
+        return {"error": "unavailable"}
 
 
 def list_groups(reader: LedgerReader, args: dict) -> dict:

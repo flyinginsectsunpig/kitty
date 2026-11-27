@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import FastAPI
@@ -29,7 +29,7 @@ def rig():
     settings = Settings(ledger_url="http://ledger.test", auth_issuer=ISSUER)
     app = FastAPI()
     verifier = TokenVerifier(ISSUER, "kitty-ai", keys.jwks)
-    app.include_router(make_draft_router(settings, verifier, store, ledger_client(), lambda: date(2026, 11, 27)))
+    app.include_router(make_draft_router(settings, verifier, store, ledger_client()))
     client = TestClient(app)
 
     def as_(sub: str) -> dict:
@@ -111,3 +111,12 @@ def test_postgres_store_round_trip():
         clock.now = T0
         store.delete(draft_id, "user-1")
         assert store.get(draft_id, "user-1") is None
+
+
+def test_a_draft_keeps_the_day_it_was_made(rig):
+    client, store, clock, as_ = rig
+    clock.now = datetime(2026, 11, 26, 21, 50, tzinfo=UTC)  # 23:50 on the 26th in South Africa
+    draft_id = store.save("user-1", G, EXPENSE)
+    # Opened the morning after: the card still says the 26th.
+    body = client.get(f"/drafts/{draft_id}", headers=as_("user-1")).json()
+    assert body["expense"]["occurredOn"] == "2026-11-26"

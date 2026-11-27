@@ -82,6 +82,10 @@ def create_app(settings: Settings | None = None, make_worker: Callable[[Settings
         app.include_router(make_draft_router(settings, verifier, drafts, http))
 
         if settings.mcp_public_url:
+            # Fail fast: without these the token exchange fails for everyone, or draft links have no host.
+            for value, name in ((settings.mcp_client_secret, "AI_MCP_CLIENT_SECRET"), (settings.web_url, "AI_WEB_URL")):
+                if not value:
+                    raise ValueError(f"{name} must be set when AI_MCP_PUBLIC_URL is.")
             # Kitty for ChatGPT, Claude and other MCP clients: their tokens are meant for kitty-mcp, and are swapped at
             # Keycloak for a ledger token as the same person. Caddy serves /mcp as /ai/mcp.
             mcp_verifier = TokenVerifier(

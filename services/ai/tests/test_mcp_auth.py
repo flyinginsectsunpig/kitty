@@ -140,3 +140,79 @@ def test_exchange_refused_is_401():
 
 def test_caller_is_a_value():
     assert McpCaller("s", "t") == McpCaller("s", "t")
+
+
+def test_exchange_with_a_wrong_client_secret_is_503_not_a_sign_in_loop():
+    client, keys, _ = rig(FakeKeycloak(status=401))
+    r = client.post("/", headers={"Authorization": f"Bearer {keys.token(aud='kitty-mcp')}"})
+    assert r.status_code == 503
+    assert "www-authenticate" not in r.headers
+
+
+def test_keycloak_down_during_exchange_is_503():
+    keys = TestIssuer()
+
+    def down(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused")
+
+    exchanger = LedgerTokenExchanger(TOKEN_URL, "kitty-mcp", "s", httpx.Client(transport=httpx.MockTransport(down)))
+
+    async def ok(request):
+        return JSONResponse({})
+
+    app = McpAuth(Starlette(routes=[Route("/", ok, methods=["POST"])]), TokenVerifier(ISSUER, "kitty-mcp", keys.jwks),
+                  exchanger, META)  # fmt: skip
+    r = TestClient(app).post("/", headers={"Authorization": f"Bearer {keys.token(aud='kitty-mcp')}"})
+    assert r.status_code == 503
+
+
+def test_keycloak_keys_unreachable_is_503():
+    keys = TestIssuer()
+
+    def no_keys() -> dict:
+        raise httpx.ConnectError("refused")
+
+    async def ok(request):
+        return JSONResponse({})
+
+    app = McpAuth(Starlette(routes=[Route("/", ok, methods=["POST"])]), TokenVerifier(ISSUER, "kitty-mcp", no_keys),
+                  LedgerTokenExchanger(TOKEN_URL, "kitty-mcp", "s", FakeKeycloak().client()), META)  # fmt: skip
+    r = TestClient(app).post("/", headers={"Authorization": f"Bearer {keys.token(aud='kitty-mcp')}"})
+    assert r.status_code == 503
+
+
+def test_exchange_answer_without_a_token_is_503():
+    keys = TestIssuer()
+
+    def odd(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"error": "?"})
+
+    async def ok(request):
+        return JSONResponse({})
+
+    exchanger = LedgerTokenExchanger(TOKEN_URL, "kitty-mcp", "s", httpx.Client(transport=httpx.MockTransport(odd)))
+    app = McpAuth(Starlette(routes=[Route("/", ok, methods=["POST"])]), TokenVerifier(ISSUER, "kitty-mcp", keys.jwks),
+                  exchanger, META)  # fmt: skip
+    r = TestClient(app).post("/", headers={"Authorization": f"Bearer {keys.token(aud='kitty-mcp')}"})
+    assert r.status_code == 503
+
+
+def test_exchange_cache_survives_parallel_calls():
+    import threading
+
+    exchanger = LedgerTokenExchanger(TOKEN_URL, "kitty-mcp", "s", FakeKeycloak(expires_in=31).client())
+    errors: list[BaseException] = []
+
+    def work(n: int) -> None:
+        try:
+            for i in range(400):
+                exchanger.exchange(f"subject-{n}-{i}")
+        except BaseException as e:  # noqa: BLE001
+            errors.append(e)
+
+    threads = [threading.Thread(target=work, args=(n,)) for n in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []

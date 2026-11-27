@@ -182,3 +182,32 @@ def test_draft_payment_and_reminder_shapes():
 def test_draft_bad_arguments():
     out = tools.draft(reader(), InMemoryDraftStore(), "user-1", WEB, "payment", {"group": G, "direction": "up"}, TODAY)
     assert out == {"error": "bad_arguments", "detail": "direction"}
+
+
+def broken_ledger(status: int) -> LedgerReader:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/groups":
+            return httpx.Response(200, json=[{"id": G, "name": "Flat 4B", "baseCurrency": "ZAR", "createdAt": ""}])
+        return httpx.Response(status, json={"code": "boom"})
+
+    return LedgerReader("http://ledger.test", "t", httpx.Client(transport=httpx.MockTransport(handle)))
+
+
+def test_ledger_failure_is_a_result_without_the_search_text(caplog):
+    import logging
+
+    # httpx's own request log is silenced by the app (main.py); this checks Kitty's own, and that no exception (whose
+    # text has the URL) reaches the MCP SDK, which would log it and send it to the assistant.
+    with caplog.at_level(logging.DEBUG, logger="kitty_ai"):
+        out = tools.list_expenses(broken_ledger(500), {"group": G, "text": "dinner with sam"})
+    assert out == {"error": "unavailable"}
+    assert "dinner" not in caplog.text
+    assert "expense-lines" not in caplog.text
+
+
+def test_ledger_unreachable_is_a_result():
+    def handle(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused")
+
+    reader = LedgerReader("http://ledger.test", "t", httpx.Client(transport=httpx.MockTransport(handle)))
+    assert tools.list_groups(reader, {}) == {"error": "unavailable"}
