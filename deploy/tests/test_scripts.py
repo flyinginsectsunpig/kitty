@@ -115,15 +115,47 @@ def test_restore_order(tmp_path):
     def first(pred):
         return next(i for i, x in enumerate(c) if pred(x))
 
-    down = first(lambda x: "scale" in x and "--replicas=0" in x)
+    down = first(lambda x: "scale deployment" in x and "--replicas=0" in x)
     assert all(a in c[down] for a in APPS)
     globals_ = first(lambda x: "postgres-0 -- psql -U postgres" in x)
     ledger = first(lambda x: "pg_restore" in x and " -d ledger" in x)
     keycloak = first(lambda x: "pg_restore" in x and " -d keycloak" in x)
-    blobs = first(lambda x: "azurite-0 -- tar xzf - -C /data" in x)
-    up = first(lambda x: "scale" in x and "--replicas=1" in x)
-    assert down < globals_ < ledger < keycloak < blobs < up
-    assert first(lambda x: "dropdb" in x and "--if-exists" in x and x.endswith(" ledger")) < ledger
+    up = first(lambda x: "scale deployment" in x and "--replicas=1" in x)
+    assert down < globals_ < ledger < keycloak < up
+    drop = first(lambda x: "dropdb" in x and x.endswith(" ledger"))
+    assert "--if-exists" in c[drop] and "--force" in c[drop]  # a leftover connection must not stall the switch
+    assert drop < ledger
+
+
+def test_restore_puts_photos_back_while_azurite_is_stopped(tmp_path):
+    # Azurite keeps its blob index in memory and writes it back on the next change: files untarred under a running
+    # Azurite are invisible, then overwritten. So it is stopped, a throwaway pod fills its volume, and it starts again.
+    env, log = stubs(tmp_path, kubectl='case "$*" in *"get pod"*) echo "${@: -1}" | sed "s/.*=//; s/$/-0/";; esac')
+    result = run_script("deploy/k3s/restore.sh", archive(tmp_path).name, env=env, cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    c = calls(log)
+
+    def first(pred):
+        return next(i for i, x in enumerate(c) if pred(x))
+
+    stop = first(lambda x: "scale statefulset azurite --replicas=0" in x)
+    fill = first(lambda x: " run " in x and "restore-photos" in x)
+    start = first(lambda x: "scale statefulset azurite --replicas=1" in x)
+    assert stop < fill < start
+    assert '"claimName":"data-azurite-0"' in c[fill].replace(" ", "")
+    assert "tar xzf - -C /data" in c[fill]
+    assert not [x for x in c if " exec " in x and "azurite" in x]  # never into the running Azurite
+
+
+def test_restore_no_start_leaves_the_apps_stopped(tmp_path):
+    # At the switch the data is compared before anything writes to it again.
+    env, log = stubs(tmp_path, kubectl='case "$*" in *"get pod"*) echo "${@: -1}" | sed "s/.*=//; s/$/-0/";; esac')
+    result = run_script("deploy/k3s/restore.sh", archive(tmp_path).name, "--no-start", env=env, cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    c = calls(log)
+    assert not [x for x in c if "scale deployment" in x and "--replicas=1" in x]
+    assert any("scale statefulset azurite --replicas=1" in x for x in c)  # storage itself comes back
+    assert "--replicas=1" in result.stdout  # says how to start the apps
 
 
 def test_restore_refuses_without_archive(tmp_path):
@@ -138,6 +170,11 @@ def test_restore_can_scale_without_argo_undoing_it(chart):
     # No replicas in git, so Argo CD's self-heal leaves a manual scale (restore.sh) alone; Kubernetes defaults to 1.
     for d in kinds(render(chart), "Deployment"):
         assert "replicas" not in d["spec"], d["metadata"]["name"]
+
+
+def test_azurite_can_be_stopped_for_a_restore():
+    (sts,) = kinds(render("azurite"), "StatefulSet")
+    assert "replicas" not in sts["spec"]
 
 
 # ---------- compare-data.sh

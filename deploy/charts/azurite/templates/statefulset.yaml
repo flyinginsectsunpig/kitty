@@ -6,7 +6,6 @@ metadata:
     app.kubernetes.io/name: azurite
 spec:
   serviceName: azurite
-  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: azurite
