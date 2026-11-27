@@ -75,15 +75,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
+          fetch-depth: 0 # the newest-code-commit check walks past tag commits
       - name: Write the image tag and push it
         run: |
-          tag="sha-${GITHUB_SHA::7}"
-          # A newer code commit on main will write its own tag: never roll the server back to this older one.
-          latest=$(git log -1 --format=%H --invert-grep --grep='\[skip ci\]')
-          if [ "$latest" != "$GITHUB_SHA" ]; then echo "main has moved on to $latest; not writing $tag"; exit 0; fi
-          deploy/k3s/set-image-tag.sh "$tag"
-          if git diff --quiet; then echo "already at $tag"; exit 0; fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore(deploy): images $tag [skip ci]"
-          git push || { git pull --rebase && git push; }
+          # Each attempt starts from main as it is now and re-checks that this is still the newest code commit, so a
+          # merge landing meanwhile is never overwritten with this older tag.
+          for attempt in 1 2 3; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            deploy/k3s/commit-image-tag.sh "$GITHUB_SHA"
+            if git push origin HEAD:main; then exit 0; fi
+            echo "main moved while writing the tag; trying again"
+          done
+          exit 1
