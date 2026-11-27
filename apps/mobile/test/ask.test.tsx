@@ -7,6 +7,7 @@ import type { AiClient, AiResult } from "../src/ai";
 import { fakeLedger, json } from "./support/fake-ledger";
 import { G, groupRoutes, ME, SAM } from "./support/group";
 import { renderApp } from "./support/render-app";
+import { noDrafts } from "./support/no-drafts";
 
 const routes = {
   "(app)/groups/index": GroupsIndex,
@@ -55,6 +56,7 @@ function fakeAi(parses: AiResult[], asks: AskResult[]) {
   const parsed: string[] = [];
   const asked: Sent[] = [];
   const client: AiClient = {
+    ...noDrafts,
     parse: async (text) => (parsed.push(text), parses.shift() ?? { error: "unexpected" }),
     resolve: async () => ({ error: "unexpected" }),
     ask: async (messages) => (asked.push(messages), asks.shift() ?? { error: "unexpected" }),

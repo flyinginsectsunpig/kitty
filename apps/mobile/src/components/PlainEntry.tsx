@@ -44,13 +44,22 @@ export const NOTICE =
  * or Send: nothing is saved until then. Or ask about your money: a question opens a short conversation, and
  * follow-ups go to Ask Kitty until New conversation. groupId: the group screen it's on, if any. onChanged: the
  * screen's reload, called after a payment is saved here (an expense opens the group screen, which loads afresh).
+ * initial: a draft an assistant made (MCP), opened from its link; once saved or sent, its link stops working.
  */
-export function PlainEntry({ groupId, onChanged }: { groupId?: string; onChanged?: () => void }) {
+export function PlainEntry({
+  groupId,
+  onChanged,
+  initial,
+}: {
+  groupId?: string;
+  onChanged?: () => void;
+  initial?: { draft: PlainDraft; draftId: string };
+}) {
   const ai = useAi();
   const ledger = useLedger();
   const router = useRouter();
   const [text, setText] = useState("");
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turns, setTurns] = useState<Turn[]>(() => (initial ? [{ role: "draft", draft: initial.draft }] : []));
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState<string | null>(null);
   const [done, setDone] = useState<string[] | null>(null);
@@ -161,7 +170,9 @@ export function PlainEntry({ groupId, onChanged }: { groupId?: string; onChanged
   const renewPayKey = pay.renew;
   useEffect(() => renewPayKey(), [draft, renewPayKey]);
 
+  // Called only after a successful Save, payment or Send.
   const finish = (message: string[] | null) => {
+    if (initial) void ai.finishDraft(initial.draftId);
     setDraft(null);
     setText("");
     setDone(message);
