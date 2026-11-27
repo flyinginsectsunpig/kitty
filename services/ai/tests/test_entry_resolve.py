@@ -198,6 +198,13 @@ def test_reminder_draft_carries_owed_and_stated():
     )
 
 
+def test_a_reminder_takes_the_counterpart_when_people_is_empty():
+    # The model sometimes names the person to remind as the counterpart (the payment field) instead of in people.
+    d = draft(parsed(intent="reminder", counterpart="Bob", reminder_amount="20"))
+    assert d["reminder"]["memberId"] == BOB.id
+    assert ("reminder.member", "missing") not in issues(d)
+
+
 def test_a_reminder_without_a_person_is_missing():
     d = draft(parsed(intent="reminder"))
     assert ("reminder.member", "missing") in issues(d)
