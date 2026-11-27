@@ -1,7 +1,10 @@
 # Deploying Kitty on Oracle Always Free
 
 One small ARM server runs everything with Docker Compose: Postgres, Keycloak, the ledger, the web
-app and Caddy (automatic HTTPS). Cost: R0. Phase 5 replaces this with k3s, Helm and Argo CD.
+app and Caddy (automatic HTTPS). Cost: R0.
+
+> **Production now runs on k3s: see `deploy/k3s/RUNBOOK.md`.** This Compose setup stays for running Kitty on one
+> machine without the .NET SDK. Its server setup (section 1), email (3) and backup bucket steps still apply.
 
 ```
 browser ──https──► Caddy ─┬─ /auth/*  → Keycloak  (admin console blocked; SSH tunnel only)
@@ -16,7 +19,8 @@ browser ──https──► Caddy ─┬─ /auth/*  → Keycloak  (admin conso
    - **Stay within 2 OCPU / 12 GB in total.** Since June 2026 that is the whole Always Free
      allowance; going over gets every A1 instance disabled.
    - If A1 capacity is unavailable in your region, retry later or try another availability domain.
-2. Networking → reserve the instance's public IP (so it never changes).
+2. The instance's public IP is ephemeral: it survives reboots and only changes if the instance is stopped. Kitty's
+   server keeps it that way (reserving one may not be free); if it ever changes, update DuckDNS.
 3. VCN → security list → add ingress rules for TCP **80** and **443** from `0.0.0.0/0`.
 4. Oracle's Ubuntu image also blocks ports with iptables. The new rules must go **above** its final `REJECT` rule
    (check its position with `sudo iptables -L INPUT --line-numbers -n`; on Ubuntu 24.04 it is rule 5):
@@ -30,7 +34,7 @@ browser ──https──► Caddy ─┬─ /auth/*  → Keycloak  (admin conso
 ## 2. Hostname (free)
 
 Create a name at <https://www.duckdns.org> (e.g. `kitty-yourname.duckdns.org`) and point it at the
-reserved IP. The IP is static, so no updater is needed.
+server's IP. It only changes if the instance is stopped, so no updater is needed.
 
 ## 3. Email for verification links
 
