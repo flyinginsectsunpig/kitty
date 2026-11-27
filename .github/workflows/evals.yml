@@ -22,7 +22,7 @@ permissions:
 jobs:
   evals:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     defaults:
       run:
         working-directory: services/ai
@@ -51,10 +51,12 @@ jobs:
           print('\n'.join(sorted(m.name for m in c.models.list() if 'generateContent' in (m.supported_actions or []))))"
 
       # Each eval writes its scores to $RUNNER_TEMP/evals; one that falls over doesn't stop the others: the gate
-      # reports it as a warning.
+      # reports it as a warning. A normal run takes about 20 minutes in all; the step limits stop a night of an
+      # overloaded model from running into the job's own limit, so the gate always gets to write its summary.
       - name: Receipts (CORD-v2 bootstrap set)
         if: env.AI_GEMINI_API_KEY != ''
         continue-on-error: true
+        timeout-minutes: 50
         run: |
           if [ -n "$MODEL" ]; then export AI_GEMINI_MODEL="$MODEL"; fi
           uv run python evals/fetch_cord.py --out "$RUNNER_TEMP/cord" --limit "${{ inputs.limit || '50' }}"
@@ -63,12 +65,14 @@ jobs:
       - name: Plain-language sentences
         if: env.AI_GEMINI_API_KEY != ''
         continue-on-error: true
+        timeout-minutes: 40
         run: |
           if [ -n "$MODEL" ]; then export AI_GEMINI_MODEL="$MODEL"; fi
           uv run python evals/nl/run.py --verbose --json-out "$RUNNER_TEMP/evals/nl.json"
       - name: Ask Kitty
         if: env.AI_GEMINI_API_KEY != ''
         continue-on-error: true
+        timeout-minutes: 25
         run: |
           if [ -n "$MODEL" ]; then export AI_GEMINI_MODEL="$MODEL"; fi
           uv run python evals/ask/run.py --verbose --json-out "$RUNNER_TEMP/evals/ask.json"

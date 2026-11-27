@@ -30,6 +30,11 @@ from results import Metric, model_name, write_results  # noqa: E402  (evals/ is 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp")
 
 
+def model_never_answered(outcomes: list[tuple[ReceiptLabel, pb.ParsedReceipt | int]]) -> bool:
+    """Every receipt failed with "model unavailable" (no key, or a retired model): nothing was measured."""
+    return bool(outcomes) and all(o == pb.ScanFailure.Reason.MODEL_UNAVAILABLE for _, o in outcomes)
+
+
 def collect(outcomes: list[tuple[ReceiptLabel, pb.ParsedReceipt | int]]) -> tuple[list, int]:
     """The pairs to score, and how many receipts the model never answered (left out of the score)."""
     pairs = [(label, o) for label, o in outcomes if o != pb.ScanFailure.Reason.RATE_LIMITED]
@@ -72,12 +77,16 @@ def main() -> int:
                 print(f"{path.stem}: busy or slow ({str(e)[:120]}); retrying in {wait}s", file=sys.stderr, flush=True)
                 time.sleep(wait)
         else:
-            outcome = pb.ScanFailure.Reason.RATE_LIMITED  # still rate limited: counts as a failed read
+            outcome = pb.ScanFailure.Reason.RATE_LIMITED  # still rate limited: skipped (see collect)
         pairs.append((label, outcome))
         # flush: CI pipes stdout, which Python would otherwise hold back until the run ends.
         print(f"{path.stem}: {describe_outcome(outcome)} in {time.monotonic() - started:.1f}s", flush=True)
         time.sleep(args.delay)
 
+    if model_never_answered(pairs):
+        # No scores at all: the gate shows a warning ("no scores"), not a drop to 0%.
+        print("The model was unavailable for every receipt (no key, or a retired model?): no scores.", file=sys.stderr)
+        return 2
     pairs, skipped = collect(pairs)
     scores = score(pairs)
     print(f"receipts={scores.receipts} total_accuracy={scores.total_accuracy:.3f} item_f1={scores.item_f1:.3f}")

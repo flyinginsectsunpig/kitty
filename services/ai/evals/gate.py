@@ -33,7 +33,7 @@ class Row:
     total: int
     baseline: float | None
     target: float | None
-    status: Literal["pass", "fail", "better", "no baseline"]
+    status: Literal["pass", "fail", "better", "no baseline", "not judged"]
 
 
 @dataclass
@@ -69,8 +69,10 @@ def judge(result: dict | None, baseline: dict) -> Verdict:
 
     skipped, cases = result.get("skipped", 0), result.get("cases", 0)
     if skipped > max(SKIP_CASES, SKIP_SHARE * cases):
-        notes.insert(0, f"Incomplete: the model never answered {skipped} of {cases} cases, so nothing is judged.")
-        return Verdict("warn", rows, notes)
+        # The scores aren't reliable: shown, but neither a drop nor a new best counts.
+        judged_rows = [Row(r.metric, r.value, r.total, r.baseline, r.target, "not judged") for r in rows]
+        note = f"Incomplete: the model never answered {skipped} of {cases} cases, so nothing is judged."
+        return Verdict("warn", judged_rows, [note])
     return Verdict("fail" if any(r.status == "fail" for r in rows) else "pass", rows, notes)
 
 
@@ -111,9 +113,9 @@ def main(argv: list[str] | None = None) -> int:
         out.append(table(name, result, verdict))
         if verdict.status == "warn":
             print(f"::warning::{TITLES[name]}: {verdict.notes[0] if verdict.notes else 'incomplete'}")
-        for row in verdict.rows:
-            if row.status == "fail":
-                failed = True
+        if verdict.status == "fail":
+            failed = True
+            for row in (r for r in verdict.rows if r.status == "fail"):
                 print(f"::error::{TITLES[name]}: {row.metric} {_pct(row.value)}, baseline {_pct(row.baseline)}")
 
     text = "".join(out)

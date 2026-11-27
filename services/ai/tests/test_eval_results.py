@@ -50,3 +50,13 @@ def test_receipt_rate_limited_counts_as_skipped():
     pairs, skipped = receipts.collect([(label, ok), (label, pb.ScanFailure.Reason.RATE_LIMITED), (label, ok)])
     assert len(pairs) == 2
     assert skipped == 1
+
+
+def test_a_model_that_never_works_writes_no_scores():
+    receipts = load("run_receipts_2", EVALS / "run_receipts.py")
+    label = ReceiptLabel(items=[("Burger", 12000)], total_minor=12000)
+    gone = pb.ScanFailure.Reason.MODEL_UNAVAILABLE
+    assert receipts.model_never_answered([(label, gone), (label, gone)]) is True
+    ok = pb.ParsedReceipt(total_minor=12000)
+    assert receipts.model_never_answered([(label, gone), (label, ok)]) is False
+    assert receipts.model_never_answered([]) is False

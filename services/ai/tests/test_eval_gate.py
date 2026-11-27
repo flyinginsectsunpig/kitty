@@ -112,3 +112,23 @@ def test_committed_baselines_are_well_formed():
     assert data["receipts"]["metrics"]["total_accuracy"] == {"value": 0.82, "total": 50}
     assert data["receipts"]["target"]["total_accuracy"] == 0.9
     assert set(data["ask"]["metrics"]) == {"calls", "contains", "not_contains", "entry"}
+
+
+def test_incomplete_run_with_a_drop_exits_zero_and_judges_nothing(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    baselines = tmp_path / "baselines.json"
+    baselines.write_text(json.dumps({"receipts": RECEIPTS_BASE}))
+    results = tmp_path / "results"
+    results.mkdir()
+    write(results, "receipts", result(0.5, total=44, skipped=6))
+    assert gate.main(["--results", str(results), "--baselines", str(baselines)]) == 0
+    out = capsys.readouterr().out
+    assert "::error::" not in out
+    assert "::warning::" in out
+
+
+def test_incomplete_run_offers_no_new_baseline():
+    verdict = gate.judge(result(0.95, total=40, skipped=10), RECEIPTS_BASE)
+    assert verdict.status == "warn"
+    assert [r.status for r in verdict.rows] == ["not judged"]
+    assert not any("baselines.json" in n for n in verdict.notes)
