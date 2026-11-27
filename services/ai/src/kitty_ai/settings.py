@@ -47,3 +47,10 @@ class Settings(BaseSettings):
     ollama_url: str = ""
     ollama_model: str = "qwen2.5:3b"
     consumer_group: str = "ai-receipts"
+    # MCP (phase 4d): off without a public URL. Locally http://localhost:5085/mcp; deployed https://{host}/ai/mcp.
+    # Tokens for it carry audience mcp_audience; the ai service swaps them at Keycloak for a ledger token, as the
+    # confidential client of the same name (mcp_client_secret). web_url is the start of the draft links.
+    mcp_public_url: str = ""
+    mcp_audience: str = "kitty-mcp"
+    mcp_client_secret: str = ""
+    web_url: str = ""
