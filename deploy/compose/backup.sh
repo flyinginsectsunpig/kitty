@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nightly backup of a Kitty Compose deployment: one dated .tar.gz holding
+# Nightly backup of Kitty, from Compose or from the k3s cluster: one dated .tar.gz holding
 #   globals.sql      Postgres roles (pg_dumpall --globals-only)
 #   ledger.dump      the ledger database, with the ai and pulse tables (pg_dump -Fc)
 #   keycloak.dump    accounts and sign-in settings (pg_dump -Fc)
@@ -8,32 +8,48 @@
 #
 # Keeps the newest $KITTY_BACKUP_KEEP (default 7) on the server and, when $KITTY_BACKUP_PAR_FILE
 # (default ~/.kitty-backup-par) holds an Object Storage write-only pre-authenticated URL, uploads a copy.
-# Restore steps: RUNBOOK.md, "Backups".
+# Restore steps: deploy/k3s/RUNBOOK.md ("Backups"; deploy/k3s/restore.sh) or, for Compose, RUNBOOK.md.
 #
+# KITTY_BACKUP_TARGET=compose (default) reads the Compose containers; k3s reads the pods in namespace "kitty".
 # Usage: deploy/compose/backup.sh   (run by /etc/cron.d/kitty-backup)
 set -euo pipefail
 
+TARGET="${KITTY_BACKUP_TARGET:-compose}"
 PROJECT="${KITTY_COMPOSE_PROJECT:-kitty}"
 OUT_DIR="${KITTY_BACKUP_DIR:-$HOME/kitty-backups}"
 KEEP="${KITTY_BACKUP_KEEP:-7}"
 PAR_FILE="${KITTY_BACKUP_PAR_FILE:-$HOME/.kitty-backup-par}"
 
 [[ "$KEEP" =~ ^[1-9][0-9]*$ ]] || { echo "KITTY_BACKUP_KEEP must be a positive number" >&2; exit 2; }
-for c in postgres azurite; do
-  docker inspect -f '{{.State.Running}}' "$PROJECT-$c-1" 2>/dev/null | grep -qx true \
-    || { echo "container $PROJECT-$c-1 is not running" >&2; exit 1; }
-done
+case "$TARGET" in
+  compose)
+    for c in postgres azurite; do
+      docker inspect -f '{{.State.Running}}' "$PROJECT-$c-1" 2>/dev/null | grep -qx true \
+        || { echo "container $PROJECT-$c-1 is not running" >&2; exit 1; }
+    done
+    in_postgres() { docker exec "$PROJECT-postgres-1" "$@"; }
+    in_azurite() { docker exec "$PROJECT-azurite-1" "$@"; }
+    ;;
+  k3s)
+    pod() { kubectl -n kitty get pod -o jsonpath='{.items[0].metadata.name}' -l "app.kubernetes.io/name=$1"; }
+    pg_pod=$(pod postgres) && az_pod=$(pod azurite) && [ -n "$pg_pod" ] && [ -n "$az_pod" ] \
+      || { echo "postgres or azurite pod not found in namespace kitty" >&2; exit 1; }
+    in_postgres() { kubectl -n kitty exec "$pg_pod" -- "$@"; }
+    in_azurite() { kubectl -n kitty exec "$az_pod" -- "$@"; }
+    ;;
+  *) echo "KITTY_BACKUP_TARGET must be compose or k3s, not $TARGET" >&2; exit 2 ;;
+esac
 
 umask 077
 mkdir -p "$OUT_DIR"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-docker exec "$PROJECT-postgres-1" pg_dumpall -U postgres --globals-only > "$work/globals.sql"
+in_postgres pg_dumpall -U postgres --globals-only > "$work/globals.sql"
 for db in ledger keycloak; do
-  docker exec "$PROJECT-postgres-1" pg_dump -U postgres -Fc "$db" > "$work/$db.dump"
+  in_postgres pg_dump -U postgres -Fc "$db" > "$work/$db.dump"
 done
-docker exec "$PROJECT-azurite-1" tar czf - -C /data . > "$work/azurite.tar.gz"
+in_azurite tar czf - -C /data . > "$work/azurite.tar.gz"
 
 name="kitty-$(date -u +%Y-%m-%dT%H%MZ).tar.gz"
 tar czf "$OUT_DIR/$name.part" -C "$work" .

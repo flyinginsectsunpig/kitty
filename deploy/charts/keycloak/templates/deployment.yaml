@@ -11,7 +11,6 @@ metadata:
   labels:
     app.kubernetes.io/name: keycloak
 spec:
-  replicas: 1
   # One Keycloak at a time on one database: stop the old pod before starting the new one.
   strategy:
     type: Recreate

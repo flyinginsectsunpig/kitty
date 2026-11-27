@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # Checks a running Kitty deployment from the outside.
-# Usage: deploy/compose/smoke.sh <host> [--insecure]
-#   --insecure  accept Caddy's local CA (only for a local trial with a *.localhost name)
+# Usage: deploy/compose/smoke.sh <host> [--insecure | --connect-to <addr>:<port>]
+#   --insecure    accept a local or self-signed CA and connect to 127.0.0.1 (a local trial, or CI's k3d cluster)
+#   --connect-to  send every request to <addr>:<port> while keeping the URLs, Host and certificate name unchanged
+#                 (the k3s cluster before the switch: deploy/compose/smoke.sh <host> --connect-to 127.0.0.1:30443)
 set -uo pipefail
 
-HOST="${1:?usage: smoke.sh <host> [--insecure]}"
+USAGE="usage: smoke.sh <host> [--insecure | --connect-to <addr>:<port>]"
+HOST="${1:?$USAGE}"
 CURL=(curl -s -m 15)
-[ "${2:-}" = "--insecure" ] && CURL+=(-k --resolve "$HOST:443:127.0.0.1")
+case "${2:-}" in
+  "") ;;
+  --insecure) CURL+=(-k --resolve "$HOST:443:127.0.0.1") ;;
+  --connect-to) CURL+=(--connect-to "$HOST:443:${3:?$USAGE}") ;;
+  *) echo "$USAGE" >&2; exit 2 ;;
+esac
 BASE="https://$HOST"
 failures=0
 

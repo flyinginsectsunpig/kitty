@@ -1,0 +1,166 @@
+import io
+import tarfile
+
+import pytest
+
+from helpers import kinds, render, run_script
+
+APPS = ["kitty-ledger", "kitty-web", "kitty-ai", "kitty-pulse", "keycloak"]
+
+
+def stubs(tmp_path, **scripts):
+    """Puts fake commands on PATH. Each logs its argv (one line) to $STUB_LOG, then runs its body."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    log = tmp_path / "stub.log"
+    for name, body in scripts.items():
+        path = bin_dir / name
+        path.write_text(f'#!/usr/bin/env bash\necho "{name} $*" >> "$STUB_LOG"\n{body}\n', encoding="utf-8", newline="\n")
+        path.chmod(0o755)
+    import os
+
+    return {"PATH": f"{bin_dir.as_posix()}{os.pathsep}{os.environ['PATH']}", "STUB_LOG": log.as_posix()}, log
+
+
+def calls(log):
+    return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+
+
+# ---------- smoke.sh
+
+
+def test_smoke_connect_to_passes_through(tmp_path):
+    env, log = stubs(tmp_path, curl="printf 200")
+    run_script("deploy/compose/smoke.sh", "h.test", "--connect-to", "127.0.0.1:30443", env=env)
+    curl_calls = [c for c in calls(log) if c.startswith("curl ")]
+    assert curl_calls
+    for c in curl_calls:
+        assert "--connect-to h.test:443:127.0.0.1:30443" in c
+        assert "https://h.test/" in c
+        assert " -k " not in f"{c} "
+
+
+def test_smoke_rejects_unknown_option(tmp_path):
+    env, log = stubs(tmp_path, curl="printf 200")
+    result = run_script("deploy/compose/smoke.sh", "h.test", "--bogus", env=env)
+    assert result.returncode == 2
+    assert not calls(log)
+
+
+# ---------- backup.sh
+
+
+def backup_env(tmp_path, **extra):
+    env, log = stubs(
+        tmp_path,
+        docker='case "$1" in inspect) echo true;; exec) echo dump;; esac',
+        kubectl='case "$*" in *"get pod"*) echo "${@: -1}" | sed "s/.*=//; s/$/-0/";; *exec*) echo dump;; esac',
+    )
+    env.update({"KITTY_BACKUP_DIR": "out",  # relative: GNU tar reads "C:" as a host
+                "KITTY_BACKUP_PAR_FILE": (tmp_path / "no-link").as_posix(), **extra})  # fmt: skip
+    return env, log
+
+
+def test_backup_k3s_uses_kubectl(tmp_path):
+    env, log = backup_env(tmp_path, KITTY_BACKUP_TARGET="k3s")
+    result = run_script("deploy/compose/backup.sh", env=env, cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    c = calls(log)
+    assert not [x for x in c if x.startswith("docker ")]
+    execs = [x for x in c if x.startswith("kubectl -n kitty exec")]
+    assert any("postgres-0 -- pg_dumpall -U postgres --globals-only" in x for x in execs)
+    assert any("postgres-0 -- pg_dump -U postgres -Fc ledger" in x for x in execs)
+    assert any("postgres-0 -- pg_dump -U postgres -Fc keycloak" in x for x in execs)
+    assert any("azurite-0 -- tar czf - -C /data ." in x for x in execs)
+    (archive,) = (tmp_path / "out").glob("kitty-*.tar.gz")
+    with tarfile.open(archive) as t:
+        assert {n.lstrip("./") for n in t.getnames()} >= {"globals.sql", "ledger.dump", "keycloak.dump", "azurite.tar.gz"}
+
+
+def test_backup_default_is_compose(tmp_path):
+    env, log = backup_env(tmp_path)
+    result = run_script("deploy/compose/backup.sh", env=env, cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    c = calls(log)
+    assert not [x for x in c if x.startswith("kubectl ")]
+    assert any(x.startswith("docker exec kitty-postgres-1 pg_dump -U postgres -Fc ledger") for x in c)
+
+
+def test_backup_rejects_unknown_target(tmp_path):
+    env, log = backup_env(tmp_path, KITTY_BACKUP_TARGET="nomad")
+    assert run_script("deploy/compose/backup.sh", env=env, cwd=tmp_path).returncode == 2
+    assert not calls(log)
+
+
+# ---------- restore.sh
+
+
+def archive(tmp_path):
+    path = tmp_path / "kitty-2026-11-28T0117Z.tar.gz"
+    with tarfile.open(path, "w:gz") as t:
+        for name in ["globals.sql", "ledger.dump", "keycloak.dump", "azurite.tar.gz"]:
+            data = name.encode()
+            info = tarfile.TarInfo(f"./{name}")
+            info.size = len(data)
+            t.addfile(info, io.BytesIO(data))
+    return path
+
+
+def test_restore_order(tmp_path):
+    env, log = stubs(tmp_path, kubectl='case "$*" in *"get pod"*) echo "${@: -1}" | sed "s/.*=//; s/$/-0/";; esac')
+    result = run_script("deploy/k3s/restore.sh", archive(tmp_path).name, env=env, cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    c = [x for x in calls(log) if "get pod" not in x]
+
+    def first(pred):
+        return next(i for i, x in enumerate(c) if pred(x))
+
+    down = first(lambda x: "scale" in x and "--replicas=0" in x)
+    assert all(a in c[down] for a in APPS)
+    globals_ = first(lambda x: "postgres-0 -- psql -U postgres" in x)
+    ledger = first(lambda x: "pg_restore" in x and " -d ledger" in x)
+    keycloak = first(lambda x: "pg_restore" in x and " -d keycloak" in x)
+    blobs = first(lambda x: "azurite-0 -- tar xzf - -C /data" in x)
+    up = first(lambda x: "scale" in x and "--replicas=1" in x)
+    assert down < globals_ < ledger < keycloak < blobs < up
+    assert first(lambda x: "dropdb" in x and "--if-exists" in x and x.endswith(" ledger")) < ledger
+
+
+def test_restore_refuses_without_archive(tmp_path):
+    env, log = stubs(tmp_path, kubectl="")
+    result = run_script("deploy/k3s/restore.sh", tmp_path / "missing.tar.gz", env=env)
+    assert result.returncode == 2
+    assert not calls(log)
+
+
+@pytest.mark.parametrize("chart", ["kitty-ledger", "kitty-web", "kitty-ai", "kitty-pulse", "keycloak"])
+def test_restore_can_scale_without_argo_undoing_it(chart):
+    # No replicas in git, so Argo CD's self-heal leaves a manual scale (restore.sh) alone; Kubernetes defaults to 1.
+    for d in kinds(render(chart), "Deployment"):
+        assert "replicas" not in d["spec"], d["metadata"]["name"]
+
+
+# ---------- compare-data.sh
+
+
+def test_compare_reports_difference(tmp_path):
+    env, log = stubs(
+        tmp_path,
+        docker='if [[ "$*" == *" -c "* ]]; then echo "select 1;"; else cat >/dev/null; echo "public.expenses 3 aaa"; fi',
+        kubectl=('case "$*" in *"get pod"*) echo postgres-0;; *" -c "*) echo "select 1;";; '
+                 '*) cat >/dev/null; echo "public.expenses 3 bbb";; esac'),
+    )  # fmt: skip
+    result = run_script("deploy/k3s/compare-data.sh", env=env)
+    assert result.returncode != 0
+    assert "public.expenses" in result.stdout
+
+
+def test_compare_passes_when_identical(tmp_path):
+    same = 'echo "public.expenses 3 aaa"'
+    env, _ = stubs(
+        tmp_path,
+        docker=f'if [[ "$*" == *" -c "* ]]; then echo "select 1;"; else cat >/dev/null; {same}; fi',
+        kubectl=f'case "$*" in *"get pod"*) echo postgres-0;; *" -c "*) echo "select 1;";; *) cat >/dev/null; {same};; esac',
+    )
+    result = run_script("deploy/k3s/compare-data.sh", env=env)
+    assert result.returncode == 0, result.stdout + result.stderr
