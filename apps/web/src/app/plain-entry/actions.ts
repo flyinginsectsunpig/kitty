@@ -10,7 +10,7 @@ import {
   type AskResult,
   type PlainDraft,
 } from "@kitty/core";
-import { askKitty, parseSentence, resolveDraft, type AiResult } from "@/lib/ai";
+import { askKitty, finishDraft, parseSentence, resolveDraft, type AiResult } from "@/lib/ai";
 import { getLedger, problemCode } from "@/lib/ledger";
 
 export async function readSentence(text: string, groupId?: string): Promise<AiResult> {
@@ -22,6 +22,11 @@ export async function askQuestion(
   groupId?: string,
 ): Promise<AskResult> {
   return askKitty(messages, groupId);
+}
+
+/** An assistant's draft was saved or sent: its link stops working. */
+export async function finishDraftAction(id: string): Promise<void> {
+  await finishDraft(id);
 }
 
 export async function rematchGroup(parsed: unknown, groupId: string): Promise<AiResult> {
