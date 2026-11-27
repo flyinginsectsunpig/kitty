@@ -18,10 +18,11 @@ browser ──https──► Caddy ─┬─ /auth/*  → Keycloak  (admin conso
    - If A1 capacity is unavailable in your region, retry later or try another availability domain.
 2. Networking → reserve the instance's public IP (so it never changes).
 3. VCN → security list → add ingress rules for TCP **80** and **443** from `0.0.0.0/0`.
-4. Oracle's Ubuntu image also blocks ports with iptables. On the server:
+4. Oracle's Ubuntu image also blocks ports with iptables. The new rules must go **above** its final `REJECT` rule
+   (check its position with `sudo iptables -L INPUT --line-numbers -n`; on Ubuntu 24.04 it is rule 5):
    ```bash
-   sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-   sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+   sudo iptables -I INPUT 5 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+   sudo iptables -I INPUT 5 -m state --state NEW -p tcp --dport 443 -j ACCEPT
    sudo netfilter-persistent save
    ```
 5. Install Docker: <https://docs.docker.com/engine/install/ubuntu/> and add your user to the `docker` group.
