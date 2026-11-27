@@ -142,6 +142,43 @@ and open it on the phone (allow installs from that source when asked). Building 
 [apps/mobile/README.md](../../apps/mobile/README.md). Once you have the signing certificate's SHA-256, set
 `ANDROID_CERT_SHA256` in `.env` and `up -d` again: invite and table links then open in the installed app.
 
+## 5b. ChatGPT and Claude (MCP)
+
+Kitty's MCP server lets people use Kitty from ChatGPT, Claude and other AI assistants. They add
+`https://<KITTY_HOST>/ai/mcp` as a connector and sign in with their Kitty account. Assistants can read the person's
+groups, balances and expenses, and prepare drafts the person saves in Kitty from a link. They never save anything
+themselves.
+
+1. Set `KITTY_MCP_CLIENT_SECRET` in `deploy/compose/.env` (`openssl rand -hex 24`), then `up -d` again.
+2. A realm first imported **after** phase 4d already has everything below. A realm imported before it doesn't, because
+   Keycloak imports `infra/keycloak/kitty-realm.json` only on the very first start. Make these changes in the admin
+   console (see below), matching that file:
+   - **Clients → Create client** `kitty-ledger`: OpenID Connect, client authentication on, and every flow off. It's
+     only an audience name for the token exchange.
+   - **Client scopes → Create** `kitty-mcp`: type Default, include in token scope, display on the consent screen.
+     Add a mapper: By configuration → Audience, included custom audience `kitty-mcp`, add to access token.
+   - **Clients → Create client** `kitty-mcp`:
+     - client authentication on, every flow off
+     - Credentials: the secret from step 1
+     - Advanced → Standard token exchange: on
+     - Client scopes → dedicated scope → mapper: Audience, custom audience `kitty-ledger`, access token
+   - Make sure `kitty-web`, `kitty-mobile` and `kitty-pulse` do **not** have `kitty-mcp` among their client scopes.
+     Their tokens must not work at `/ai/mcp`.
+   - **Clients → Client registration → Anonymous access policies**:
+     - Trusted Hosts: `localhost`, `127.0.0.1`, `chatgpt.com`, `claude.ai`, `claude.com`. Turn "host sending
+       registration request must match" off and "client URIs must match" on.
+     - Allowed Client Scopes: allow default scopes on.
+     - Keep Consent Required, Full Scope Disabled and Max Clients.
+3. Check from your own machine (both are also in `smoke.sh`):
+
+```bash
+curl -i https://<KITTY_HOST>/ai/mcp                    # 401, with a resource_metadata=... header
+curl https://<KITTY_HOST>/.well-known/oauth-protected-resource/ai/mcp   # names https://<KITTY_HOST>/auth/realms/kitty
+```
+
+To try it, add the connector in Claude (Settings → Connectors → Add custom connector) or in ChatGPT (developer mode →
+connectors) with the address above.
+
 ## Keycloak admin console
 
 It is not reachable from the internet. From your own machine:

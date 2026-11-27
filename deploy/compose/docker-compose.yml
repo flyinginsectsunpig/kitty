@@ -46,6 +46,8 @@ services:
       KITTY_WEB_CLIENT_SECRET: ${KITTY_WEB_CLIENT_SECRET:?set KITTY_WEB_CLIENT_SECRET}
       # pulse's client secret, read by the realm import (never the dev default from the repo).
       PULSE_CLIENT_SECRET: ${PULSE_CLIENT_SECRET:?set PULSE_CLIENT_SECRET}
+      # The MCP server's client secret (token exchange), read by the realm import.
+      KITTY_MCP_CLIENT_SECRET: ${KITTY_MCP_CLIENT_SECRET:?set KITTY_MCP_CLIENT_SECRET}
       KITTY_VERIFY_EMAIL: ${KITTY_VERIFY_EMAIL:-true}
       SMTP_HOST: ${SMTP_HOST:-smtp.resend.com}
       SMTP_PORT: ${SMTP_PORT:-465}
@@ -148,6 +150,11 @@ services:
       # the person.
       AI_LEDGER_URL: http://ledger:8080
       AI_AUTH_ISSUER: https://${KITTY_HOST}/auth/realms/kitty
+      # MCP (ChatGPT, Claude): the address assistants use, the kitty-mcp client's secret for the token exchange, and
+      # where draft links point.
+      AI_MCP_PUBLIC_URL: https://${KITTY_HOST}/ai/mcp
+      AI_MCP_CLIENT_SECRET: ${KITTY_MCP_CLIENT_SECRET:?set KITTY_MCP_CLIENT_SECRET}
+      AI_WEB_URL: https://${KITTY_HOST}
     healthcheck:
       # 503 when a receipt reader has stopped.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]

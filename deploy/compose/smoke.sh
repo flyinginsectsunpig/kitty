@@ -31,6 +31,11 @@ check "path-parameter bypass is blocked" 404 "$(status "$BASE/auth/realms/kitty/
 check "encoded traversal is blocked" 404 "$(status "$BASE/auth/realms/kitty/%2e%2e/master/account")"
 check "kitty sign-in page loads" 200 "$(status "$BASE/auth/realms/kitty/account")"
 
+# MCP (ChatGPT, Claude): /ai/mcp asks for a token and points at its metadata, which names the realm.
+check "mcp asks for a token" 401 "$(status "$BASE/ai/mcp")"
+check "mcp points at its metadata" 1 "$("${CURL[@]}" -D - -o /dev/null "$BASE/ai/mcp"   | grep -ci "resource_metadata=\"$BASE/.well-known/oauth-protected-resource/ai/mcp\"")"
+check "mcp metadata names the realm" 1 "$("${CURL[@]}" "$BASE/.well-known/oauth-protected-resource/ai/mcp"   | grep -c "\"$BASE/auth/realms/kitty\"")"
+
 issuer="$("${CURL[@]}" "$BASE/auth/realms/kitty/.well-known/openid-configuration" \
   | sed -n 's/.*"issuer":"\([^"]*\)".*/\1/p')"
 check "keycloak issuer" "$BASE/auth/realms/kitty" "$issuer"

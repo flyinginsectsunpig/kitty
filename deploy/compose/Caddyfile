@@ -45,6 +45,12 @@
 		respond 404
 	}
 
+	# MCP (phase 4d): an assistant that calls /ai/mcp without a token is pointed at this metadata (RFC 9728 puts it
+	# at the root, before the resource's path), which names the Keycloak realm to sign in with. Path kept as is.
+	handle /.well-known/oauth-protected-resource* {
+		reverse_proxy ai:8000
+	}
+
 	# Plain-language entry (phase 4a): /ai/parse → ai /parse. The ai service checks the Keycloak token itself.
 	handle_path /ai/* {
 		reverse_proxy ai:8000
