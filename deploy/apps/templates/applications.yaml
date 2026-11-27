@@ -89,6 +89,10 @@ spec:
     helm:
       # kubeseal looks for a controller called sealed-secrets-controller in kube-system by default.
       releaseName: sealed-secrets-controller
+      valuesObject:
+        # One sealing key, never renewed: it is exported once and kept off the server (deploy/k3s/RUNBOOK.md), and
+        # a renewed key would seal new settings with a key the owner never exported.
+        keyrenewperiod: "0"
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system

@@ -37,6 +37,13 @@ def test_platform_and_secrets_applications():
     assert found["kitty-secrets"]["spec"]["source"]["path"] == "deploy/secrets/production"
 
 
+def test_sealing_key_is_not_renewed():
+    # By default the controller makes a new key every 30 days; anything sealed afterwards would need a key the owner
+    # never exported. One key, exported once (deploy/k3s/RUNBOOK.md), is what makes a rebuild possible.
+    helm = apps()["sealed-secrets"]["spec"]["source"]["helm"]
+    assert helm["valuesObject"]["keyrenewperiod"] == "0"
+
+
 @pytest.mark.parametrize("chart", CHARTS + ["kitty-secrets"])
 def test_sync_is_automatic_with_retries(chart):
     policy = apps()[chart]["spec"]["syncPolicy"]
