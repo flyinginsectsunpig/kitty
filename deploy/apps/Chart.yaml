@@ -1,0 +1,5 @@
+apiVersion: v2
+name: kitty-apps
+description: Argo CD Applications for Kitty (app of apps). The root Application (deploy/k3s/root-app.yaml) renders this chart with the git revision to follow.
+type: application
+version: 0.1.0

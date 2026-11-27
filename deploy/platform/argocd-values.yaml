@@ -1,0 +1,14 @@
+# Argo CD for one small server: one replica of everything, no Dex (no SSO), no notifications, not exposed.
+# Its UI is reached with:  kubectl -n argocd port-forward svc/argocd-server 8081:80   then http://localhost:8081
+# (admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)
+dex:
+  enabled: false
+notifications:
+  enabled: false
+configs:
+  params:
+    # TLS isn't needed behind a port-forward.
+    server.insecure: true
+server:
+  service:
+    type: ClusterIP

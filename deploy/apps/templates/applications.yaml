@@ -1,0 +1,95 @@
+{{- $rev := required "revision is required: run deploy/k3s/bootstrap.sh <revision>" .Values.revision -}}
+{{- define "apps.sync" -}}
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+  # CRDs, the controller and the sealed Secret can arrive after the charts that use them: retry until they do.
+  retry:
+    limit: 10
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 5m
+{{- end -}}
+{{- range .Values.charts }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ . }}
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: {{ $.Values.repoURL }}
+    targetRevision: {{ $rev }}
+    path: deploy/charts/{{ . }}
+    helm:
+      valueFiles:
+        - ../../values/production/{{ . }}.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kitty
+  {{- include "apps.sync" $ | nindent 2 }}
+{{- end }}
+---
+# The sealed settings (deploy/k3s/seal-env.sh): only the Sealed Secrets controller can open them.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kitty-secrets
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ $rev }}
+    path: deploy/secrets/production
+    directory:
+      exclude: .gitkeep
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kitty
+  {{- include "apps.sync" . | nindent 2 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: {{ .Values.certManager.version }}
+    helm:
+      valuesObject:
+        crds:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  {{- include "apps.sync" . | nindent 2 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sealed-secrets
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.sealedSecrets.repoURL }}
+    targetRevision: {{ .Values.sealedSecrets.tag }}
+    path: helm/sealed-secrets
+    helm:
+      # kubeseal looks for a controller called sealed-secrets-controller in kube-system by default.
+      releaseName: sealed-secrets-controller
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  {{- include "apps.sync" . | nindent 2 }}

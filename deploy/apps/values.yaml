@@ -1,0 +1,25 @@
+# The git revision every Kitty Application follows. No default: deploy/k3s/bootstrap.sh sets it (a branch for a
+# rehearsal, main in production).
+revision: ""
+repoURL: https://github.com/flyinginsectsunpig/kitty.git
+
+# Kitty's own charts, all in namespace "kitty" (deploy/charts/<name>, values in deploy/values/production/<name>.yaml).
+charts:
+  - postgres
+  - redis
+  - redpanda
+  - azurite
+  - keycloak
+  - kitty-pulse
+  - kitty-ledger
+  - kitty-ai
+  - kitty-web
+  - kitty-edge
+
+# Upstream charts, pinned.
+certManager:
+  version: v1.21.3
+sealedSecrets:
+  # Published as GitHub releases only (its Pages chart repo is gone), so Argo CD reads the chart from the tag.
+  repoURL: https://github.com/bitnami-labs/sealed-secrets.git
+  tag: helm-v2.22.0
