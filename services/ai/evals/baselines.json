@@ -1,0 +1,57 @@
+{
+  "receipts": {
+    "target": {
+      "total_accuracy": 0.9
+    },
+    "metrics": {
+      "total_accuracy": {
+        "value": 0.82,
+        "total": 50
+      },
+      "item_f1": {
+        "value": 0.7833,
+        "total": 50
+      }
+    }
+  },
+  "nl": {
+    "metrics": {
+      "intent": {
+        "value": 1.0,
+        "total": 106
+      },
+      "amount": {
+        "value": 0.9792,
+        "total": 48
+      },
+      "people": {
+        "value": 0.6939,
+        "total": 49
+      },
+      "other": {
+        "value": 0.9286,
+        "total": 140
+      }
+    }
+  },
+  "ask": {
+    "metrics": {
+      "calls": {
+        "value": 1.0,
+        "total": 20
+      },
+      "contains": {
+        "value": 1.0,
+        "total": 35
+      },
+      "not_contains": {
+        "value": 1.0,
+        "total": 8
+      },
+      "entry": {
+        "value": 1.0,
+        "total": 26
+      }
+    }
+  }
+}

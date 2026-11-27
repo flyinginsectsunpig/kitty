@@ -22,13 +22,21 @@ EXPECT_FIELDS = {
 
 def test_nl_evals_file_is_well_formed():
     lines = [json.loads(line) for line in PHRASES.read_text(encoding="utf-8").splitlines() if line.strip()]
-    assert len(lines) >= 30
+    assert len(lines) >= 100
     for case in lines:
         assert set(case) == {"text", "today", "currency", "expect"}, case
         assert set(case["expect"]) <= EXPECT_FIELDS, case
         assert case["expect"]["intent"] in {"expense", "reminder", "question", "payment", "unclear"}
         # Every expected value has to be something the model could return.
-        ParsedSentence.model_validate({"intent": case["expect"]["intent"]})
+        expect = dict(case["expect"])
+        if "people" in expect:
+            expect["people"] = [{"name": n} for n in expect["people"]]
+        ParsedSentence.model_validate(expect)
+
+
+def test_no_duplicate_sentences():
+    texts = [json.loads(line)["text"].casefold() for line in PHRASES.read_text(encoding="utf-8").splitlines() if line]
+    assert len(texts) == len(set(texts))
 
 
 def test_the_owners_five_sentences_are_in_the_set():

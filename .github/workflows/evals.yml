@@ -1,7 +1,9 @@
 name: evals
 
-# Receipt-reading accuracy against labelled receipts. Nightly and on demand only: it calls the model's free
-# tier, so it never runs on pull requests.
+# Kitty's AI evals: receipt reading, plain-language sentences and Ask Kitty, against labelled sets. Nightly and on
+# demand only: they call the model's free tier (about 150 calls a run), so they never run on pull requests.
+# The gate (services/ai/evals/gate.py) compares the scores with the best recorded ones (evals/baselines.json): red only
+# on a clear drop, a warning when the model was too busy to finish, and one summary table either way.
 on:
   workflow_dispatch:
     inputs:
@@ -18,18 +20,20 @@ permissions:
   contents: read
 
 jobs:
-  receipts:
+  evals:
     runs-on: ubuntu-latest
+    timeout-minutes: 150
     defaults:
       run:
         working-directory: services/ai
     env:
       AI_GEMINI_API_KEY: ${{ secrets.AI_GEMINI_API_KEY }}
+      MODEL: ${{ inputs.model }}
     steps:
       - name: Skip without a model key
         if: env.AI_GEMINI_API_KEY == ''
         working-directory: .
-        run: echo "::notice::AI_GEMINI_API_KEY is not set; receipt evals skipped."
+        run: echo "::notice::AI_GEMINI_API_KEY is not set; evals skipped."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.AI_GEMINI_API_KEY != ''
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
@@ -45,13 +49,41 @@ jobs:
           uv run python -c "import os; from google import genai;
           c = genai.Client(api_key=os.environ['AI_GEMINI_API_KEY']);
           print('\n'.join(sorted(m.name for m in c.models.list() if 'generateContent' in (m.supported_actions or []))))"
-      - name: Fetch the bootstrap set (CORD-v2)
+
+      # Each eval writes its scores to $RUNNER_TEMP/evals; one that falls over doesn't stop the others: the gate
+      # reports it as a warning. A normal run takes about 20 minutes in all; the step limits stop a night of an
+      # overloaded model from running into the job's own limit, so the gate always gets to write its summary.
+      - name: Receipts (CORD-v2 bootstrap set)
         if: env.AI_GEMINI_API_KEY != ''
-        run: uv run python evals/fetch_cord.py --out "$RUNNER_TEMP/cord" --limit "${{ inputs.limit || '50' }}"
-      - name: Score
-        if: env.AI_GEMINI_API_KEY != ''
-        env:
-          MODEL: ${{ inputs.model }}
+        continue-on-error: true
+        timeout-minutes: 50
         run: |
           if [ -n "$MODEL" ]; then export AI_GEMINI_MODEL="$MODEL"; fi
-          uv run python evals/run_receipts.py --data "$RUNNER_TEMP/cord" --min-total-accuracy 0.9
+          uv run python evals/fetch_cord.py --out "$RUNNER_TEMP/cord" --limit "${{ inputs.limit || '50' }}"
+          uv run python evals/run_receipts.py --data "$RUNNER_TEMP/cord" --min-total-accuracy 0 \
+            --json-out "$RUNNER_TEMP/evals/receipts.json"
+      - name: Plain-language sentences
+        if: env.AI_GEMINI_API_KEY != ''
+        continue-on-error: true
+        timeout-minutes: 40
+        run: |
+          if [ -n "$MODEL" ]; then export AI_GEMINI_MODEL="$MODEL"; fi
+          uv run python evals/nl/run.py --verbose --json-out "$RUNNER_TEMP/evals/nl.json"
+      - name: Ask Kitty
+        if: env.AI_GEMINI_API_KEY != ''
+        continue-on-error: true
+        timeout-minutes: 25
+        run: |
+          if [ -n "$MODEL" ]; then export AI_GEMINI_MODEL="$MODEL"; fi
+          uv run python evals/ask/run.py --verbose --json-out "$RUNNER_TEMP/evals/ask.json"
+
+      - name: Gate against the baselines
+        if: env.AI_GEMINI_API_KEY != ''
+        run: uv run python evals/gate.py --results "$RUNNER_TEMP/evals" --baselines evals/baselines.json
+      - name: Keep the scores
+        if: always() && env.AI_GEMINI_API_KEY != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: eval-scores
+          path: ${{ runner.temp }}/evals
+          if-no-files-found: ignore
