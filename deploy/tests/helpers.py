@@ -5,7 +5,9 @@ Needs `helm` on PATH.
 """
 
 import functools
+import os
 import pathlib
+import shutil
 import subprocess
 
 import yaml
@@ -44,6 +46,15 @@ def one(docs: list[dict], kind: str, name: str | None = None) -> dict:
 @functools.lru_cache(maxsize=None)
 def compose() -> dict:
     return yaml.safe_load((REPO / "deploy" / "compose" / "docker-compose.yml").read_text(encoding="utf-8"))
+
+
+def run_script(script: str, *args, env: dict | None = None, cwd=None) -> subprocess.CompletedProcess:
+    """Runs a repo bash script (path relative to the repo root) with Git Bash / bash, capturing output."""
+    bash = shutil.which("bash")
+    assert bash, "bash not found"
+    argv = [bash, (REPO / script).as_posix(), *(a.as_posix() if isinstance(a, pathlib.Path) else str(a) for a in args)]
+    full_env = {**os.environ, **(env or {})}
+    return subprocess.run(argv, capture_output=True, text=True, env=full_env, cwd=cwd or REPO)
 
 
 def pod_spec(workload: dict) -> dict:
