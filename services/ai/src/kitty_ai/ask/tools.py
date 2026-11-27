@@ -71,7 +71,7 @@ TOOLS: list[ToolSpec] = [
 ]
 
 
-def _date(value) -> str | None:
+def iso_date(value) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str) or not _ISO_DATE.match(value):
@@ -86,7 +86,7 @@ def _spending_args(args: dict) -> tuple[str, str | None, str | None, str | None,
     group_id = args.get("group_id")
     if not isinstance(group_id, str) or not group_id:
         raise ValueError("group_id")
-    from_, to = _date(args.get("from")), _date(args.get("to"))
+    from_, to = iso_date(args.get("from")), iso_date(args.get("to"))
     if from_ and to and from_ > to:
         raise ValueError("from after to")
     category = args.get("category")

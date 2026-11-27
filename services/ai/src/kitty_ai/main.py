@@ -4,19 +4,24 @@ Run with: uvicorn kitty_ai.main:create_app --factory"""
 
 import logging
 from collections.abc import Callable
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 
 import httpx
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from starlette.routing import Route
 
 from kitty_ai.ask.models import chat_from
 from kitty_ai.ask.routes import make_ask_router
 from kitty_ai.auth import TokenVerifier, jwks_fetcher
 from kitty_ai.entry.parse import parser_from
-from kitty_ai.entry.routes import make_router
+from kitty_ai.entry.routes import make_router, south_african_today
+from kitty_ai.ledger import LedgerReader
+from kitty_ai.mcp.auth import LedgerTokenExchanger
 from kitty_ai.mcp.draft_routes import make_draft_router
 from kitty_ai.mcp.drafts import DraftStore, InMemoryDraftStore, PostgresDraftStore
+from kitty_ai.mcp.metadata import make_metadata_router
+from kitty_ai.mcp.server import MCP_PATH, build_mcp
 from kitty_ai.receipts.extract import extractor_from
 from kitty_ai.receipts.worker import Worker
 from kitty_ai.settings import Settings
@@ -31,6 +36,8 @@ def _real_worker(settings: Settings) -> Worker:
 def create_app(settings: Settings | None = None, make_worker: Callable[[Settings], Worker] = _real_worker) -> FastAPI:
     settings = settings or Settings()
     state: dict[str, Worker | None] = {"worker": None}
+    # Run for the app's lifetime: the MCP SDK's session manager, when MCP is on.
+    background: list[Callable[[], AbstractAsyncContextManager]] = []
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -39,7 +46,10 @@ def create_app(settings: Settings | None = None, make_worker: Callable[[Settings
             worker.start()
             state["worker"] = worker
         try:
-            yield
+            async with AsyncExitStack() as stack:
+                for run in background:
+                    await stack.enter_async_context(run())
+                yield
         finally:
             if state["worker"]:
                 state["worker"].stop()
@@ -70,5 +80,29 @@ def create_app(settings: Settings | None = None, make_worker: Callable[[Settings
             PostgresDraftStore(settings.postgres_dsn) if settings.postgres_dsn else InMemoryDraftStore()
         )
         app.include_router(make_draft_router(settings, verifier, drafts, http))
+
+        if settings.mcp_public_url:
+            # Kitty for ChatGPT, Claude and other MCP clients: their tokens are meant for kitty-mcp, and are swapped at
+            # Keycloak for a ledger token as the same person. Caddy serves /mcp as /ai/mcp.
+            mcp_verifier = TokenVerifier(
+                settings.auth_issuer, settings.mcp_audience, jwks_fetcher(settings.auth_issuer, http)
+            )
+            exchanger = LedgerTokenExchanger(
+                f"{settings.auth_issuer.rstrip('/')}/protocol/openid-connect/token",
+                settings.mcp_audience,
+                settings.mcp_client_secret,
+                http,
+            )
+            mcp_app, sessions = build_mcp(
+                settings,
+                mcp_verifier,
+                exchanger,
+                lambda token: LedgerReader(settings.ledger_url, token, http),
+                drafts,
+                south_african_today,
+            )
+            app.router.routes.append(Route(MCP_PATH, mcp_app, methods=["GET", "POST", "DELETE"]))
+            app.include_router(make_metadata_router(settings))
+            background.append(sessions)
 
     return app

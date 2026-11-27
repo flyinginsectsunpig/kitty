@@ -107,3 +107,7 @@ class LedgerReader:
         filters = {"from": from_, "to": to, "category": category, "q": q, "member": member, "cursor": cursor}
         params = {k: v for k, v in filters.items() if v is not None} | {"limit": str(limit)}
         return self._get(f"/groups/{group_id}/expense-lines", params)
+
+    def balances(self, group_id: str) -> dict:
+        """Who owes whom in a group, with the settle-up plan: the ledger's /groups/{id}/balances JSON."""
+        return self._get(f"/groups/{group_id}/balances")
