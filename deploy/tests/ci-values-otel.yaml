@@ -1,0 +1,14 @@
+# CI's k3d run (deploy/tests/k3d-e2e.sh): layered over deploy/values/production/otel-collector.yaml. Everything the
+# collector would send to Grafana Cloud goes to its own log instead (the debug exporter), where the run checks it.
+config:
+  exporters:
+    debug:
+      verbosity: detailed
+  service:
+    pipelines:
+      traces:
+        exporters: [debug]
+      metrics:
+        exporters: [debug]
+      logs:
+        exporters: [debug]
