@@ -6,3 +6,7 @@ host: kitty.localhost
 memory: 1500Mi
 waitImage: busybox:1.37
 setupImage: pgvector/pgvector:pg17
+# OpenTelemetry: the Collector's OTLP/HTTP address; empty = no telemetry exported.
+otel:
+  endpoint: ""
+  environment: production

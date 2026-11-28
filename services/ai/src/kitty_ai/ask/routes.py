@@ -21,6 +21,7 @@ from kitty_ai.ledger import LedgerReader
 from kitty_ai.limits import RateLimiter
 from kitty_ai.receipts.extract import ModelUnavailable, RateLimited, UnusableOutput
 from kitty_ai.settings import Settings
+from kitty_ai.telemetry import model_call
 
 log = logging.getLogger(__name__)
 
@@ -98,9 +99,9 @@ def make_ask_router(
         me = reader.me()
         group = next((g for g in reader.groups() if g.id == group_id), None)
         try:
-            outcome, lookups, calls = run_agent(
-                chat, system_prompt(today(), me.display_name, group), conversation, lambda n, a: run_tool(reader, n, a)
-            )
+            prompt = system_prompt(today(), me.display_name, group)
+            with model_call("ask"):  # one question, however many model turns it takes
+                outcome, lookups, calls = run_agent(chat, prompt, conversation, lambda n, a: run_tool(reader, n, a))
         except (ModelUnavailable, RateLimited) as e:
             log.warning("model unavailable: %s status=%s", type(e).__name__, getattr(e.__cause__, "code", None))
             return _error(503, "ai_unavailable")

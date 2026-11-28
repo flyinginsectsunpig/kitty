@@ -64,3 +64,28 @@ def _collect(node, found):
     elif isinstance(node, list):
         for v in node:
             _collect(v, found)
+
+
+GRAFANA_KEYS = ["GRAFANA_OTLP_ENDPOINT", "GRAFANA_OTLP_INSTANCE_ID", "GRAFANA_OTLP_TOKEN"]
+
+
+def grafana_env(tmp_path, drop=()):
+    lines = [f"{k}=dummy-{k.lower()}" for k in GRAFANA_KEYS if k not in drop] + ["POSTGRES_PASSWORD=not-this-one"]
+    path = tmp_path / ".env"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def test_grafana_secret_has_exactly_three_keys(tmp_path):
+    result = run_script(SEAL, grafana_env(tmp_path), "--grafana", "--plain")
+    assert result.returncode == 0, result.stderr
+    secret = yaml.safe_load(result.stdout)
+    assert (secret["metadata"]["name"], secret["metadata"]["namespace"]) == ("grafana-cloud", "observability")
+    assert set(secret["data"]) == set(GRAFANA_KEYS)  # nothing from kitty-secrets
+
+
+def test_grafana_missing_key_is_refused_by_name(tmp_path):
+    result = run_script(SEAL, grafana_env(tmp_path, drop={"GRAFANA_OTLP_TOKEN"}), "--grafana", "--plain")
+    assert result.returncode == 2
+    assert "GRAFANA_OTLP_TOKEN" in result.stderr
+    assert "dummy" not in result.stdout + result.stderr

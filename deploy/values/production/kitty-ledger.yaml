@@ -3,3 +3,5 @@
 host: kitty-split.duckdns.org
 image:
   tag: sha-c7a5452
+otel:
+  endpoint: http://otel-collector.observability:4318

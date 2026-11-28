@@ -1,3 +1,5 @@
+using Npgsql;
+using OpenTelemetry.Trace;
 using Kitty.Ledger.Data;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -28,6 +30,9 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+// Database calls in the same traces (phase 5b). Npgsql records the SQL text with $n placeholders, never values;
+// the collector drops the statement anyway and keeps the operation and table.
+builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing.AddNpgsql());
 builder.Services.AddProblemDetails();
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
@@ -41,7 +46,12 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<LedgerDbContext>((sp, options) =>
     options.UseNpgsql(sp.GetRequiredService<IConfiguration>().GetConnectionString("ledger")
-        ?? throw new InvalidOperationException("Connection string 'ledger' is not configured.")));
+            ?? throw new InvalidOperationException("Connection string 'ledger' is not configured."),
+        npgsql => npgsql.ConfigureDataSource(ds => ds.ConfigureTracing(tracing => tracing
+            // Only commands inside a trace (a request, a Kafka message): the outbox relay's half-second polls
+            // would otherwise each be a trace of their own.
+            .ConfigureCommandFilter(_ => System.Diagnostics.Activity.Current is not null)
+            .ConfigureBatchFilter(_ => System.Diagnostics.Activity.Current is not null)))));
 builder.Services.AddLedgerAuth(builder.Configuration, builder.Environment);
 builder.Services.AddWriteRateLimiting(builder.Configuration);
 if (builder.Configuration.GetValue<bool>("Ledger:TrustForwardedHeaders"))

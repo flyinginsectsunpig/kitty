@@ -12,6 +12,7 @@ using Kitty.Ledger.Features.Notifications;
 using Kitty.Ledger.Infrastructure;
 using Kitty.Ledger.Infrastructure.Audit;
 using Kitty.Ledger.Infrastructure.Messaging;
+using Kitty.Ledger.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -83,6 +84,7 @@ public sealed class RecurringGrpcService(LedgerDbContext db, ExpenseRates rates,
             if (added is null) throw;
             return added;
         }
+        LedgerTelemetry.CountExpenseCreated(expense.SplitMethod);
         return new AddOccurrenceResponse { ExpenseId = expense.Id.ToString(), AlreadyAdded = false };
     }
 

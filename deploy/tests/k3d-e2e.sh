@@ -4,13 +4,17 @@
 #   1. the 16 smoke checks (deploy/compose/smoke.sh --insecure),
 #   2. a receipt photo over 11 MB is refused at the edge (413),
 #   3. a WebSocket upgrade for live table updates reaches the ledger,
-#   4. every pod deleted at once, and Kitty comes back on its own: the smoke checks again.
+#   4. every pod deleted at once, and Kitty comes back on its own: the smoke checks again,
+#   5. telemetry reaches the OpenTelemetry collector with Kubernetes attributes and nothing scrubbed left in it,
+#   6. with Grafana Cloud unreachable, Kitty answers as fast as before,
+#   7. with the collector gone, Kitty keeps working.
 # Needs docker, k3d, helm and kubectl. Run from anywhere: deploy/tests/k3d-e2e.sh   (CI: .github/workflows/deploy.yml)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 K3S_IMAGE="${K3S_IMAGE:-rancher/k3s:v1.37.2-k3s1}"
 CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.21.3}"
+OTEL_COLLECTOR_CHART="${OTEL_COLLECTOR_CHART:-0.183.2}"
 HOST=kitty.localhost
 CHARTS=(postgres redis redpanda azurite keycloak kitty-pulse kitty-ledger kitty-ai kitty-web kitty-edge)
 
@@ -32,6 +36,20 @@ done
   echo "SMTP_USER=ci@kitty.localhost"; echo "SMTP_FROM=ci@kitty.localhost"; } >> "$env_file"
 deploy/k3s/seal-env.sh "$env_file" --plain | kubectl apply -f -
 rm -f "$env_file"
+echo "::endgroup::"
+
+echo "::group::otel collector (exports to its own log: deploy/tests/ci-values-otel.yaml)"
+kubectl create namespace observability
+grafana_env=$(mktemp)
+printf 'GRAFANA_OTLP_ENDPOINT=http://unused.invalid\nGRAFANA_OTLP_INSTANCE_ID=0\nGRAFANA_OTLP_TOKEN=ci-dummy\n' > "$grafana_env"
+deploy/k3s/seal-env.sh "$grafana_env" --grafana --plain | kubectl apply -f -
+rm -f "$grafana_env"
+collector() { # extra helm args
+  helm upgrade --install otel-collector opentelemetry-collector \
+    --repo https://open-telemetry.github.io/opentelemetry-helm-charts --version "$OTEL_COLLECTOR_CHART" \
+    -n observability -f deploy/values/production/otel-collector.yaml "$@" --wait --timeout 5m
+}
+collector -f deploy/tests/ci-values-otel.yaml
 echo "::endgroup::"
 
 echo "::group::kitty"
@@ -83,6 +101,35 @@ kubectl -n kitty delete pods --all --wait=false
 sleep 10
 kubectl -n kitty rollout status statefulset --timeout=10m
 kubectl -n kitty wait --for=condition=Available deployment --all --timeout=15m
+deploy/compose/smoke.sh "$HOST" --insecure || failures=$((failures + 1))
+
+echo "== telemetry reaches the collector, scrubbed"
+sleep 20 # the services and the collector export in batches
+otel_logs=$(kubectl -n observability logs ds/otel-collector-agent --since=60m 2>/dev/null || true)
+# Not printf | grep -q: grep quits at the first match, printf gets SIGPIPE, and pipefail turns "found" into "no".
+has() { grep -qF "$1" <<<"$otel_logs" && echo yes || echo no; }
+expect "a ledger span reached the collector" yes "$(has 'service.name: Str(ledger)')"
+expect "with Kubernetes attributes" yes "$(has 'k8s.namespace.name: Str(kitty)')"
+expect "no client address, full URL or bearer token in what would leave" 0 \
+  "$(printf '%s' "$otel_logs" | grep -cE 'client\.address|url\.full|Bearer [A-Za-z0-9]' || true)"
+
+median_ms() { # n requests to an endpoint that is traced, the median time in ms
+  for _ in $(seq 20); do "${curl_k[@]}" -o /dev/null -w '%{time_total}\n' "https://$HOST/api/me"; done \
+    | sort -n | awk '{a[NR]=$1} END {printf "%d", a[int((NR+1)/2)] * 1000}'
+}
+
+echo "== Grafana unreachable: Kitty answers as fast"
+before=$(median_ms)
+collector -f deploy/tests/ci-values-otel-blackhole.yaml
+sleep 30
+after=$(median_ms)
+expect "median /api/me ${before}ms before, ${after}ms after" yes "$([ "$after" -le $((before * 2 + 50)) ] && echo yes || echo no)"
+deploy/compose/smoke.sh "$HOST" --insecure || failures=$((failures + 1))
+
+echo "== the collector gone: Kitty keeps working"
+kubectl -n observability patch daemonset otel-collector-agent --type merge \
+  -p '{"spec":{"template":{"spec":{"nodeSelector":{"kitty-ci/no-such-node":"true"}}}}}'
+kubectl -n observability wait --for=delete pod -l app.kubernetes.io/name=opentelemetry-collector --timeout=120s || true
 deploy/compose/smoke.sh "$HOST" --insecure || failures=$((failures + 1))
 
 [ "$failures" -eq 0 ] && echo "k3d end-to-end: all passed" || { echo "k3d end-to-end: $failures failed"; exit 1; }

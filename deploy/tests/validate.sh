@@ -19,6 +19,12 @@ for dir in deploy/charts/*/; do
         -schema-location default -schema-location "$CRDS" || status=1
 done
 
+echo "== otel-collector (upstream chart with our values)"
+helm template otel-collector opentelemetry-collector \
+  --repo https://open-telemetry.github.io/opentelemetry-helm-charts --version 0.183.2 \
+  --namespace observability -f deploy/values/production/otel-collector.yaml \
+  | kubeconform -strict -summary -schema-location default -schema-location "$CRDS" || status=1
+
 echo "== apps (Argo CD Applications)"
 helm lint --quiet deploy/apps --set revision=main || status=1
 { helm template kitty-apps deploy/apps --set revision=main; echo "---"; cat deploy/k3s/root-app.yaml; } \

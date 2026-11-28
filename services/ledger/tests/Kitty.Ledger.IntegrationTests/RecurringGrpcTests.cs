@@ -75,10 +75,12 @@ public class RecurringGrpcTests(LedgerApiFactory factory)
     {
         using var env = await GroupAsync();
         var id = await ScheduleAsync(env);
+        using var counter = new ExpenseCounter();
 
         var res = await AddAsync(env, id, Today);
 
         Assert.False(res.AlreadyAdded);
+        Assert.Contains((1L, "equal"), counter.Points); // recurring expenses count as created too
         var e = (await env.Owner.GetFromJsonAsync<ExpenseFxDto>($"/groups/{env.G}/expenses/{res.ExpenseId}", ApiClientExtensions.Json, Ct))!;
         Assert.Equal(("Rent", Today, 1200000L), (e.Description, e.OccurredOn, e.AmountMinor));
     }

@@ -1,0 +1,228 @@
+# The OpenTelemetry Collector (upstream chart open-telemetry/opentelemetry-collector, Argo CD Application
+# "otel-collector"). One pod on the one node: it receives the services' OTLP, reads pod logs, collects node, pod and
+# cluster health, scrapes cert-manager, Traefik and itself, SCRUBS everything personal, then sends to Grafana Cloud.
+# Design: docs/superpowers/specs/2026-11-28-kitty-phase5b-observability-design.md (§5.1, §5.4).
+# The scrubbing processors (filter/noise, attributes/kitty, transform/kitty) are also run by deploy/tests/test_scrub.py.
+mode: daemonset
+fullnameOverride: otel-collector
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: "0.165.0"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    memory: 256Mi
+
+service:
+  enabled: true # services send to otel-collector.observability:4318
+
+ports:
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+presets:
+  logsCollection:
+    enabled: true # every pod's stdout, from /var/log/pods
+    includeCollectorLogs: false
+  kubernetesAttributes:
+    enabled: true # namespace, pod and deployment on every signal
+  kubeletMetrics:
+    enabled: true # node and pod CPU and memory
+  clusterMetrics:
+    enabled: true # pod status, restarts, readiness
+
+# Grafana Cloud's OTLP gateway, instance id and write token: Secret "grafana-cloud" (deploy/k3s/seal-env.sh --grafana).
+# Until it exists the pod waits, and the services' exports are simply dropped.
+extraEnvs:
+  - name: GRAFANA_OTLP_ENDPOINT
+    valueFrom:
+      secretKeyRef:
+        name: grafana-cloud
+        key: GRAFANA_OTLP_ENDPOINT
+  - name: GRAFANA_OTLP_INSTANCE_ID
+    valueFrom:
+      secretKeyRef:
+        name: grafana-cloud
+        key: GRAFANA_OTLP_INSTANCE_ID
+  - name: GRAFANA_OTLP_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: grafana-cloud
+        key: GRAFANA_OTLP_TOKEN
+
+config:
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus:
+      config:
+        scrape_configs:
+          # The Collector's own health (otelcol_exporter_sent_*): the "collector silent" alert.
+          - job_name: opentelemetry-collector
+            scrape_interval: 30s
+            static_configs:
+              - targets: ["${env:MY_POD_IP}:8888"]
+          # Certificate expiry: the "certificate expiring" alert.
+          - job_name: cert-manager
+            scrape_interval: 60s
+            static_configs:
+              - targets: ["cert-manager.cert-manager.svc:9402"]
+          # Edge request counts and latency.
+          - job_name: traefik
+            scrape_interval: 30s
+            kubernetes_sd_configs:
+              - role: pod
+                namespaces:
+                  names: [kube-system]
+            relabel_configs:
+              - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+                regex: traefik
+                action: keep
+              - source_labels: [__meta_kubernetes_pod_ip]
+                target_label: __address__
+                replacement: $$1:9100
+
+  processors:
+    # Only Kitty's own logs leave the server (not Traefik's access log, CoreDNS, Argo CD...), and no health checks.
+    filter/noise:
+      error_mode: ignore
+      traces:
+        span:
+          - 'attributes["http.route"] == "/health"'
+          - 'IsMatch(name, ".*/health$$")'
+      logs:
+        log_record:
+          - 'resource.attributes["k8s.namespace.name"] != "kitty"'
+      # Only the metrics the dashboard and alerts use: keeps Grafana Cloud's free tier (budget < 3k series) safe
+      # from runtime, Kestrel, controller and volume metrics nobody reads.
+      metrics:
+        metric:
+          - 'not IsMatch(name, "^(kitty\\.|http\\.server\\.request\\.duration$$|rpc\\.server\\.(call\\.)?duration$$|k8s\\.(pod|container|node|deployment|statefulset|daemonset)\\.|container\\.(cpu|memory)\\.|certmanager_certificate_(expiration_timestamp_seconds|ready_status)|traefik_(service|entrypoint)_|otelcol_exporter_|otelcol_receiver_accepted_)")'
+
+    # Attributes that identify people, carry secrets, or hold raw paths (invite tokens) or user-entered text.
+    attributes/kitty:
+      actions:
+        - {key: url.full, action: delete}
+        - {key: url.path, action: delete}
+        - {key: url.query, action: delete}
+        - {key: http.target, action: delete}
+        - {key: http.url, action: delete}
+        - {key: client.address, action: delete}
+        - {key: http.client_ip, action: delete}
+        - {key: network.peer.address, action: delete}
+        - {key: ClientHost, action: delete}
+        - {key: ClientAddr, action: delete}
+        - {key: RequestPath, action: delete}
+        - {key: RequestAddr, action: delete}
+        - {key: db.statement, action: delete} # db.operation.name and db.collection.name stay
+        - {key: db.query.text, action: delete}
+        - {pattern: '^http\.(request|response)\.header\..*', action: delete}
+        - {pattern: '^enduser\..*', action: delete}
+        - {pattern: '(?i).*(token|password|secret|authorization|cookie|email).*', action: delete}
+
+    # Personal values that hide inside other values, span names, span events, resources or log lines.
+    # ($$ is a literal $ in collector config: "$$1" reaches OTTL as the capture group $1.)
+    transform/kitty:
+      error_mode: ignore
+      trace_statements:
+        - context: span
+          statements:
+            # Client span names can carry the full URL ("fetch POST http://ledger/invites/<token>/accept"):
+            # keep only the kind and method; the route is in the server span.
+            - 'replace_pattern(name, "^(fetch|http|HTTP|GET|POST|PUT|PATCH|DELETE) ([A-Z]+ )?https?://.*$$", "$$1 $$2")'
+            - 'replace_pattern(name, "\\?.*$$", "")'
+            - 'replace_pattern(name, "/invites?/[^/\\s?\"]+", "/invite/***")'
+            - 'replace_pattern(name, "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "***")'
+            # A status message is free text (often an exception's message): not shipped.
+            - 'set(status.message, "") where status.message != ""'
+        - context: span
+          statements: &mask_attributes
+            - 'replace_all_patterns(attributes, "value", "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "***")'
+            - 'replace_all_patterns(attributes, "value", "Bearer [A-Za-z0-9._~+/=-]+", "***")'
+            - 'replace_all_patterns(attributes, "value", "eyJ[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*", "***")'
+            - 'replace_all_patterns(attributes, "value", "AIza[0-9A-Za-z_-]{20,}", "***")'
+            - 'replace_all_patterns(attributes, "value", "AQ\\.[0-9A-Za-z_-]{20,}", "***")'
+            - 'replace_all_patterns(attributes, "value", "/invites?/[^/\\s?\"]+", "/invite/***")'
+            - 'replace_all_patterns(attributes, "value", "\\?[^\\s\"]+", "?***")'
+            - 'replace_all_patterns(attributes, "value", "\\b[a-z]{4} [a-z]{4} [a-z]{4} [a-z]{4}\\b", "***")'
+            - 'replace_all_patterns(attributes, "value", "\\b([0-9]{1,3}\\.){3}[0-9]{1,3}\\b", "***")'
+            - 'replace_all_patterns(attributes, "value", "\\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\\b", "***")'
+            - 'replace_all_patterns(attributes, "value", "[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*::(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?", "***")'
+        # Exceptions recorded as span events carry messages and stack traces.
+        - context: spanevent
+          statements: *mask_attributes
+        - context: resource
+          statements: *mask_attributes
+      log_statements:
+        - context: log
+          statements:
+            - 'replace_pattern(body, "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "***")'
+            - 'replace_pattern(body, "Bearer [A-Za-z0-9._~+/=-]+", "***")'
+            - 'replace_pattern(body, "eyJ[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*", "***")'
+            - 'replace_pattern(body, "AIza[0-9A-Za-z_-]{20,}", "***")'
+            - 'replace_pattern(body, "AQ\\.[0-9A-Za-z_-]{20,}", "***")'
+            - 'replace_pattern(body, "/invites?/[^/\\s?\"]+", "/invite/***")'
+            # Query strings (Azurite's signed upload URLs carry a write token in sig=...).
+            - 'replace_pattern(body, "\\?[^\\s\"]+", "?***")'
+            # Keycloak's event lines name what someone typed or who they are.
+            - 'replace_pattern(body, "(username|first_name|last_name|email|identity_provider_identity|redirect_uri)=\"?[^\",\\s]*\"?", "$$1=***")'
+            - 'replace_pattern(body, "\\b[a-z]{4} [a-z]{4} [a-z]{4} [a-z]{4}\\b", "***")'
+            - 'replace_pattern(body, "\\b([0-9]{1,3}\\.){3}[0-9]{1,3}\\b", "***")'
+            - 'replace_pattern(body, "\\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\\b", "***")'
+            - 'replace_pattern(body, "[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*::(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})*)?", "***")'
+        - context: log
+          statements: *mask_attributes
+        - context: resource
+          statements: *mask_attributes
+      metric_statements:
+        - context: datapoint
+          statements: *mask_attributes
+        - context: resource
+          statements: *mask_attributes
+
+    batch: {}
+
+  exporters:
+    otlp_http/grafana:
+      endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
+      auth:
+        authenticator: basicauth/grafana
+      # Never hold Kitty up: a bounded queue, a minute of retries, then the data is dropped.
+      sending_queue:
+        enabled: true
+        queue_size: 1000
+      retry_on_failure:
+        enabled: true
+        max_elapsed_time: 60s
+
+  extensions:
+    basicauth/grafana:
+      client_auth:
+        username: ${env:GRAFANA_OTLP_INSTANCE_ID}
+        password: ${env:GRAFANA_OTLP_TOKEN}
+
+  service:
+    extensions: [health_check, basicauth/grafana]
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, filter/noise, attributes/kitty, transform/kitty, batch]
+        exporters: [otlp_http/grafana]
+      metrics:
+        receivers: [otlp, prometheus]
+        processors: [memory_limiter, filter/noise, attributes/kitty, transform/kitty, batch]
+        exporters: [otlp_http/grafana]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, filter/noise, attributes/kitty, transform/kitty, batch]
+        exporters: [otlp_http/grafana]

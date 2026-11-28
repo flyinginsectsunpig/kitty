@@ -135,6 +135,61 @@ State is in the private bucket `kitty-tfstate` (created once by hand: `oci os bu
 apply it.** `prevent_destroy` makes Terraform refuse such a plan anyway. The upload link for backups, DuckDNS and the
 API keys are deliberately outside Terraform.
 
+## Observability (Grafana Cloud)
+
+Every service (ledger, ai, pulse, web) sends traces and metrics over OTLP to one OpenTelemetry Collector in the
+`observability` namespace (`otel-collector.observability:4318`). The collector also reads Kitty's pod logs, collects
+node, pod and cluster health, and scrapes cert-manager, Traefik and itself. It **scrubs** everything, then forwards it
+to Grafana Cloud's free tier. Design: `docs/superpowers/specs/2026-11-28-kitty-phase5b-observability-design.md`.
+
+**What never leaves the server** (`deploy/values/production/otel-collector.yaml`, proven by
+`deploy/tests/test_scrub.py`):
+- email addresses, tokens (JWTs, bearer, API keys, app passwords), invite links;
+- client IP addresses, raw paths and full URLs, query strings;
+- SQL text and request bodies;
+- personal values inside span names, exception messages and stack traces, and Keycloak's login events (usernames,
+  names); span status messages are blanked.
+
+Traefik's access log, CoreDNS and Argo CD's logs aren't shipped at all; only namespace `kitty`'s logs are. Only the
+metrics the dashboard and alerts read are kept (a keep-list in `filter/noise`), which holds the free tier's series
+budget; add a metric's name there before building a panel on it.
+
+**Setting it up** (once):
+1. Create a free Grafana Cloud account (no payment method) and a stack in the region nearest South Africa.
+2. In the stack, under OpenTelemetry, create a token for sending data. Note the OTLP endpoint, the instance id and
+   the token, and add them to the server's `~/kitty/deploy/compose/.env` as `GRAFANA_OTLP_ENDPOINT`,
+   `GRAFANA_OTLP_INSTANCE_ID` and `GRAFANA_OTLP_TOKEN`.
+3. On the server: `deploy/k3s/seal-env.sh ~/kitty/deploy/compose/.env --grafana > grafana-cloud.yaml`, then commit
+   `grafana-cloud.yaml` into `deploy/secrets/production/`. Until it's there, the collector pod waits and the services'
+   exports are simply dropped.
+4. In the stack, under Administration, create a service account with the Editor role, and a token for it.
+5. Dashboard and alerts, from your PC:
+   ```bash
+   cd deploy/terraform/grafana
+   cp terraform.tfvars.example terraform.tfvars        # stack URL, service-account token, alert email (git-ignored)
+   echo 'namespace = "<oci os ns get>"' > backend.hcl  # git-ignored; same state bucket as Oracle's
+   terraform init -backend-config=backend.hcl
+   terraform plan && terraform apply
+   ```
+
+**The alerts** (emailed to you; `deploy/terraform/grafana/alerts.tf`):
+
+| Alert | What it means | First thing to do |
+|---|---|---|
+| `error-rate` | over 5% of a service's requests failed (5xx) for 10 minutes | `kubectl -n kitty logs deploy/kitty-<service>` |
+| `pod-unhealthy` | a Kitty pod hasn't been ready, or has restarted twice or more, for 10 minutes | `kubectl -n kitty describe pod <pod>`, then its logs |
+| `backup-missing` | no successful nightly backup for 26 hours | `tail ~/kitty-backups/backup.log` on the server |
+| `certificate-expiring` | the HTTPS certificate expires within 14 days | `kubectl -n kitty describe certificate kitty-tls` |
+| `collector-silent` | no telemetry for 15 minutes | `kubectl -n observability get pods`, then its logs |
+
+**Locally**, Aspire's dashboard receives the same telemetry (`http://localhost:18888`; the services send to its
+OTLP endpoints on 18889 and 18890). With no `OTEL_EXPORTER_OTLP_ENDPOINT` set, nothing is exported anywhere.
+
+**Client addresses** (the web app's guest-join limit uses them): check on the node, never in Grafana. Request the site
+from outside, then look at the newest line of `kubectl -n kube-system logs deploy/traefik`. Its first field must be
+the caller's public address, not a `10.x` one. If it's internal, switch Traefik to `hostPort` in the HelmChartConfig
+(`deploy/charts/kitty-edge/templates/cluster.yaml`).
+
 ## The public IP
 
 The server's IP is ephemeral: it survives reboots and only changes if the instance is stopped from Oracle's console.

@@ -7,3 +7,7 @@ memory: 512Mi
 # The APK signing certificate's SHA-256, so invite and table links open in the Android app (optional).
 androidCertSha256: ""
 waitImage: busybox:1.37
+# OpenTelemetry: the Collector's OTLP/HTTP address; empty = no telemetry exported.
+otel:
+  endpoint: ""
+  environment: production

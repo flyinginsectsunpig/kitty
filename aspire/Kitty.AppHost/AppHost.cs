@@ -60,6 +60,7 @@ var pulse = builder.AddExecutable("pulse", "go", "../../services/pulse", "run", 
     .WithDeveloperCertificateTrust(false)
 #pragma warning restore ASPIRECERTIFICATES001
     .WithHttpEndpoint(env: "PULSE_PORT", name: "grpc")
+    .WithOtlpExporter(OtlpProtocol.HttpProtobuf) // the dashboard's OTLP/HTTP endpoint (pulse's exporter speaks HTTP)
     .WithEnvironment("PULSE_DATABASE_URL", ledgerDb.Resource.UriExpression)
     .WaitFor(ledgerDb)
     // Recurring expenses: follow the ledger's schedules on Kafka, add due periods over the ledger's internal gRPC port
@@ -109,6 +110,7 @@ var ai = builder.AddUvicornApp("ai", "../../services/ai", "kitty_ai.main:create_
 #pragma warning restore ASPIRECERTIFICATES001
     .WithUv()
     .WithArgs("--factory")
+    .WithOtlpExporter(OtlpProtocol.HttpProtobuf)
     .WithEndpoint("http", e => { e.Port = AiPort; e.IsProxied = false; })
     .WithEnvironment("AI_LEDGER_URL", ledger.GetEndpoint("http"))
     .WithEnvironment("AI_AUTH_ISSUER", realmUrl)
@@ -135,6 +137,7 @@ var authSecret = builder.AddParameter("auth-secret",
 builder.AddJavaScriptApp("web", "../../apps/web", "dev")
     .WithNpm(install: false)
     .WithHttpEndpoint(port: 3000, env: "PORT") // must match the Keycloak client redirect URI
+    .WithOtlpExporter(OtlpProtocol.HttpProtobuf)
     .WithReference(ledger)
     .WaitFor(ledger)
     .WithEnvironment("LEDGER_URL", ledger.GetEndpoint("http"))

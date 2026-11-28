@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using Confluent.Kafka;
 using Confluent.Kafka.SyncOverAsync;
 using Confluent.SchemaRegistry.Serdes;
 using Kitty.Contracts.Events.V1;
 using Kitty.Ledger.Features.Scans;
+using Kitty.Ledger.Infrastructure.Telemetry;
 
 namespace Kitty.Ledger.Infrastructure.Messaging;
 
@@ -49,7 +51,12 @@ public sealed class InboxConsumer(IServiceScopeFactory scopes, KafkaOptions kafk
                 }
                 if (message?.Message?.Value is not { } result) continue;
 
-                await HandleAsync(result, ct);
+                // The ai service sends the receipt's trace back with the result: this work joins that trace.
+                using (LedgerTelemetry.StartLinked($"{Topics.ReceiptParsed} process", ActivityKind.Consumer,
+                           LedgerTelemetry.TraceParentOf(message.Message.Headers)))
+                {
+                    await HandleAsync(result, ct);
+                }
                 consumer.Commit(message);
             }
         }

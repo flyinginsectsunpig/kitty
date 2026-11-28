@@ -1,0 +1,14 @@
+# CI's k3d run, Review Focus 1: Grafana Cloud unreachable. The real exporter, pointed at an address nothing answers.
+# Kitty must answer as fast as before.
+config:
+  exporters:
+    otlp_http/grafana:
+      endpoint: http://10.255.255.1:4318
+  service:
+    pipelines:
+      traces:
+        exporters: [otlp_http/grafana]
+      metrics:
+        exporters: [otlp_http/grafana]
+      logs:
+        exporters: [otlp_http/grafana]

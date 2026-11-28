@@ -85,6 +85,22 @@ spec:
                   key: KITTY_MCP_CLIENT_SECRET
             - name: AI_WEB_URL
               value: https://{{ .Values.host }}
+            # OpenTelemetry (phase 5b): to the Collector when otel.endpoint is set; logs go via the Collector's file_log.
+            {{- with .Values.otel.endpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ . | quote }}
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: http/protobuf
+            - name: OTEL_SERVICE_NAME
+              value: ai
+            - name: OTEL_LOGS_EXPORTER
+              value: none
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.environment.name={{ $.Values.otel.environment }}
+            # Stable HTTP metric names (http.server.request.duration, in seconds), the same as the ledger's.
+            - name: OTEL_SEMCONV_STABILITY_OPT_IN
+              value: http
+            {{- end }}
           ports:
             - name: http
               containerPort: 8000

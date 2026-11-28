@@ -3,4 +3,4 @@
 image: mcr.microsoft.com/azure-storage/azurite:3.37.0
 memory: 256Mi
 storage: 5Gi
-args: ["azurite-blob", "--blobHost", "0.0.0.0", "--location", "/data", "--skipApiVersionCheck", "--loose"]
+args: ["azurite-blob", "--blobHost", "0.0.0.0", "--location", "/data", "--skipApiVersionCheck", "--loose", "--silent"]

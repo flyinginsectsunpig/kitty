@@ -14,6 +14,7 @@ using Kitty.Ledger.Infrastructure.Errors;
 using Microsoft.EntityFrameworkCore;
 using Kitty.Contracts.Events.V1;
 using Kitty.Ledger.Infrastructure.Messaging;
+using Kitty.Ledger.Infrastructure.Telemetry;
 
 namespace Kitty.Ledger.Features.Expenses;
 
@@ -52,6 +53,7 @@ public static class ExpenseEndpoints
         outbox.ExpenseChanged(groupId, expense.Id, ExpenseChanged.Types.Change.Created);
         await notifier.ExpenseAddedAsync(expense, caller.User.Id, ct);
         await db.SaveChangesAsync(ct);
+        LedgerTelemetry.CountExpenseCreated(expense.SplitMethod);
         return Results.Created($"/groups/{groupId}/expenses/{expense.Id}", dto);
     }
 

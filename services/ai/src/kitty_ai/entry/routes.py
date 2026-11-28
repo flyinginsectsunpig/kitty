@@ -20,6 +20,7 @@ from kitty_ai.ledger import LedgerReader, NotFound
 from kitty_ai.limits import RateLimiter
 from kitty_ai.receipts.extract import ModelUnavailable, RateLimited, UnusableOutput
 from kitty_ai.settings import Settings
+from kitty_ai.telemetry import model_call, record_sentence
 
 log = logging.getLogger(__name__)
 
@@ -92,13 +93,17 @@ def make_router(
         # Only when the group is already known: otherwise the draft takes the currency of the group the sentence names.
         default_currency = (page or only).base_currency if (page or only) else None
         try:
-            parsed = parser.parse(text, today(), default_currency)
+            with model_call("sentence"):
+                parsed = parser.parse(text, today(), default_currency)
         except (ModelUnavailable, RateLimited) as e:
             log.warning("model unavailable: %s status=%s", type(e).__name__, getattr(e.__cause__, "code", None))
+            record_sentence("unavailable")
             return _error(503, "ai_unavailable")
         except UnusableOutput:
             log.warning("model answer didn't fit the schema")  # the answer may quote the sentence: not logged
+            record_sentence("unclear")
             return _error(422, "unclear")
+        record_sentence("ok")
         match = match_group(parsed.group, body.groupId, groups)
         try:
             if parsed.intent == "question":  # the app sends it on to /ask

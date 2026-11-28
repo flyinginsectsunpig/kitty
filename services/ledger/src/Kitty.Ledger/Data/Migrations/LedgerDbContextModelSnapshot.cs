@@ -428,6 +428,9 @@ namespace Kitty.Ledger.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("TraceParent")
+                        .HasColumnType("text");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(200)

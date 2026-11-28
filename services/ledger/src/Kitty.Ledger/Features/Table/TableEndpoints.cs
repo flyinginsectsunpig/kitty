@@ -10,6 +10,7 @@ using Kitty.Ledger.Features.Scans;
 using Kitty.Ledger.Infrastructure;
 using Kitty.Ledger.Infrastructure.Audit;
 using Kitty.Ledger.Infrastructure.Errors;
+using Kitty.Ledger.Infrastructure.Telemetry;
 using Kitty.Ledger.Infrastructure.Messaging;
 using Kitty.Contracts.Events.V1;
 using Microsoft.EntityFrameworkCore;
@@ -323,6 +324,7 @@ public static class TableEndpoints
         await notifier.ExpenseAddedAsync(expense, caller.User.Id, ct);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        LedgerTelemetry.CountExpenseCreated(expense.SplitMethod);
 
         await svc.NotifyAsync(session.Id, ct);
         return Results.Ok(await svc.ToDtoAsync(session, Viewer(http), ct));

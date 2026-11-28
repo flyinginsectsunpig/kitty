@@ -50,11 +50,13 @@ def test_smoke_rejects_unknown_option(tmp_path):
 # ---------- backup.sh
 
 
-def backup_env(tmp_path, **extra):
+def backup_env(tmp_path, curl_exit=0, **extra):
     env, log = stubs(
         tmp_path,
         docker='case "$1" in inspect) echo true;; exec) echo dump;; esac',
-        kubectl='case "$*" in *"get pod"*) echo "${@: -1}" | sed "s/.*=//; s/$/-0/";; *exec*) echo dump;; esac',
+        kubectl=('case "$*" in *"get pod"*) echo "${@: -1}" | sed "s/.*=//; s/$/-0/";; *"get svc"*) echo 10.43.0.50;; '
+                 '*exec*) echo dump;; esac'),
+        curl=f"exit {curl_exit}",
     )
     env.update({"KITTY_BACKUP_DIR": "out",  # relative: GNU tar reads "C:" as a host
                 "KITTY_BACKUP_PAR_FILE": (tmp_path / "no-link").as_posix(), **extra})  # fmt: skip
@@ -84,6 +86,32 @@ def test_backup_default_is_compose(tmp_path):
     c = calls(log)
     assert not [x for x in c if x.startswith("kubectl ")]
     assert any(x.startswith("docker exec kitty-postgres-1 pg_dump -U postgres -Fc ledger") for x in c)
+
+
+def test_backup_reports_last_success(tmp_path):
+    env, log = backup_env(tmp_path, KITTY_BACKUP_TARGET="k3s")
+    result = run_script("deploy/compose/backup.sh", env=env, cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    (report,) = [x for x in calls(log) if x.startswith("curl ") and "/v1/metrics" in x]
+    assert "http://10.43.0.50:4318/v1/metrics" in report
+    for needle in ("kitty.backup.last_success", "kitty.backup.size_bytes", '"kitty-backup"'):
+        assert needle in report, needle
+
+
+def test_backup_succeeds_when_reporting_fails(tmp_path):
+    # Review Focus 5: the collector unreachable never fails the backup itself.
+    env, _ = backup_env(tmp_path, curl_exit=7, KITTY_BACKUP_TARGET="k3s")
+    result = run_script("deploy/compose/backup.sh", env=env, cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "backup ok" in result.stdout
+    assert "reporting it failed" in result.stdout + result.stderr
+    assert list((tmp_path / "out").glob("kitty-*.tar.gz"))
+
+
+def test_compose_mode_does_not_report(tmp_path):
+    env, log = backup_env(tmp_path)
+    assert run_script("deploy/compose/backup.sh", env=env, cwd=tmp_path).returncode == 0
+    assert not [x for x in calls(log) if "/v1/metrics" in x]
 
 
 def test_backup_rejects_unknown_target(tmp_path):

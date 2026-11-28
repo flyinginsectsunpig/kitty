@@ -22,9 +22,16 @@ spec:
         nodePort: {{ .Values.traefik.nodePorts.web }}
       websecure:
         nodePort: {{ .Values.traefik.nodePorts.websecure }}
+      # Prometheus metrics for the collector to scrape (edge request counts and latency).
+      metrics:
+        port: 9100
     service:
       spec:
         externalTrafficPolicy: Local
-    logs:
-      access:
-        enabled: true
+    # Chart 41.6 (k3s v1.37) key: top-level accessLog (logs.access is ignored). Read on the node with
+    # kubectl -n kube-system logs deploy/traefik; never shipped to Grafana (the collector drops kube-system logs).
+    accessLog:
+      enabled: true
+    metrics:
+      prometheus:
+        entryPoint: metrics

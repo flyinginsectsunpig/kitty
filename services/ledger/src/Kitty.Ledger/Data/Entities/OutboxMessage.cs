@@ -15,4 +15,7 @@ public sealed class OutboxMessage
     public DateTimeOffset OccurredAt { get; set; }
     public DateTimeOffset? SentAt { get; set; }
     public int Attempts { get; set; }
+    /// <summary>The W3C traceparent of the request that queued it (phase 5b), so its Kafka hop joins that trace.
+    /// Null for rows queued outside a trace, and for rows written before this column existed.</summary>
+    public string? TraceParent { get; set; }
 }

@@ -34,16 +34,20 @@ def put_photo(settings: Settings, name: str, data: bytes = b"\xff\xd8\xff\xe0 ph
     container.upload_blob(name, data, overwrite=True)
 
 
-def publish_upload(settings: Settings, event: pb.ReceiptUploaded) -> None:
+def publish_upload(settings: Settings, event: pb.ReceiptUploaded, headers: list | None = None) -> None:
     registry = SchemaRegistryClient({"url": settings.schema_registry_url})
     serialize = ProtobufSerializer(pb.ReceiptUploaded, registry, SERDE)
     producer = Producer({"bootstrap.servers": settings.kafka_bootstrap})
     value = serialize(event, SerializationContext(RECEIPT_UPLOADED, MessageField.VALUE))
-    producer.produce(RECEIPT_UPLOADED, key=event.session_id, value=value)
+    producer.produce(RECEIPT_UPLOADED, key=event.session_id, value=value, headers=headers or [])
     producer.flush(10)
 
 
 def results_for(settings: Settings, scan_id: str, wait: float = 20, count: int = 1) -> list[pb.ReceiptResult]:
+    return [r for r, _ in results_with_headers(settings, scan_id, wait, count)]
+
+
+def results_with_headers(settings: Settings, scan_id: str, wait: float = 20, count: int = 1) -> list[tuple]:
     deserialize = ProtobufDeserializer(pb.ReceiptResult, SERDE)
     consumer = Consumer(
         {
@@ -61,7 +65,7 @@ def results_for(settings: Settings, scan_id: str, wait: float = 20, count: int =
                 continue
             result = deserialize(msg.value(), SerializationContext(RECEIPT_PARSED, MessageField.VALUE))
             if result.scan_id == scan_id:
-                found.append(result)
+                found.append((result, dict(msg.headers() or [])))
     finally:
         consumer.close()
     return found
@@ -111,6 +115,22 @@ def test_rate_limited_scan_ends_failed_after_retries(settings):
         worker.stop()
     assert result.failed.reason == Reason.RATE_LIMITED
     assert len(extractor.seen) == 5  # the first try and 4 retries
+
+
+def test_rate_limited_scan_keeps_the_upload_trace(settings):
+    # Each retry goes back through Kafka: the upload's traceparent must survive every hop to the final result.
+    trace_id = "4bf92f3577b34da6a3ce929d0e0e4736"
+    event = upload_event()
+    put_photo(settings, event.blob_name)
+    worker = Worker(settings, FakeOcr("Burger 120,00"), FakeExtractor(error=RateLimited()), retry_delays=(0.1, 0.1))
+    worker.start()
+    try:
+        publish_upload(settings, event, headers=[("traceparent", f"00-{trace_id}-00f067aa0ba902b7-01".encode())])
+        ((result, headers),) = results_with_headers(settings, event.scan_id, wait=30)
+    finally:
+        worker.stop()
+    assert result.failed.reason == Reason.RATE_LIMITED
+    assert headers["traceparent"].decode().split("-")[1] == trace_id
 
 
 def test_duplicate_upload_event_is_processed_once(settings):

@@ -1,6 +1,9 @@
+using System.Diagnostics;
+using System.Text;
 using Confluent.Kafka;
 using Kitty.Ledger.Data;
 using Kitty.Ledger.Data.Entities;
+using Kitty.Ledger.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
 
 namespace Kitty.Ledger.Infrastructure.Messaging;
@@ -59,7 +62,17 @@ public sealed class OutboxRelay(IServiceScopeFactory scopes, KafkaOptions kafka,
             try
             {
                 var value = await serializers.SerializeAsync(message.Type, message.Payload, message.Topic);
-                await producer.ProduceAsync(message.Topic, new Message<string, byte[]> { Key = message.Key, Value = value }, ct);
+                var kafkaMessage = new Message<string, byte[]> { Key = message.Key, Value = value };
+                if (message.TraceParent is not null)
+                {
+                    // A publish span in the request's trace; the message carries it on to the consumer.
+                    using var publish = LedgerTelemetry.StartLinked($"{message.Topic} publish", ActivityKind.Producer, message.TraceParent);
+                    kafkaMessage.Headers = new Headers
+                    {
+                        { LedgerTelemetry.TraceParentHeader, Encoding.UTF8.GetBytes(publish?.Id ?? message.TraceParent) },
+                    };
+                }
+                await producer.ProduceAsync(message.Topic, kafkaMessage, ct);
                 message.SentAt = clock.NowMicros();
                 sent++;
             }

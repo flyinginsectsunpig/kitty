@@ -25,6 +25,7 @@ from kitty_ai.mcp.server import MCP_PATH, build_mcp
 from kitty_ai.receipts.extract import extractor_from
 from kitty_ai.receipts.worker import Worker
 from kitty_ai.settings import Settings
+from kitty_ai.telemetry import setup_telemetry
 
 
 def _real_worker(settings: Settings) -> Worker:
@@ -60,6 +61,7 @@ def create_app(settings: Settings | None = None, make_worker: Callable[[Settings
     for noisy in ("httpx", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     app = FastAPI(title="Kitty AI", lifespan=lifespan)
+    setup_telemetry(app)  # only when OTEL_EXPORTER_OTLP_ENDPOINT is set
 
     @app.get("/health")
     def health() -> JSONResponse:
