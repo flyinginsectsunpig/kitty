@@ -146,9 +146,13 @@ to Grafana Cloud's free tier. Design: `docs/superpowers/specs/2026-11-28-kitty-p
 `deploy/tests/test_scrub.py`):
 - email addresses, tokens (JWTs, bearer, API keys, app passwords), invite links;
 - client IP addresses, raw paths and full URLs, query strings;
-- SQL text and request bodies.
+- SQL text and request bodies;
+- personal values inside span names, exception messages and stack traces, and Keycloak's login events (usernames,
+  names); span status messages are blanked.
 
-Traefik's access log, CoreDNS and Argo CD's logs aren't shipped at all; only namespace `kitty`'s logs are.
+Traefik's access log, CoreDNS and Argo CD's logs aren't shipped at all; only namespace `kitty`'s logs are. Only the
+metrics the dashboard and alerts read are kept (a keep-list in `filter/noise`), which holds the free tier's series
+budget; add a metric's name there before building a panel on it.
 
 **Setting it up** (once):
 1. Create a free Grafana Cloud account (no payment method) and a stack in the region nearest South Africa.
@@ -173,7 +177,7 @@ Traefik's access log, CoreDNS and Argo CD's logs aren't shipped at all; only nam
 | Alert | What it means | First thing to do |
 |---|---|---|
 | `error-rate` | over 5% of a service's requests failed (5xx) for 10 minutes | `kubectl -n kitty logs deploy/kitty-<service>` |
-| `pod-unhealthy` | a Kitty pod hasn't been ready for 10 minutes | `kubectl -n kitty describe pod <pod>`, then its logs |
+| `pod-unhealthy` | a Kitty pod hasn't been ready, or has restarted twice or more, for 10 minutes | `kubectl -n kitty describe pod <pod>`, then its logs |
 | `backup-missing` | no successful nightly backup for 26 hours | `tail ~/kitty-backups/backup.log` on the server |
 | `certificate-expiring` | the HTTPS certificate expires within 14 days | `kubectl -n kitty describe certificate kitty-tls` |
 | `collector-silent` | no telemetry for 15 minutes | `kubectl -n observability get pods`, then its logs |
