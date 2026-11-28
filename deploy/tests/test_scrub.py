@@ -6,6 +6,7 @@ import pathlib
 import shutil
 import subprocess
 import time
+import urllib.error
 import urllib.request
 
 import pytest
@@ -46,9 +47,12 @@ def scrubbed(tmp_path_factory) -> str:
         }},
     }  # fmt: skip
     (work / "config.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    # The image runs as a non-root user: on Linux it can't read pytest's 0700 temp dir (Docker Desktop doesn't care).
+    work.chmod(0o755)
+    (work / "config.yaml").chmod(0o644)
     (work / "out").chmod(0o777)
     name = f"kitty-scrub-{int(time.time())}"
-    subprocess.run(["docker", "run", "-d", "--rm", "--name", name, "-p", "127.0.0.1::4318",
+    subprocess.run(["docker", "run", "-d", "--name", name, "-p", "127.0.0.1::4318",
                     "-v", f"{work.as_posix()}:/conf", "-v", f"{(work / 'out').as_posix()}:/out",
                     IMAGE, "--config", "/conf/config.yaml"], check=True, capture_output=True)  # fmt: skip
     try:
@@ -58,8 +62,13 @@ def scrubbed(tmp_path_factory) -> str:
             try:
                 urllib.request.urlopen(url + "/v1/traces", data=b"{}", timeout=2)
                 break
+            except urllib.error.HTTPError:  # any answer (415 for this bare ping) means it's listening
+                break
             except Exception:
                 time.sleep(1)
+        else:  # never listened: show why (the container is kept until finally, so its log is still there)
+            logs = subprocess.run(["docker", "logs", name], capture_output=True, text=True)
+            pytest.fail(f"the Collector never started:\n{logs.stdout}{logs.stderr}")
         for signal in ("traces", "logs", "metrics"):
             body = (FIXTURES / f"dirty-{signal}.json").read_bytes()
             req = urllib.request.Request(f"{url}/v1/{signal}", data=body, headers={"Content-Type": "application/json"})
