@@ -84,7 +84,7 @@ Without it, re-seal from `.env` with `seal-env.sh`.
 ```
 SHELL=/bin/bash
 PATH=/usr/local/bin:/usr/bin:/bin
-17 1 * * * ubuntu KITTY_BACKUP_TARGET=k3s /home/ubuntu/kitty/deploy/compose/backup.sh >> /home/ubuntu/kitty-backups/backup.log 2>&1
+17 1 * * * ubuntu KITTY_BACKUP_TARGET=k3s KUBECONFIG=/home/ubuntu/.kube/config /home/ubuntu/kitty/deploy/compose/backup.sh >> /home/ubuntu/kitty-backups/backup.log 2>&1
 ```
 
 Same archive and bucket as before (Postgres roles, `ledger` and `keycloak` databases, receipt photos); the server

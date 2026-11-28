@@ -85,12 +85,14 @@ def test_waits_for_dependencies(chart, deps):
         assert dep.replace(":", " ") in script, dep
 
 
-def test_notifications_off_by_default():
-    off = env(main("kitty-pulse"))
+def test_notifications_switch():
+    # Off (a rehearsal cluster, CI): pulse sends nothing. Production has them on since the k3s switch.
+    off = env(main("kitty-pulse", "--set", "notifications.enabled=false"))
     assert off["PULSE_SMTP_HOST"]["value"] == ""
     assert off["PULSE_FCM_CREDENTIALS"]["value"] == ""
-    on = env(main("kitty-pulse", "--set", "notifications.enabled=true"))
+    on = env(main("kitty-pulse"))
     assert on["PULSE_SMTP_HOST"]["value"] == "smtp.gmail.com"
+    assert on["PULSE_FCM_CREDENTIALS"]["value"] == ""  # push stays off until a Firebase key is sealed
 
 
 @pytest.mark.parametrize("chart", KITTY_CHARTS)
