@@ -87,3 +87,7 @@ def test_payment_fields_validate():
 
 def test_prompt_describes_payments():
     assert "cross off the Uber for Joe, I paid him" in parse.SYSTEM
+
+
+def test_prompt_says_where_the_person_to_remind_goes():
+    assert 'For a reminder, put the person to remind in people ("tell Bob he owes me R20": people Bob)' in parse.SYSTEM

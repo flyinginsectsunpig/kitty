@@ -8,7 +8,7 @@ from datetime import date
 
 from kitty_ai.currencies import exponent
 from kitty_ai.entry.money import to_minor
-from kitty_ai.entry.schema import ParsedSentence
+from kitty_ai.entry.schema import ParsedSentence, Person
 from kitty_ai.ledger import Group, GroupSummary, Member
 
 SPEAKER = {"me", "i", "my", "myself", "mine"}
@@ -213,6 +213,9 @@ def build_draft(
 
     if parsed.intent == "reminder":
         others = [p for p in parsed.people if _norm(p.name) not in SPEAKER]
+        if not others and parsed.counterpart and _norm(parsed.counterpart) not in SPEAKER:
+            # The model sometimes names the person as the counterpart (the payment field) instead of in people.
+            others = [Person(name=parsed.counterpart)]
         member_id = resolve(others[0].name, "reminder.member") if others else None
         if not others:
             issues.append(_issue("reminder.member", "missing", ""))

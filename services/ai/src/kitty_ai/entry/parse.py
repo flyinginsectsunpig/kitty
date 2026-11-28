@@ -20,6 +20,7 @@ SYSTEM = " ".join(
         'intent is "expense" when they are recording money spent or owed. A debt ("add R20 debt for Bob",',
         '"Lee owes me R150") is an expense with split "amounts" and one person, with their own amount (20, 150).',
         'intent is "reminder" when they want to remind someone of money already owed ("tell Bob he owes me R20").',
+        'For a reminder, put the person to remind in people ("tell Bob he owes me R20": people Bob).',
         'intent is "question" when they ask about money already recorded ("how much do I owe Sam?",',
         '"what did we spend on groceries?"): leave the other fields empty.',
         'intent is "payment" when they say they paid someone back, or someone paid them back, for something already',
