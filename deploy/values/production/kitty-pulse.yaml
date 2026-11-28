@@ -4,7 +4,7 @@ host: kitty-split.duckdns.org
 image:
   tag: sha-befe579
 notifications:
-  enabled: false # turned on at the k3s switch (deploy/k3s/RUNBOOK.md)
+  enabled: true # on since the k3s switch (2026-11-28)
 smtp:
   host: smtp.gmail.com
   port: 465
