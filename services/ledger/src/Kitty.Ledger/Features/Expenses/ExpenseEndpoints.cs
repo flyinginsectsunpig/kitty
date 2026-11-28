@@ -53,7 +53,7 @@ public static class ExpenseEndpoints
         outbox.ExpenseChanged(groupId, expense.Id, ExpenseChanged.Types.Change.Created);
         await notifier.ExpenseAddedAsync(expense, caller.User.Id, ct);
         await db.SaveChangesAsync(ct);
-        LedgerTelemetry.ExpensesCreated.Add(1, new KeyValuePair<string, object?>("split_type", expense.SplitMethod.ToString().ToLowerInvariant()));
+        LedgerTelemetry.CountExpenseCreated(expense.SplitMethod);
         return Results.Created($"/groups/{groupId}/expenses/{expense.Id}", dto);
     }
 

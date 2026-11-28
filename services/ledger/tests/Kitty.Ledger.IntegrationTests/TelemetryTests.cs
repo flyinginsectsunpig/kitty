@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 using System.Text;
 using Confluent.Kafka;
 using Confluent.SchemaRegistry;
@@ -138,27 +137,13 @@ public sealed class TelemetryTests : IDisposable
     [Fact]
     public async Task Expense_create_counts_once()
     {
-        var points = new ConcurrentBag<(long Value, string? SplitType)>();
-        using var meters = new MeterListener
-        {
-            InstrumentPublished = (instrument, l) =>
-            {
-                if (instrument.Meter.Name == "Kitty.Ledger" && instrument.Name == "kitty.expenses.created") l.EnableMeasurementEvents(instrument);
-            },
-        };
-        meters.SetMeasurementEventCallback<long>((_, value, tags, _) =>
-        {
-            string? split = null;
-            foreach (var t in tags) if (t.Key == "split_type") split = t.Value as string;
-            points.Add((value, split));
-        });
-        meters.Start();
+        using var counter = new ExpenseCounter();
 
         var alice = factory.NewUser("Alice");
         var g = await alice.CreateGroupAsync();
         var me = g.Members[0].Id;
         await alice.AddEqualAsync(g.Id, 30000, me, [me]);
 
-        Assert.Contains((1L, "equal"), points);
+        Assert.Contains((1L, "equal"), counter.Points);
     }
 }

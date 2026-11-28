@@ -176,10 +176,12 @@ public class TableSessionTests(LedgerApiFactory factory)
         (await host.ClaimAsync(g.Id, s.Id, Burger)).EnsureSuccessStatusCode();
         (await friend.ClaimAsync(g.Id, s.Id, Salad)).EnsureSuccessStatusCode();
         // Fries unclaimed: shared by both.
+        using var counter = new ExpenseCounter();
 
         var confirmed = await (await host.PostJsonAsync($"/groups/{g.Id}/table-sessions/{s.Id}/confirm", new { })).ReadAsync<TableSessionDto>();
         Assert.Equal("confirmed", confirmed.Status);
         Assert.NotNull(confirmed.ExpenseId);
+        Assert.Contains((1L, "itemized"), counter.Points); // the dashboard's expenses per day counts table bills too
 
         var expense = (await host.GetFromJsonAsync<ExpenseDto>($"/groups/{g.Id}/expenses/{confirmed.ExpenseId}", ApiClientExtensions.Json,
             TestContext.Current.CancellationToken))!;

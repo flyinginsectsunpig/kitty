@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text;
 using Confluent.Kafka;
+using Kitty.Ledger.Domain.Splits;
 
 namespace Kitty.Ledger.Infrastructure.Telemetry;
 
@@ -22,6 +23,10 @@ public static class LedgerTelemetry
 
     /// <summary>Expenses added, by split type (equal, exact, percent, shares, itemized…).</summary>
     public static readonly Counter<long> ExpensesCreated = Meter.CreateCounter<long>("kitty.expenses.created");
+
+    /// <summary>Counts one saved expense, from any path: the expense form, a table bill, a recurring schedule.</summary>
+    public static void CountExpenseCreated(SplitMethod split) =>
+        ExpensesCreated.Add(1, new KeyValuePair<string, object?>("split_type", split.ToString().ToLowerInvariant()));
 
     /// <summary>The current trace as a W3C traceparent, or null outside a W3C trace.</summary>
     public static string? CurrentTraceParent() =>
