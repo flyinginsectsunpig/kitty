@@ -46,7 +46,12 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<LedgerDbContext>((sp, options) =>
     options.UseNpgsql(sp.GetRequiredService<IConfiguration>().GetConnectionString("ledger")
-        ?? throw new InvalidOperationException("Connection string 'ledger' is not configured.")));
+            ?? throw new InvalidOperationException("Connection string 'ledger' is not configured."),
+        npgsql => npgsql.ConfigureDataSource(ds => ds.ConfigureTracing(tracing => tracing
+            // Only commands inside a trace (a request, a Kafka message): the outbox relay's half-second polls
+            // would otherwise each be a trace of their own.
+            .ConfigureCommandFilter(_ => System.Diagnostics.Activity.Current is not null)
+            .ConfigureBatchFilter(_ => System.Diagnostics.Activity.Current is not null)))));
 builder.Services.AddLedgerAuth(builder.Configuration, builder.Environment);
 builder.Services.AddWriteRateLimiting(builder.Configuration);
 if (builder.Configuration.GetValue<bool>("Ledger:TrustForwardedHeaders"))

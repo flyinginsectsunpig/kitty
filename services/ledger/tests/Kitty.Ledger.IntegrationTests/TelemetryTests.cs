@@ -118,6 +118,24 @@ public sealed class TelemetryTests : IDisposable
     }
 
     [Fact]
+    public async Task Database_calls_outside_a_trace_are_not_traced()
+    {
+        // The outbox relay polls every half second: as root spans those would be ~170,000 empty traces a day.
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
+        Activity.Current = null;
+        var since = DateTime.UtcNow;
+        await db.Database.ExecuteSqlAsync($"SELECT 1", Ct);
+        await Task.Delay(TimeSpan.FromSeconds(2), Ct); // the relay polls several times meanwhile
+        Assert.DoesNotContain(_stopped, a => a.Source.Name == "Npgsql" && a.Parent is null && a.ParentSpanId == default
+                                             && a.StartTimeUtc >= since);
+
+        using var request = new Activity("request").SetIdFormat(ActivityIdFormat.W3C).Start();
+        await db.Database.ExecuteSqlAsync($"SELECT 2", Ct);
+        Assert.Contains(_stopped, a => a.Source.Name == "Npgsql" && a.ParentSpanId == request.SpanId);
+    }
+
+    [Fact]
     public async Task Expense_create_counts_once()
     {
         var points = new ConcurrentBag<(long Value, string? SplitType)>();
