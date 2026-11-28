@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger
+  labels:
+    app.kubernetes.io/name: kitty-ledger
+spec:
+  selector:
+    app.kubernetes.io/name: kitty-ledger
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    # pulse adds recurring periods here (plain HTTP/2); never routed by Traefik.
+    - name: grpc
+      port: 8082
+      targetPort: grpc

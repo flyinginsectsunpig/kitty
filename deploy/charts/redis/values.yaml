@@ -1,0 +1,4 @@
+# Only carries live-update messages between ledger instances: nothing to persist.
+image: redis:7.4-alpine
+memory: 64Mi
+args: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "48mb", "--maxmemory-policy", "allkeys-lru"]

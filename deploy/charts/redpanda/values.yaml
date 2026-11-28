@@ -1,0 +1,20 @@
+# Kafka API + schema registry, one broker. Carries receipt scans to the ai service and results back, and the ledger's
+# schedule events to pulse. Same flags as deploy/compose; the Service keeps Compose's name, so the advertised addresses
+# are unchanged.
+image: docker.redpanda.com/redpandadata/redpanda:v26.2.6
+memory: 1500Mi
+storage: 5Gi
+args:
+  - redpanda
+  - start
+  - --smp=1
+  - --memory=1G
+  - --reserve-memory=0M
+  - --overprovisioned
+  - --node-id=0
+  - --check=false
+  - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+  - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
+  - --schema-registry-addr=0.0.0.0:8081
+  - --rpc-addr=0.0.0.0:33145
+  - --advertise-rpc-addr=redpanda:33145

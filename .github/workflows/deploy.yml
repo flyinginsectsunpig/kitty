@@ -1,0 +1,82 @@
+name: deploy
+
+# Checks the Kubernetes deployment in deploy/: chart tests (pytest), helm lint, and schema validation of the
+# rendered manifests. See deploy/k3s/RUNBOOK.md.
+on:
+  push:
+    branches: [main]
+    paths: ["deploy/**", "infra/keycloak/**", ".github/workflows/deploy.yml"]
+  pull_request:
+    paths: ["deploy/**", "infra/keycloak/**", ".github/workflows/deploy.yml"]
+
+permissions:
+  contents: read
+
+env:
+  HELM_VERSION: v4.3.2
+  KUBECONFORM_VERSION: v0.8.0
+  K3D_VERSION: v5.9.0
+  TERRAFORM_VERSION: 1.17.2
+
+jobs:
+  charts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.12.24"
+      - name: Install helm and kubeconform (checksums verified)
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin" && cd "$RUNNER_TEMP"
+          curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+          curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz.sha256sum" | sha256sum -c -
+          tar xzf "helm-${HELM_VERSION}-linux-amd64.tar.gz" && mv linux-amd64/helm bin/
+          base="https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}"
+          curl -fsSLO "$base/kubeconform-linux-amd64.tar.gz"
+          curl -fsSL "$base/CHECKSUMS" | grep ' kubeconform-linux-amd64.tar.gz$' | sha256sum -c -
+          tar xzf kubeconform-linux-amd64.tar.gz -C bin kubeconform
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Chart tests
+        run: uv run --with pytest --with pyyaml pytest deploy/tests -q
+      - name: Lint and validate the rendered manifests
+        run: deploy/tests/validate.sh
+      - name: Terraform format and validate (never plan or apply in CI)
+        working-directory: deploy/terraform/oracle
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}"
+          curl -fsSLO "$base/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          curl -fsSL "$base/terraform_${TERRAFORM_VERSION}_SHA256SUMS" | grep " terraform_${TERRAFORM_VERSION}_linux_amd64.zip$" | sha256sum -c -
+          unzip -q -o "terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -d bin
+          cd "$GITHUB_WORKSPACE/deploy/terraform/oracle"
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+
+  k3d:
+    # Installs everything into a throwaway k3d cluster and runs the smoke checks (deploy/tests/k3d-e2e.sh).
+    needs: charts
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install helm and k3d (checksums verified)
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin" && cd "$RUNNER_TEMP"
+          curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+          curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz.sha256sum" | sha256sum -c -
+          tar xzf "helm-${HELM_VERSION}-linux-amd64.tar.gz" && mv linux-amd64/helm bin/
+          base="https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}"
+          curl -fsSLO "$base/k3d-linux-amd64"
+          curl -fsSL "$base/checksums.txt" | grep ' _dist/k3d-linux-amd64$' | sed 's| _dist/| |' | sha256sum -c -
+          install -m 0755 k3d-linux-amd64 bin/k3d
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Install Kitty into k3d and run the checks
+        run: deploy/tests/k3d-e2e.sh
+      - name: What was running (on failure)
+        if: failure()
+        run: |
+          kubectl get pods -A -o wide || true
+          kubectl -n kitty describe pods | tail -n 200 || true
+          for p in $(kubectl -n kitty get pods -o name); do echo "== $p"; kubectl -n kitty logs "$p" --all-containers --tail=40 || true; done

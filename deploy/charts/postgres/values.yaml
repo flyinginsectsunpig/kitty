@@ -1,0 +1,4 @@
+# Postgres 17 with pgvector: the ledger database (with the ai and pulse schemas) and Keycloak's database.
+image: pgvector/pgvector:pg17
+memory: 1Gi
+storage: 10Gi

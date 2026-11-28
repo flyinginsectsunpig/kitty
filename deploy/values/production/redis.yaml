@@ -1,0 +1,2 @@
+# Production settings for the redis chart (defaults: deploy/charts/redis/values.yaml).
+{}

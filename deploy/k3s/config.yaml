@@ -1,0 +1,3 @@
+# k3s server settings: /etc/rancher/k3s/config.yaml on the server (deploy/k3s/RUNBOOK.md).
+# The kubeconfig is readable by root only; the runbook copies it for the ubuntu user.
+write-kubeconfig-mode: "0600"

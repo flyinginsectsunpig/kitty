@@ -1,0 +1,5 @@
+apiVersion: v2
+name: kitty-edge
+description: Kitty edge - Traefik routes matching deploy/compose/Caddyfile, HTTPS certificates and in-cluster DNS for the public hostname.
+type: application
+version: 0.1.0

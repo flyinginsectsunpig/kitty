@@ -1,0 +1,14 @@
+# Keycloak: sign-in for the web app, the Android app and MCP assistants. Same settings as deploy/compose.
+image: quay.io/keycloak/keycloak:26.6
+memory: 1Gi
+# Public hostname; Keycloak's issuer is https://<host>/auth/realms/kitty.
+host: kitty.localhost
+verifyEmail: true
+googleEnabled: false
+smtp:
+  host: smtp.resend.com
+  port: 465
+  ssl: true
+  starttls: false
+# Waits for Postgres before starting.
+waitImage: pgvector/pgvector:pg17

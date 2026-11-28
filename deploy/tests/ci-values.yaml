@@ -1,0 +1,7 @@
+# CI's throwaway k3d cluster (.github/workflows/deploy.yml, job k3d): layered over each chart's production values.
+# Keys a chart doesn't use are ignored by it.
+host: kitty.localhost
+tls:
+  selfSigned: true
+notifications:
+  enabled: false

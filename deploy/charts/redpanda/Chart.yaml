@@ -1,0 +1,5 @@
+apiVersion: v2
+name: redpanda
+description: Kitty redpanda from its official image (see deploy/k3s/RUNBOOK.md).
+type: application
+version: 0.1.0

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: kitty-pulse
+description: Kitty pulse service (see deploy/k3s/RUNBOOK.md).
+type: application
+version: 0.1.0

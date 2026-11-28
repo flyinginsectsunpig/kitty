@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kitty-ai
+  labels:
+    app.kubernetes.io/name: kitty-ai
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kitty-ai
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kitty-ai
+    spec:
+      initContainers:
+        - name: wait
+          image: {{ .Values.waitImage }}
+          command: ["sh", "-c", "for d in 'postgres 5432' 'redpanda 9092' 'azurite 10000'; do until nc -z $d; do echo waiting for $d; sleep 2; done; done"]
+        # Every start, as Compose's ai-db-setup did: gives the ai service its own role, limited to schema "ai".
+        - name: db-setup
+          image: {{ .Values.setupImage }}
+          command: ["psql", "-v", "ai_password=$(AI_DB_PASSWORD)", "-f", "/setup/ai-db-setup.sql"]
+          env:
+            - name: AI_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: AI_DB_PASSWORD
+            - name: PGHOST
+              value: postgres
+            - name: PGUSER
+              value: postgres
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: POSTGRES_PASSWORD
+            - name: PGDATABASE
+              value: ledger
+          volumeMounts:
+            - name: setup
+              mountPath: /setup
+              readOnly: true
+      containers:
+        - name: ai
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          env:
+            - name: AI_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: AI_DB_PASSWORD
+            - name: BLOB_ACCOUNT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: BLOB_ACCOUNT_KEY
+            - name: AI_KAFKA_BOOTSTRAP
+              value: redpanda:9092
+            - name: AI_SCHEMA_REGISTRY_URL
+              value: http://redpanda:8081
+            - name: AI_BLOB_CONNECTION_STRING
+              value: DefaultEndpointsProtocol=http;AccountName=kitty;AccountKey=$(BLOB_ACCOUNT_KEY);BlobEndpoint=http://azurite:10000/kitty;
+            - name: AI_POSTGRES_DSN
+              value: host=postgres port=5432 dbname=ledger user=ai password=$(AI_DB_PASSWORD)
+            # Empty: scans fail fast with "type the items" and everything else keeps working.
+            - name: AI_GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: GEMINI_API_KEY
+            - name: AI_LEDGER_URL
+              value: http://ledger:8080
+            - name: AI_AUTH_ISSUER
+              value: https://{{ .Values.host }}/auth/realms/kitty
+            # MCP (ChatGPT, Claude): the public address, the kitty-mcp client's secret for the token exchange, and
+            # where draft links point.
+            - name: AI_MCP_PUBLIC_URL
+              value: https://{{ .Values.host }}/ai/mcp
+            - name: AI_MCP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: KITTY_MCP_CLIENT_SECRET
+            - name: AI_WEB_URL
+              value: https://{{ .Values.host }}
+          ports:
+            - name: http
+              containerPort: 8000
+          # 503 when a receipt reader has stopped.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: {{ .Values.memory }}
+            limits:
+              memory: {{ .Values.memory }}
+      volumes:
+        - name: setup
+          configMap:
+            name: ai-db-setup

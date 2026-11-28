@@ -1,0 +1,24 @@
+# The root of Kitty's app of apps. Applied by deploy/k3s/bootstrap.sh, which replaces REVISION with the git revision
+# to follow; Argo CD then renders deploy/apps with it and creates every other Application.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kitty-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/flyinginsectsunpig/kitty.git
+    targetRevision: REVISION
+    path: deploy/apps
+    helm:
+      parameters:
+        - name: revision
+          value: REVISION
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

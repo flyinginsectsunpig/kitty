@@ -1,0 +1,8 @@
+# Production settings for the keycloak chart (defaults: deploy/charts/keycloak/values.yaml).
+host: kitty-split.duckdns.org
+smtp:
+  host: smtp.gmail.com
+  port: 465
+  ssl: true
+  starttls: false
+googleEnabled: false

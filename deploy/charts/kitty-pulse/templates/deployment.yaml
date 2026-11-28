@@ -1,0 +1,137 @@
+{{- $notify := .Values.notifications.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kitty-pulse
+  labels:
+    app.kubernetes.io/name: kitty-pulse
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kitty-pulse
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kitty-pulse
+    spec:
+      initContainers:
+        - name: wait
+          image: {{ .Values.waitImage }}
+          command: ["sh", "-c", "for d in 'postgres 5432' 'redpanda 9092' 'keycloak 8080'; do until nc -z $d; do echo waiting for $d; sleep 2; done; done"]
+        # Every start, as Compose's pulse-db-setup did: gives pulse its own role, limited to schema "pulse".
+        - name: db-setup
+          image: {{ .Values.setupImage }}
+          command: ["psql", "-v", "pulse_password=$(PULSE_DB_PASSWORD)", "-f", "/setup/pulse-db-setup.sql"]
+          env:
+            - name: PULSE_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: PULSE_DB_PASSWORD
+            - name: PGHOST
+              value: postgres
+            - name: PGUSER
+              value: postgres
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: POSTGRES_PASSWORD
+            - name: PGDATABASE
+              value: ledger
+          volumeMounts:
+            - name: setup
+              mountPath: /setup
+              readOnly: true
+      containers:
+        - name: pulse
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          env:
+            - name: PULSE_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: PULSE_DB_PASSWORD
+            - name: SMTP_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: SMTP_FROM
+            - name: PULSE_DATABASE_URL
+              value: postgres://pulse:$(PULSE_DB_PASSWORD)@postgres:5432/ledger?sslmode=disable
+            - name: PULSE_PORT
+              value: "5090"
+            # Recurring expenses: follow the ledger's schedules (Kafka) and add due periods over its gRPC port.
+            - name: PULSE_KAFKA_BOOTSTRAP
+              value: redpanda:9092
+            - name: PULSE_LEDGER_GRPC
+              value: ledger:8082
+            - name: PULSE_TOKEN_URL
+              value: http://keycloak:8080/auth/realms/kitty/protocol/openid-connect/token
+            - name: PULSE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: PULSE_CLIENT_SECRET
+            # Notifications: the same SMTP account as Keycloak's. An empty host turns email off.
+            - name: PULSE_SMTP_HOST
+              value: {{ ternary .Values.smtp.host "" $notify | quote }}
+            - name: PULSE_SMTP_PORT
+              value: {{ .Values.smtp.port | quote }}
+            - name: PULSE_SMTP_SSL
+              value: {{ .Values.smtp.ssl | quote }}
+            - name: PULSE_SMTP_STARTTLS
+              value: {{ .Values.smtp.starttls | quote }}
+            - name: PULSE_SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: SMTP_USER
+            - name: PULSE_SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kitty-secrets
+                  key: SMTP_PASSWORD
+            - name: PULSE_SMTP_FROM
+              value: Kitty <$(SMTP_FROM)>
+            - name: PULSE_WEB_URL
+              value: https://{{ .Values.host }}
+            # Push: empty turns it off.
+            - name: PULSE_FCM_CREDENTIALS
+              value: {{ ternary "/secrets/fcm.json" "" (and $notify .Values.fcm.enabled) | quote }}
+          ports:
+            - name: grpc
+              containerPort: 5090
+          readinessProbe:
+            exec:
+              command: ["/pulse", "-health"]
+            periodSeconds: 30
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["/pulse", "-health"]
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 10m
+              memory: {{ .Values.memory }}
+            limits:
+              memory: {{ .Values.memory }}
+          {{- if .Values.fcm.enabled }}
+          volumeMounts:
+            - name: fcm
+              mountPath: /secrets
+              readOnly: true
+          {{- end }}
+      volumes:
+        - name: setup
+          configMap:
+            name: pulse-db-setup
+        {{- if .Values.fcm.enabled }}
+        - name: fcm
+          secret:
+            secretName: pulse-fcm
+        {{- end }}

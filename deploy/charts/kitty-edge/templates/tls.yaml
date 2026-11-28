@@ -1,0 +1,36 @@
+{{- $issuer := ternary "selfsigned" "letsencrypt" .Values.tls.selfSigned -}}
+{{- if .Values.tls.selfSigned }}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+{{- else }}
+# Let's Encrypt over HTTP-01 through Traefik. No email: this file is public.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    server: {{ ternary "https://acme-staging-v02.api.letsencrypt.org/directory" "https://acme-v02.api.letsencrypt.org/directory" (eq .Values.acme.server "staging") }}
+    privateKeySecretRef:
+      name: letsencrypt-account
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: traefik
+{{- end }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kitty-tls
+spec:
+  secretName: kitty-tls
+  dnsNames:
+    - {{ .Values.host }}
+  issuerRef:
+    kind: ClusterIssuer
+    name: {{ $issuer }}

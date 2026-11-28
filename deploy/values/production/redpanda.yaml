@@ -1,0 +1,2 @@
+# Production settings for the redpanda chart (defaults: deploy/charts/redpanda/values.yaml).
+{}

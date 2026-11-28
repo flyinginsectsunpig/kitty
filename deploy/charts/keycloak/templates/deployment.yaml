@@ -1,0 +1,129 @@
+{{- define "keycloak.secret" -}}
+valueFrom:
+  secretKeyRef:
+    name: kitty-secrets
+    key: {{ . }}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    app.kubernetes.io/name: keycloak
+spec:
+  # One Keycloak at a time on one database: stop the old pod before starting the new one.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ .Values.waitImage }}
+          command: ["sh", "-c", "until pg_isready -h postgres -U postgres; do sleep 2; done"]
+      containers:
+        - name: keycloak
+          image: {{ .Values.image }}
+          args: ["start", "--import-realm"]
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://postgres:5432/keycloak
+            - name: KC_DB_USERNAME
+              value: postgres
+            - name: KC_DB_PASSWORD
+              {{- include "keycloak.secret" "POSTGRES_PASSWORD" | nindent 14 }}
+            - name: KC_HTTP_ENABLED
+              value: "true" # TLS ends at Traefik
+            - name: KC_HTTP_RELATIVE_PATH
+              value: /auth
+            - name: KC_HOSTNAME
+              value: https://{{ .Values.host }}/auth
+            # The admin console is not public; reach it with kubectl port-forward (see the Service).
+            - name: KC_HOSTNAME_ADMIN
+              value: http://localhost:8180/auth
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: admin
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              {{- include "keycloak.secret" "KEYCLOAK_ADMIN_PASSWORD" | nindent 14 }}
+            # Placeholders substituted into kitty-realm.json on first import:
+            - name: KITTY_PUBLIC_URL
+              value: https://{{ .Values.host }}
+            - name: KITTY_WEB_CLIENT_SECRET
+              {{- include "keycloak.secret" "KITTY_WEB_CLIENT_SECRET" | nindent 14 }}
+            - name: PULSE_CLIENT_SECRET
+              {{- include "keycloak.secret" "PULSE_CLIENT_SECRET" | nindent 14 }}
+            - name: KITTY_MCP_CLIENT_SECRET
+              {{- include "keycloak.secret" "KITTY_MCP_CLIENT_SECRET" | nindent 14 }}
+            - name: KITTY_VERIFY_EMAIL
+              value: {{ .Values.verifyEmail | quote }}
+            - name: SMTP_HOST
+              value: {{ .Values.smtp.host | quote }}
+            - name: SMTP_PORT
+              value: {{ .Values.smtp.port | quote }}
+            - name: SMTP_FROM
+              {{- include "keycloak.secret" "SMTP_FROM" | nindent 14 }}
+            - name: SMTP_AUTH
+              value: "true"
+            - name: SMTP_USER
+              {{- include "keycloak.secret" "SMTP_USER" | nindent 14 }}
+            - name: SMTP_PASSWORD
+              {{- include "keycloak.secret" "SMTP_PASSWORD" | nindent 14 }}
+            - name: SMTP_SSL
+              value: {{ .Values.smtp.ssl | quote }}
+            - name: SMTP_STARTTLS
+              value: {{ .Values.smtp.starttls | quote }}
+            - name: GOOGLE_ENABLED
+              value: {{ .Values.googleEnabled | quote }}
+            - name: GOOGLE_CLIENT_ID
+              {{- include "keycloak.secret" "GOOGLE_CLIENT_ID" | nindent 14 }}
+            - name: GOOGLE_CLIENT_SECRET
+              {{- include "keycloak.secret" "GOOGLE_CLIENT_SECRET" | nindent 14 }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          # Keycloak 26 serves health on its management port, under the same /auth relative path.
+          startupProbe:
+            httpGet:
+              path: /auth/health/started
+              port: management
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /auth/health/ready
+              port: management
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /auth/health/live
+              port: management
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 100m
+              memory: {{ .Values.memory }}
+            limits:
+              memory: {{ .Values.memory }}
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import/kitty-realm.json
+              subPath: kitty-realm.json
+              readOnly: true
+      volumes:
+        - name: realm
+          configMap:
+            name: keycloak-realm

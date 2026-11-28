@@ -1,0 +1,7 @@
+# The ledger (.NET): groups, expenses, balances; the public API under /api and gRPC for pulse on 8082.
+image:
+  repository: ghcr.io/flyinginsectsunpig/kitty-ledger
+  tag: sha-0000000
+host: kitty.localhost
+memory: 512Mi
+waitImage: busybox:1.37
