@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars (git-ignored) and fill in (deploy/k3s/RUNBOOK.md, "Observability").
+grafana_url               = "https://<your stack>.grafana.net"
+grafana_token             = "<service-account token with Editor on the stack>"
+alert_email               = "<where alerts go>"
+prometheus_datasource_uid = "grafanacloud-prom"

@@ -97,6 +97,9 @@ spec:
               value: none
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: deployment.environment.name={{ $.Values.otel.environment }}
+            # Stable HTTP metric names (http.server.request.duration, in seconds), the same as the ledger's.
+            - name: OTEL_SEMCONV_STABILITY_OPT_IN
+              value: http
             {{- end }}
           ports:
             - name: http

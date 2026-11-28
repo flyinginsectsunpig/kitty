@@ -11,7 +11,7 @@ SERVICE = {"kitty-ledger": "ledger", "kitty-web": "web", "kitty-ai": "ai", "kitt
 HELPERS = {"POSTGRES_PASSWORD", "BLOB_ACCOUNT_KEY", "AI_DB_PASSWORD", "PULSE_DB_PASSWORD", "SMTP_FROM"}
 # OpenTelemetry's standard variables (phase 5b), only when the chart's otel.endpoint is set.
 OTEL = {"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_PROTOCOL", "OTEL_SERVICE_NAME", "OTEL_LOGS_EXPORTER",
-        "OTEL_RESOURCE_ATTRIBUTES"}
+        "OTEL_RESOURCE_ATTRIBUTES", "OTEL_SEMCONV_STABILITY_OPT_IN"}
 LIMITS = {"kitty-ledger": "512Mi", "kitty-web": "512Mi", "kitty-ai": "1500Mi", "kitty-pulse": "128Mi"}
 
 
@@ -131,3 +131,9 @@ def test_otel_env_in_production(chart):
 @pytest.mark.parametrize("chart", KITTY_CHARTS)
 def test_no_otel_env_without_endpoint(chart):
     assert not OTEL & set(env(main(chart, "--set", "otel.endpoint=")))
+
+
+def test_ai_uses_the_stable_http_metric_names():
+    # FastAPI's instrumentation still defaults to http.server.duration (ms); opted in, it emits
+    # http.server.request.duration (s) like the ledger, so one p95 and error-rate query covers both.
+    assert env(main("kitty-ai"))["OTEL_SEMCONV_STABILITY_OPT_IN"]["value"] == "http"
