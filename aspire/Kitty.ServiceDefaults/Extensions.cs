@@ -34,14 +34,19 @@ public static class ServiceDefaultsExtensions
 
     private static void ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
-        builder.Logging.AddOpenTelemetry(logging =>
+        // OTEL_LOGS_EXPORTER=none (production): logs reach Grafana once, through the collector reading stdout.
+        if (!string.Equals(builder.Configuration["OTEL_LOGS_EXPORTER"], "none", StringComparison.OrdinalIgnoreCase))
         {
-            logging.IncludeFormattedMessage = true;
-            logging.IncludeScopes = true;
-        });
+            builder.Logging.AddOpenTelemetry(logging =>
+            {
+                logging.IncludeFormattedMessage = true;
+                logging.IncludeScopes = true;
+            });
+        }
 
         builder.Services.AddOpenTelemetry()
             .WithMetrics(metrics => metrics
+                .AddMeter(builder.Environment.ApplicationName) // the service's own counters (e.g. Kitty.Ledger)
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation())

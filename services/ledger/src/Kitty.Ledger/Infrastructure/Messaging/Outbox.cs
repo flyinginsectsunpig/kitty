@@ -6,6 +6,7 @@ using Kitty.Ledger.Domain.Recurring;
 using Kitty.Ledger.Data;
 using Kitty.Ledger.Data.Entities;
 using Kitty.Ledger.Infrastructure;
+using Kitty.Ledger.Infrastructure.Telemetry;
 
 namespace Kitty.Ledger.Infrastructure.Messaging;
 
@@ -24,6 +25,7 @@ public sealed class Outbox(LedgerDbContext db, TimeProvider clock)
             Type = message.Descriptor.FullName,
             Payload = message.ToByteArray(),
             OccurredAt = clock.NowMicros(),
+            TraceParent = LedgerTelemetry.CurrentTraceParent(),
         });
 
     public void ExpenseChanged(Guid groupId, Guid expenseId, ExpenseChanged.Types.Change change) =>

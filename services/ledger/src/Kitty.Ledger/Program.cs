@@ -1,3 +1,5 @@
+using Npgsql;
+using OpenTelemetry.Trace;
 using Kitty.Ledger.Data;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -28,6 +30,9 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+// Database calls in the same traces (phase 5b). Npgsql records the SQL text with $n placeholders, never values;
+// the collector drops the statement anyway and keeps the operation and table.
+builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing.AddNpgsql());
 builder.Services.AddProblemDetails();
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
