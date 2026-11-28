@@ -133,7 +133,12 @@ def test_traefik_config():
     assert v["ports"]["web"]["nodePort"] == 30080
     assert v["ports"]["websecure"]["nodePort"] == 30443
     assert v["service"]["spec"]["externalTrafficPolicy"] == "Local"
-    assert v["logs"]["access"]["enabled"] is True
+    # Traefik chart 41.6 (k3s v1.37) reads the access log from top-level accessLog; logs.access is silently ignored.
+    assert v["accessLog"]["enabled"] is True
+    assert "logs" not in v
+    # Prometheus metrics on the "metrics" entrypoint, port 9100: the collector scrapes them (phase 5b).
+    assert v["metrics"]["prometheus"]["entryPoint"] == "metrics"
+    assert v["ports"]["metrics"]["port"] == 9100
 
 
 def test_deny_backend():
