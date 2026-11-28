@@ -137,3 +137,12 @@ def test_ai_uses_the_stable_http_metric_names():
     # FastAPI's instrumentation still defaults to http.server.duration (ms); opted in, it emits
     # http.server.request.duration (s) like the ledger, so one p95 and error-rate query covers both.
     assert env(main("kitty-ai"))["OTEL_SEMCONV_STABILITY_OPT_IN"]["value"] == "http"
+
+
+def test_web_probes_send_no_http_requests():
+    # An HTTP probe of "/" renders the home page every 10 s: a trace (and its ledger calls) nobody asked for,
+    # which the Collector's /health filter can't tell apart. A TCP check proves Next.js is listening, no trace.
+    c = main("kitty-web")
+    for probe in ("readinessProbe", "livenessProbe"):
+        assert "httpGet" not in c[probe], probe
+        assert c[probe]["tcpSocket"]["port"] == "http", probe
