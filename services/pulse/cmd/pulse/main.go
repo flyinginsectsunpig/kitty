@@ -20,6 +20,8 @@ import (
 	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/kafkaconsume"
 	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/notify"
 	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/recurring"
+	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/telemetry"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health"
@@ -49,6 +51,17 @@ func run(port string) error {
 	dbURL := cfg["PULSE_DATABASE_URL"]
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Telemetry first, so everything below is traced (only when OTEL_EXPORTER_OTLP_ENDPOINT is set).
+	shutdownTelemetry, err := telemetry.Setup(ctx, "pulse")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		flush, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = shutdownTelemetry(flush)
+	}()
 
 	store, err := fx.OpenStore(ctx, dbURL)
 	if err != nil {
@@ -80,7 +93,8 @@ func run(port string) error {
 			slog.Error("schedule consumer stopped", "err", err)
 		}
 	}()
-	ledgerConn, err := recurring.NewLedgerConn(cfg["PULSE_LEDGER_GRPC"], cfg["PULSE_TOKEN_URL"], cfg["PULSE_CLIENT_SECRET"])
+	ledgerConn, err := recurring.NewLedgerConn(cfg["PULSE_LEDGER_GRPC"], cfg["PULSE_TOKEN_URL"], cfg["PULSE_CLIENT_SECRET"],
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return err
 	}
@@ -96,7 +110,7 @@ func run(port string) error {
 	if err != nil {
 		return err
 	}
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
 	fxv1.RegisterRatesServiceServer(srv, svc)
 	healthpb.RegisterHealthServer(srv, health.NewServer()) // SERVING once registered
 

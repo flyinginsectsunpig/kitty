@@ -2,6 +2,7 @@ package recurring
 
 import (
 	"context"
+	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/telemetry"
 	"log/slog"
 	"time"
 
@@ -48,6 +49,9 @@ func (s *Scheduler) Tick(ctx context.Context) error {
 				slog.WarnContext(ctx, "recurring period not added; retrying next tick",
 					"schedule", sch.ID, "period", period.Format(time.DateOnly), "err", err)
 				break
+			}
+			if err == nil {
+				telemetry.RecordRecurringAdded(ctx)
 			}
 			if err != nil {
 				slog.InfoContext(ctx, "recurring period dropped by the ledger",

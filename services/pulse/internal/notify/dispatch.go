@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/flyinginsectsunpig/kitty/services/pulse/internal/telemetry"
 	"log/slog"
 	"net/textproto"
 	"regexp"
@@ -228,6 +229,11 @@ func (d *Dispatcher) pushAll(ctx context.Context, tokens []string, m Message) er
 	var busy error
 	for _, t := range tokens {
 		res, err := d.Push.Push(ctx, t, m)
+		if res == PushSent {
+			telemetry.RecordNotification(ctx, telemetry.Push, telemetry.Sent)
+		} else {
+			telemetry.RecordNotification(ctx, telemetry.Push, telemetry.Failed)
+		}
 		switch res {
 		case PushSent:
 			sent++
@@ -251,8 +257,10 @@ func (d *Dispatcher) pushAll(ctx context.Context, tokens []string, m Message) er
 func (d *Dispatcher) mail(ctx context.Context, to string, m Message) error {
 	err := d.Mail.Send(ctx, to, m)
 	if err == nil {
+		telemetry.RecordNotification(ctx, telemetry.Email, telemetry.Sent)
 		return nil
 	}
+	telemetry.RecordNotification(ctx, telemetry.Email, telemetry.Failed)
 	err = mailError(err)
 	if IsTransient(err) {
 		return errRetry{err}
