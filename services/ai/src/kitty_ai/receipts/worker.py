@@ -24,6 +24,7 @@ from kitty_ai.receipts.extract import Extractor, RateLimited
 from kitty_ai.receipts.ocr import Ocr
 from kitty_ai.receipts.pipeline import process
 from kitty_ai.settings import Settings, postgres_conninfo
+from kitty_ai.telemetry import consumer_span, inject_headers, model_call, record_receipt
 
 log = logging.getLogger(__name__)
 
@@ -186,7 +187,7 @@ class Worker:
                     paused[(msg.topic(), msg.partition())] = (tp, float(not_before))
                     continue
                 try:
-                    self._handle(msg.value())
+                    self._handle(msg.value(), msg.headers())
                 except Exception:
                     log.exception("Handling a %s message failed; will retry it", topic)
                     consumer.seek(TopicPartition(msg.topic(), msg.partition(), msg.offset()))
@@ -196,17 +197,19 @@ class Worker:
         finally:
             consumer.close()
 
-    def _handle(self, value: bytes) -> None:
-        event = self._read_upload(value, SerializationContext(RECEIPT_UPLOADED, MessageField.VALUE))
-        key = f"{event.event_id}:{event.attempt}"
-        if self._processed.seen(key):
-            return
-        outcome = self._read_receipt(event, key)
-        if outcome is None:  # rate limited, and another retry is due
-            self._retry_later(event)
-        else:
-            self._publish(event, outcome)
-        self._processed.mark(key)
+    def _handle(self, value: bytes, headers: list | None = None) -> None:
+        # The upload's trace (the ledger's traceparent header) continues here, through every retry, to the result.
+        with consumer_span("receipt.read", headers):
+            event = self._read_upload(value, SerializationContext(RECEIPT_UPLOADED, MessageField.VALUE))
+            key = f"{event.event_id}:{event.attempt}"
+            if self._processed.seen(key):
+                return
+            outcome = self._read_receipt(event, key)
+            if outcome is None:  # rate limited, and another retry is due
+                self._retry_later(event)
+            else:
+                self._publish(event, outcome)
+            self._processed.mark(key)
 
     def _read_receipt(self, event: pb.ReceiptUploaded, key: str) -> pb.ParsedReceipt | int | None:
         if self._processed.started(key) > MAX_STARTS:
@@ -220,7 +223,8 @@ class Worker:
         if len(image) > MAX_PHOTO_BYTES:
             return Reason.UNREADABLE
         try:
-            return process(image, self._ocr, self._extractor, event.currency)
+            with model_call("receipt"):
+                return process(image, self._ocr, self._extractor, event.currency)
         except RateLimited:
             return None if event.attempt < len(self._retry_delays) else Reason.RATE_LIMITED
         except Exception:
@@ -234,7 +238,7 @@ class Worker:
         not_before = time.time() + self._retry_delays[event.attempt]
         value = self._write_upload(retry, SerializationContext(RECEIPT_RETRY, MessageField.VALUE))
         self._producer.produce(
-            RECEIPT_RETRY, key=event.session_id, value=value, headers=[(NOT_BEFORE, str(not_before))]
+            RECEIPT_RETRY, key=event.session_id, value=value, headers=[(NOT_BEFORE, str(not_before)), *inject_headers()]
         )
         if self._producer.flush(10):
             raise RuntimeError("retry was not delivered")
@@ -248,6 +252,7 @@ class Worker:
         else:
             result.failed.reason = outcome
         value = self._write_result(result, SerializationContext(RECEIPT_PARSED, MessageField.VALUE))
-        self._producer.produce(RECEIPT_PARSED, key=event.session_id, value=value)
+        self._producer.produce(RECEIPT_PARSED, key=event.session_id, value=value, headers=inject_headers())
+        record_receipt("parsed" if isinstance(outcome, pb.ParsedReceipt) else Reason.Name(outcome).lower())
         if self._producer.flush(10):
             raise RuntimeError("result was not delivered")
