@@ -66,3 +66,26 @@ else
   where="server only (no $PAR_FILE)"
 fi
 echo "$(date -u +%FT%TZ) backup ok: $name, $(du -h "$OUT_DIR/$name" | cut -f1), kept on $where"
+
+# k3s: tell the OpenTelemetry collector the backup succeeded (gauges kitty.backup.last_success, in Unix seconds,
+# and kitty.backup.size_bytes), for the "no backup for 26 hours" alert. Reporting never fails the backup itself.
+report_backup() { # <bytes>
+  local ip now body
+  ip=$(kubectl -n observability get svc otel-collector -o jsonpath='{.spec.clusterIP}' 2>/dev/null) || ip=""
+  if [ -z "$ip" ]; then
+    echo "backup ok, but reporting it failed: no otel-collector service"
+    return 0
+  fi
+  now=$(date -u +%s)
+  body='{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"kitty-backup"}}]},'
+  body+='"scopeMetrics":[{"scope":{"name":"kitty-backup"},"metrics":['
+  body+='{"name":"kitty.backup.last_success","unit":"s","gauge":{"dataPoints":[{"asInt":"'"$now"'","timeUnixNano":"'"$now"'000000000"}]}},'
+  body+='{"name":"kitty.backup.size_bytes","unit":"By","gauge":{"dataPoints":[{"asInt":"'"$1"'","timeUnixNano":"'"$now"'000000000"}]}}'
+  body+=']}]}]}'
+  if ! curl -fsS -m 10 -X POST -H 'Content-Type: application/json' -d "$body" "http://$ip:4318/v1/metrics" >/dev/null; then
+    echo "backup ok, but reporting it failed: the collector at $ip didn't take it"
+  fi
+}
+if [ "$TARGET" = k3s ]; then
+  report_backup "$(wc -c < "$OUT_DIR/$name" | tr -d ' ')"
+fi
