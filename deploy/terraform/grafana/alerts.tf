@@ -48,15 +48,17 @@ resource "grafana_rule_group" "kitty" {
     }
   }
 
-  # A Kitty container not ready for the whole last 10 minutes (crash-looping, stuck starting, failing probes).
+  # A Kitty pod not ready for 10 minutes in a row (stuck starting, failing probes), or crash-looping (2+ restarts in
+  # 10 minutes, which the readiness check alone misses: a crashing pod is briefly ready between restarts).
+  # A slow start shorter than 10 minutes, or a single restart, doesn't fire.
   rule {
     name           = "pod-unhealthy"
     condition      = "C"
-    for            = "0s"
+    for            = "10m"
     no_data_state  = "OK"
     exec_err_state = "Error"
     annotations = {
-      summary = "{{ $labels.k8s_pod_name }} has not been ready for 10 minutes."
+      summary = "{{ $labels.k8s_pod_name }} has been unready or restarting for 10 minutes (kubectl -n kitty describe pod)."
     }
     data {
       ref_id         = "A"
@@ -67,7 +69,19 @@ resource "grafana_rule_group" "kitty" {
       }
       model = jsonencode({
         refId = "A", instant = true, datasource = local.prometheus
-        expr  = "max by (k8s_pod_name) (max_over_time(k8s_container_ready{k8s_namespace_name=\"kitty\"}[10m]))"
+        expr  = "min by (k8s_pod_name) (k8s_container_ready{k8s_namespace_name=\"kitty\"})"
+      })
+    }
+    data {
+      ref_id         = "B"
+      datasource_uid = var.prometheus_datasource_uid
+      relative_time_range {
+        from = 600
+        to   = 0
+      }
+      model = jsonencode({
+        refId = "B", instant = true, datasource = local.prometheus
+        expr  = "max by (k8s_pod_name) (delta(k8s_container_restarts{k8s_namespace_name=\"kitty\"}[10m]))"
       })
     }
     data {
@@ -78,8 +92,7 @@ resource "grafana_rule_group" "kitty" {
         to   = 0
       }
       model = jsonencode({
-        refId      = "C", type = "threshold", expression = "A", datasource = local.expression
-        conditions = [{ evaluator = { type = "lt", params = [1] } }]
+        refId = "C", type = "math", expression = "$A < 1 || $B >= 2", datasource = local.expression
       })
     }
   }

@@ -26,7 +26,9 @@ def rule(name: str) -> str:
     ("name", "needles"),
     [
         ("error-rate", ["0.05", ">= 20", "[10m]", 'http_response_status_code=~\\"5..\\"']),
-        ("pod-unhealthy", ["k8s_container_ready", "[10m]", 'k8s_namespace_name=\\"kitty\\"']),
+        # Not ready for 10 minutes in a row (a slow start doesn't fire), or a crash loop (2+ restarts in 10 minutes).
+        ("pod-unhealthy", ["k8s_container_ready", "k8s_container_restarts", ">= 2", "FOR_10M",
+                           'k8s_namespace_name=\\"kitty\\"']),
         ("backup-missing", ["kitty_backup_last_success_seconds", "93600", "NO_DATA_ALERTS"]),
         ("certificate-expiring", ["certmanager_certificate_expiration_timestamp_seconds", "1209600"]),
         ("collector-silent", ["otelcol_exporter_sent_metric_points_total", "[15m]", "NO_DATA_ALERTS"]),
@@ -37,6 +39,8 @@ def test_five_alerts_with_spec_thresholds(name, needles):
     for needle in needles:
         if needle == "NO_DATA_ALERTS":  # silence itself is the problem for these two
             assert re.search(r'no_data_state\s*=\s*"Alerting"', body), name
+        elif needle == "FOR_10M":
+            assert re.search(r'for\s*=\s*"10m"', body), name
         else:
             assert needle in body, (name, needle)
 
