@@ -5,3 +5,7 @@ image:
 host: kitty.localhost
 memory: 512Mi
 waitImage: busybox:1.37
+# OpenTelemetry: the Collector's OTLP/HTTP address; empty = no telemetry exported.
+otel:
+  endpoint: ""
+  environment: production

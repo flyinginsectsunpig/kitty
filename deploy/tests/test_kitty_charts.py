@@ -9,6 +9,9 @@ HOST = "kitty-split.duckdns.org"
 SERVICE = {"kitty-ledger": "ledger", "kitty-web": "web", "kitty-ai": "ai", "kitty-pulse": "pulse"}
 # Variables Kubernetes needs only to build other values with $(NAME) (Compose interpolated them from .env instead).
 HELPERS = {"POSTGRES_PASSWORD", "BLOB_ACCOUNT_KEY", "AI_DB_PASSWORD", "PULSE_DB_PASSWORD", "SMTP_FROM"}
+# OpenTelemetry's standard variables (phase 5b), only when the chart's otel.endpoint is set.
+OTEL = {"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_PROTOCOL", "OTEL_SERVICE_NAME", "OTEL_LOGS_EXPORTER",
+        "OTEL_RESOURCE_ATTRIBUTES"}
 LIMITS = {"kitty-ledger": "512Mi", "kitty-web": "512Mi", "kitty-ai": "1500Mi", "kitty-pulse": "128Mi"}
 
 
@@ -25,7 +28,7 @@ def test_env_names_match_compose(chart):
     names = set(env(main(chart)))
     wanted = set(compose()["services"][SERVICE[chart]]["environment"])
     assert wanted <= names, f"missing: {sorted(wanted - names)}"
-    assert names - wanted <= HELPERS, f"unexpected: {sorted(names - wanted - HELPERS)}"
+    assert names - wanted <= HELPERS | OTEL, f"unexpected: {sorted(names - wanted - HELPERS - OTEL)}"
 
 
 @pytest.mark.parametrize("chart", KITTY_CHARTS)
@@ -113,3 +116,18 @@ def test_services_keep_compose_names(chart, ports):
     svc = one(render(chart), "Service", SERVICE[chart])
     assert {p["port"] for p in svc["spec"]["ports"]} == ports
     assert svc["spec"]["selector"] == {"app.kubernetes.io/name": chart}
+
+
+@pytest.mark.parametrize("chart", KITTY_CHARTS)
+def test_otel_env_in_production(chart):
+    e = env(main(chart))
+    assert e["OTEL_EXPORTER_OTLP_ENDPOINT"]["value"] == "http://otel-collector.observability:4318"
+    assert e["OTEL_EXPORTER_OTLP_PROTOCOL"]["value"] == "http/protobuf"
+    assert e["OTEL_SERVICE_NAME"]["value"] == SERVICE[chart]
+    assert e["OTEL_LOGS_EXPORTER"]["value"] == "none"  # logs reach Grafana once, through the Collector's file_log
+    assert e["OTEL_RESOURCE_ATTRIBUTES"]["value"] == "deployment.environment.name=production"
+
+
+@pytest.mark.parametrize("chart", KITTY_CHARTS)
+def test_no_otel_env_without_endpoint(chart):
+    assert not OTEL & set(env(main(chart, "--set", "otel.endpoint=")))
