@@ -75,6 +75,29 @@ spec:
     namespace: cert-manager
   {{- include "apps.sync" . | nindent 2 }}
 ---
+# The OpenTelemetry Collector: the upstream chart, with its values from this repository (source ref "values").
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: otel-collector
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: {{ .Values.otelCollector.repoURL }}
+      chart: opentelemetry-collector
+      targetRevision: {{ .Values.otelCollector.version }}
+      helm:
+        valueFiles:
+          - $values/deploy/values/production/otel-collector.yaml
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ $rev }}
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  {{- include "apps.sync" . | nindent 2 }}
+---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

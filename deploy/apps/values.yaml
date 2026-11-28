@@ -19,6 +19,9 @@ charts:
 # Upstream charts, pinned.
 certManager:
   version: v1.21.3
+otelCollector:
+  repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+  version: 0.183.2
 sealedSecrets:
   # Published as GitHub releases only (its Pages chart repo is gone), so Argo CD reads the chart from the tag.
   repoURL: https://github.com/bitnami-labs/sealed-secrets.git

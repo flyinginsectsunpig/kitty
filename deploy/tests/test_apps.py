@@ -64,16 +64,17 @@ def test_stateful_volumes_are_kept(chart):
 
 def test_versions_are_pinned():
     for name, app in apps().items():
-        src = app["spec"]["source"]
-        if src["repoURL"].startswith("https://github.com/flyinginsectsunpig/"):
-            continue
-        assert re.fullmatch(r"v?\d+\.\d+\.\d+|helm-v\d+\.\d+\.\d+", src["targetRevision"]), name
+        for src in app["spec"].get("sources") or [app["spec"]["source"]]:
+            if src["repoURL"].startswith("https://github.com/flyinginsectsunpig/"):
+                continue
+            assert re.fullmatch(r"v?\d+\.\d+\.\d+|helm-v\d+\.\d+\.\d+", src["targetRevision"]), name
 
 
 def test_revision_is_a_parameter():
     found = apps("some-branch")
-    ours = [a for a in found.values() if a["spec"]["source"]["repoURL"].startswith("https://github.com/flyinginsectsunpig/")]
-    assert ours and all(a["spec"]["source"]["targetRevision"] == "some-branch" for a in ours)
+    ours = [s for a in found.values() for s in (a["spec"].get("sources") or [a["spec"]["source"]])
+            if s["repoURL"].startswith("https://github.com/flyinginsectsunpig/")]
+    assert ours and all(s["targetRevision"] == "some-branch" for s in ours)
     root = (REPO / "deploy" / "k3s" / "root-app.yaml").read_text(encoding="utf-8")
     assert "targetRevision: REVISION" in root
     for f in (REPO / "deploy" / "apps").rglob("*.yaml"):
