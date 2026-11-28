@@ -106,7 +106,8 @@ deploy/compose/smoke.sh "$HOST" --insecure || failures=$((failures + 1))
 echo "== telemetry reaches the collector, scrubbed"
 sleep 20 # the services and the collector export in batches
 otel_logs=$(kubectl -n observability logs ds/otel-collector-agent --since=60m 2>/dev/null || true)
-has() { printf '%s' "$otel_logs" | grep -qF "$1" && echo yes || echo no; }
+# Not printf | grep -q: grep quits at the first match, printf gets SIGPIPE, and pipefail turns "found" into "no".
+has() { grep -qF "$1" <<<"$otel_logs" && echo yes || echo no; }
 expect "a ledger span reached the collector" yes "$(has 'service.name: Str(ledger)')"
 expect "with Kubernetes attributes" yes "$(has 'k8s.namespace.name: Str(kitty)')"
 expect "no client address, full URL or bearer token in what would leave" 0 \
