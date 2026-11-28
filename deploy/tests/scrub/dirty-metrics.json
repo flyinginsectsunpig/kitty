@@ -1,20 +1,127 @@
-{"resourceMetrics": [{
-  "resource": {"attributes": [
-    {"key": "service.name", "value": {"stringValue": "ai"}},
-    {"key": "k8s.namespace.name", "value": {"stringValue": "kitty"}}
-  ]},
-  "scopeMetrics": [{"scope": {"name": "test"}, "metrics": [
-    {"name": "kitty.receipts.read", "sum": {"aggregationTemporality": 2, "isMonotonic": true, "dataPoints": [
-      {"asInt": "3", "timeUnixNano": "1700000000000000000",
-       "attributes": [{"key": "outcome", "value": {"stringValue": "parsed"}}]}
-    ]}},
-    {"name": "http.server.request.duration", "gauge": {"dataPoints": [
-      {"asDouble": 0.12, "timeUnixNano": "1700000000000000000",
-       "attributes": [
-         {"key": "http.route", "value": {"stringValue": "/groups/{groupId}/expenses"}},
-         {"key": "url.path", "value": {"stringValue": "/random/123"}},
-         {"key": "client.address", "value": {"stringValue": "10.0.0.213"}}
-       ]}
-    ]}}
-  ]}]
-}]}
+{
+ "resourceMetrics": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "ai"
+      }
+     },
+     {
+      "key": "k8s.namespace.name",
+      "value": {
+       "stringValue": "kitty"
+      }
+     }
+    ]
+   },
+   "scopeMetrics": [
+    {
+     "scope": {
+      "name": "test"
+     },
+     "metrics": [
+      {
+       "name": "kitty.receipts.read",
+       "sum": {
+        "aggregationTemporality": 2,
+        "isMonotonic": true,
+        "dataPoints": [
+         {
+          "asInt": "3",
+          "timeUnixNano": "1700000000000000000",
+          "attributes": [
+           {
+            "key": "outcome",
+            "value": {
+             "stringValue": "parsed"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "name": "http.server.request.duration",
+       "gauge": {
+        "dataPoints": [
+         {
+          "asDouble": 0.12,
+          "timeUnixNano": "1700000000000000000",
+          "attributes": [
+           {
+            "key": "http.route",
+            "value": {
+             "stringValue": "/groups/{groupId}/expenses"
+            }
+           },
+           {
+            "key": "url.path",
+            "value": {
+             "stringValue": "/random/123"
+            }
+           },
+           {
+            "key": "client.address",
+            "value": {
+             "stringValue": "10.0.0.213"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "name": "kestrel.active_connections",
+       "gauge": {
+        "dataPoints": [
+         {
+          "asInt": "1",
+          "timeUnixNano": "1700000000000000000"
+         }
+        ]
+       }
+      },
+      {
+       "name": "k8s.volume.available",
+       "gauge": {
+        "dataPoints": [
+         {
+          "asInt": "1",
+          "timeUnixNano": "1700000000000000000"
+         }
+        ]
+       }
+      },
+      {
+       "name": "go_goroutines",
+       "gauge": {
+        "dataPoints": [
+         {
+          "asInt": "1",
+          "timeUnixNano": "1700000000000000000"
+         }
+        ]
+       }
+      },
+      {
+       "name": "certmanager_controller_sync_call_count",
+       "gauge": {
+        "dataPoints": [
+         {
+          "asInt": "1",
+          "timeUnixNano": "1700000000000000000"
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -113,7 +113,7 @@ services:
     # Blob storage for receipt photos (Azure Blob's emulator; swap for a real Azure account via BLOB_CONNECTION_STRING).
     # Its own secret account key: Azurite's default key is public knowledge.
     image: mcr.microsoft.com/azure-storage/azurite:3.37.0
-    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--location", "/data", "--skipApiVersionCheck", "--loose"]
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--location", "/data", "--skipApiVersionCheck", "--loose", "--silent"]
     environment:
       AZURITE_ACCOUNTS: kitty:${BLOB_ACCOUNT_KEY:?set BLOB_ACCOUNT_KEY}
     volumes:

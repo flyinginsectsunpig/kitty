@@ -84,3 +84,8 @@ def test_services_keep_compose_names(chart, ports):
     assert svc["spec"]["selector"] == {"app.kubernetes.io/name": chart}
     assert pod_spec(workload(chart)) is not None
     assert workload(chart)["spec"]["template"]["metadata"]["labels"]["app.kubernetes.io/name"] == chart
+
+
+def test_azurite_does_not_log_signed_urls():
+    # Its access log would print each upload's SAS URL, whose sig= is a write token.
+    assert "--silent" in container(workload("azurite"))["args"]

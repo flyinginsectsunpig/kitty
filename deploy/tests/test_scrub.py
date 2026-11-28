@@ -17,8 +17,12 @@ IMAGE = "otel/opentelemetry-collector-contrib:0.165.0"
 FIXTURES = REPO / "deploy" / "tests" / "scrub"
 SCRUBBERS = ["filter/noise", "attributes/kitty", "transform/kitty"]
 LEAKS = ["bob@", "eyJ", "Bearer", "abc123", "client.address", "ClientHost", "url.query", "url.full", "url.path",
-         "RequestPath", "Pizza", "enduser.", "AIzaSy", "AQ.Ab", "10.0.0.213", "http.request.header", "db.statement"]
-KEPT = ["/groups/{groupId}/expenses", "SELECT", "expenses", "kitty.receipts.read"]
+         "RequestPath", "Pizza", "enduser.", "AIzaSy", "AQ.Ab", "10.0.0.213", "http.request.header", "db.statement",
+         # review fix pass: span names, events, status, resources; Keycloak details, SAS URLs, IPv6; series budget
+         "x=1", "frank@", "dave@", "erin@", "carol.typed", "Carol", "SASsecretSIG", "2001:db8", "kestrel.",
+         "k8s.volume", "go_goroutines", "certmanager_controller"]
+KEPT = ["/groups/{groupId}/expenses", "SELECT", "expenses", "kitty.receipts.read", "fetch POST", "LOGIN_ERROR",
+        "user_not_found", "exception"]
 
 
 def docker_ok() -> bool:

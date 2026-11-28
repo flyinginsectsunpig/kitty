@@ -1,33 +1,173 @@
-{"resourceSpans": [{
-  "resource": {"attributes": [
-    {"key": "service.name", "value": {"stringValue": "ledger"}},
-    {"key": "k8s.namespace.name", "value": {"stringValue": "kitty"}}
-  ]},
-  "scopeSpans": [{"scope": {"name": "test"}, "spans": [
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "ledger"
+      }
+     },
+     {
+      "key": "k8s.namespace.name",
+      "value": {
+       "stringValue": "kitty"
+      }
+     },
+     {
+      "key": "process.command_args",
+      "value": {
+       "stringValue": "--token eyJhbGciOiJIUzI1NiJ9.e30.sig --mail erin@example.com"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
     {
-      "traceId": "5b8efff798038103d269b633813fc60c", "spanId": "eee19b7ec3c1b174",
-      "name": "GET /groups/{groupId}/expenses", "kind": 2,
-      "startTimeUnixNano": "1700000000000000000", "endTimeUnixNano": "1700000000100000000",
-      "attributes": [
-        {"key": "http.route", "value": {"stringValue": "/groups/{groupId}/expenses"}},
-        {"key": "http.response.status_code", "value": {"intValue": "200"}},
-        {"key": "url.full", "value": {"stringValue": "https://kitty.test/api/invites/abc123/join?x=1"}},
-        {"key": "url.path", "value": {"stringValue": "/api/invites/abc123/join"}},
-        {"key": "url.query", "value": {"stringValue": "x=1"}},
-        {"key": "client.address", "value": {"stringValue": "10.0.0.213"}},
-        {"key": "http.request.header.authorization", "value": {"arrayValue": {"values": [{"stringValue": "Bearer eyJhbGciOiJIUzI1NiJ9.e30.sig"}]}}},
-        {"key": "db.statement", "value": {"stringValue": "SELECT * FROM expenses WHERE description = 'Pizza with bob@x.com'"}},
-        {"key": "db.operation.name", "value": {"stringValue": "SELECT"}},
-        {"key": "db.collection.name", "value": {"stringValue": "expenses"}},
-        {"key": "enduser.id", "value": {"stringValue": "user-1"}},
-        {"key": "note", "value": {"stringValue": "keys AIzaSyA1b2C3d4E5f6G7h8I9j0KlMnOpQrStUvW and AQ.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdefghij"}}
-      ]
-    },
-    {
-      "traceId": "5b8efff798038103d269b633813fc60c", "spanId": "aaa19b7ec3c1b174",
-      "name": "GET /health", "kind": 2,
-      "startTimeUnixNano": "1700000000000000000", "endTimeUnixNano": "1700000000001000000",
-      "attributes": [{"key": "http.route", "value": {"stringValue": "/health"}}]
+     "scope": {
+      "name": "test"
+     },
+     "spans": [
+      {
+       "traceId": "5b8efff798038103d269b633813fc60c",
+       "spanId": "eee19b7ec3c1b174",
+       "name": "GET /groups/{groupId}/expenses",
+       "kind": 2,
+       "startTimeUnixNano": "1700000000000000000",
+       "endTimeUnixNano": "1700000000100000000",
+       "attributes": [
+        {
+         "key": "http.route",
+         "value": {
+          "stringValue": "/groups/{groupId}/expenses"
+         }
+        },
+        {
+         "key": "http.response.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        },
+        {
+         "key": "url.full",
+         "value": {
+          "stringValue": "https://kitty.test/api/invites/abc123/join?x=1"
+         }
+        },
+        {
+         "key": "url.path",
+         "value": {
+          "stringValue": "/api/invites/abc123/join"
+         }
+        },
+        {
+         "key": "url.query",
+         "value": {
+          "stringValue": "x=1"
+         }
+        },
+        {
+         "key": "client.address",
+         "value": {
+          "stringValue": "10.0.0.213"
+         }
+        },
+        {
+         "key": "http.request.header.authorization",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "Bearer eyJhbGciOiJIUzI1NiJ9.e30.sig"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "db.statement",
+         "value": {
+          "stringValue": "SELECT * FROM expenses WHERE description = 'Pizza with bob@x.com'"
+         }
+        },
+        {
+         "key": "db.operation.name",
+         "value": {
+          "stringValue": "SELECT"
+         }
+        },
+        {
+         "key": "db.collection.name",
+         "value": {
+          "stringValue": "expenses"
+         }
+        },
+        {
+         "key": "enduser.id",
+         "value": {
+          "stringValue": "user-1"
+         }
+        },
+        {
+         "key": "note",
+         "value": {
+          "stringValue": "keys AIzaSyA1b2C3d4E5f6G7h8I9j0KlMnOpQrStUvW and AQ.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdefghij"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "5b8efff798038103d269b633813fc60c",
+       "spanId": "aaa19b7ec3c1b174",
+       "name": "GET /health",
+       "kind": 2,
+       "startTimeUnixNano": "1700000000000000000",
+       "endTimeUnixNano": "1700000000001000000",
+       "attributes": [
+        {
+         "key": "http.route",
+         "value": {
+          "stringValue": "/health"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "5b8efff798038103d269b633813fc60c",
+       "spanId": "bbb19b7ec3c1b174",
+       "name": "fetch POST http://ledger:8080/invites/abc123/accept?x=1",
+       "kind": 3,
+       "startTimeUnixNano": "1700000000000000000",
+       "endTimeUnixNano": "1700000000002000000",
+       "status": {
+        "code": 2,
+        "message": "failed for frank@example.com"
+       },
+       "events": [
+        {
+         "name": "exception",
+         "timeUnixNano": "1700000000001000000",
+         "attributes": [
+          {
+           "key": "exception.message",
+           "value": {
+            "stringValue": "duplicate key for dave@example.com"
+           }
+          },
+          {
+           "key": "exception.stacktrace",
+           "value": {
+            "stringValue": "at Send(Bearer eyJhbGciOiJIUzI1NiJ9.e30.sig)"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
     }
-  ]}]
-}]}
+   ]
+  }
+ ]
+}
